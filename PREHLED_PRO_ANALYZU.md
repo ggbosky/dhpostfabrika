@@ -33,8 +33,7 @@ Do té doby se používá výchozí profil, který je pouze **odhad** (označen�
 ## 3. Technologie
 
 - **Python 3.10+**
-- **Google Gemini API – free tier** (SDK `google-genai`), výchozí model `gemini-flash-latest`
-  (alias na aktuální Flash; při neexistujícím modelu automaticky zkusí záložní)
+- **Google Gemini API – free tier** (SDK `google-genai`), výchozí režim `auto` (zkouší gemini-3.8 → 3.7 → 3.6 → 3.5 → 2.5-flash a přetížené modely přeskočí)
   – text i vision, JSON výstup podle Pydantic schématu, automatické čekání při limitu (429)
 - **DuckDuckGo obrázky** (knihovna `ddgs`, nástupce `duckduckgo_search`) – bez klíče,
   filtr licence (výchozí: volně použitelné komerčně vč. úprav), blokace fotobank s vodoznakem

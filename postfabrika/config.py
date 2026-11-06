@@ -44,7 +44,7 @@ def nacti_config() -> Config:
     if licence not in LICENCE:
         raise ValueError(f"FOTO_LICENCE musí být jedno z: {', '.join(LICENCE)}")
     return Config(
-        model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
+        model=os.getenv("GEMINI_MODEL", "auto"),
         licence=licence,
         region=os.getenv("HLEDANI_REGION", "wt-wt"),
         pridat_zdroj_fota=_bool("PRIDAT_ZDROJ_FOTA", True),

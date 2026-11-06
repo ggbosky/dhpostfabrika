@@ -169,10 +169,11 @@ def test_gemini_limit_a_zalozni_model(monkeypatch):
             return SimpleNamespace(text=_post().model_dump_json(), candidates=[])
 
     monkeypatch.setattr(llm, "_klient", lambda: SimpleNamespace(models=FakeModels()))
+    monkeypatch.setattr(llm, "_fungujici_model", None)
     monkeypatch.setattr(llm.time, "sleep", lambda s: None)
     out = llm.strukturovane(model="neexistujici-model", system="s", content="c", schema=Prispevek)
     assert out.hook == _post().hook
-    assert volani == ["neexistujici-model", "gemini-flash-latest", "gemini-flash-latest"]
+    assert volani == ["neexistujici-model", "gemini-3.8-flash", "gemini-3.8-flash"]
 
 
 def test_web_rozhrani(tmp_path: Path, monkeypatch):
@@ -203,3 +204,27 @@ def test_web_rozhrani(tmp_path: Path, monkeypatch):
     assert v["text"].startswith("🚨") and v["obrazek"].endswith("obrazek.jpg")
     assert c.get(v["obrazek"]).status_code == 200
     assert len(c.get("/api/historie").json) == 1
+
+
+def test_gemini_pretizeny_model_preskoci(monkeypatch):
+    from types import SimpleNamespace
+
+    from google.genai import errors
+
+    volani = []
+
+    class FakeModels:
+        def generate_content(self, *, model, contents, config):
+            volani.append(model)
+            if model == "gemini-3.8-flash":
+                raise errors.ServerError(503, {"error": {"message": "high demand"}})
+            return SimpleNamespace(text=_post().model_dump_json(), candidates=[])
+
+    monkeypatch.setattr(llm, "_klient", lambda: SimpleNamespace(models=FakeModels()))
+    monkeypatch.setattr(llm, "_fungujici_model", None)
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    llm.strukturovane(model="auto", system="s", content="c", schema=Prispevek)
+    assert volani == ["gemini-3.8-flash", "gemini-3.8-flash", "gemini-3.7-flash"]
+    # druhé volání jde rovnou na model, který fungoval
+    llm.strukturovane(model="auto", system="s", content="c", schema=Prispevek)
+    assert volani[-1] == "gemini-3.7-flash" and len(volani) == 4
