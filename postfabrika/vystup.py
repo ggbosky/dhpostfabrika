@@ -32,7 +32,7 @@ def uloz(
     zduvodneni_fota: str | None,
     licence: str,
 ) -> Path:
-    slozka = koren / f"{dt.datetime.now():%Y-%m-%d_%H%M}_{_slug(tema)}"
+    slozka = koren / f"{dt.datetime.now():%Y-%m-%d_%H%M%S}_{_slug(tema)}"
     slozka.mkdir(parents=True, exist_ok=True)
 
     (slozka / "post.txt").write_text(text + "\n", encoding="utf-8")

@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import sys
 import webbrowser
 from pathlib import Path
 
-from . import generator, images, llm, style, vystup
+from . import images, llm, pipeline, style
 from .config import LICENCE, nacti_config
 from .llm import LLMChyba
 
@@ -44,80 +43,40 @@ def _cmd_modely(_: argparse.Namespace) -> int:
     return 0
 
 
-def _vyber_fotku(args, cfg, tema, post) -> tuple:
-    """Vrátí (obrázek, kandidát, skóre, zdůvodnění) nebo (None, None, None, None)."""
-    print(f"🔎 Hledám fotky (licence: {cfg.licence}): {' | '.join(post.obrazek_dotazy)}")
-    kandidati = images.vyhledej(post.obrazek_dotazy, cfg)
-    if not kandidati:
-        print(
-            "⚠️  Žádná vhodná fotka nenalezena. Buď nic neprošlo filtrem (zkus jinou "
-            "--licence nebo --obrazek), nebo je DuckDuckGo dočasně nedostupný / omezuje "
-            "počet dotazů (zkus to za pár minut)."
-        )
-        return None, None, None, None
-
-    print(f"🧐 Gemini Vision hodnotí {min(len(kandidati), 16)} z {len(kandidati)} kandidátů…")
-    text_bez_tagu = generator.sloz_text(post.model_copy(update={"hashtagy": []}))
-    poradi, vyber = images.ohodnot(kandidati, tema, text_bez_tagu, post.obrazek_brief, cfg.model)
-    for k, s in poradi[:3]:
-        print(f"   {s:>3} b  {k.domena}  {k.titulek[:60]}")
-
-    vysledek = images.stahni_nejlepsi(poradi, vyber, min_skore=args.min_skore)
-    if vysledek is None:
-        print(f"⚠️  Žádná fotka neprošla (min. {args.min_skore} bodů / nešla stáhnout).")
-        return None, None, None, None
-    foto, img, fx, fy, skore = vysledek
-    zduvodneni = vyber.zduvodneni if foto is poradi[0][0] else "náhradník (vítěz nešel stáhnout)"
-    print(f"   → vybráno: {foto.domena} ({skore} b) – {zduvodneni}")
-    return images.orizni_4x5(img, fx, fy), foto, skore, zduvodneni
-
-
 def _cmd_generuj(args: argparse.Namespace) -> int:
-    cfg = nacti_config()
-    if args.licence:
-        cfg = dataclasses.replace(cfg, licence=args.licence)
-    profil = style.nacti_profil(cfg.styl_soubor)
-    if profil.je_vychozi:
-        print(
-            "⚠️  Používám výchozí odhad stylu. Pro věrný styl spusť nejdřív\n"
-            "    python -m postfabrika analyzuj <export nebo txt s příspěvky>\n"
-        )
-
     tema = args.tema or input("Téma / podnět příspěvku: ").strip()
     if not tema:
         print("Téma je prázdné.")
         return 1
     fakta = Path(args.fakta_soubor).read_text(encoding="utf-8") if args.fakta_soubor else args.fakta
-
-    print("✍️  Gemini píše text…")
-    post = generator.generuj(tema, profil, cfg.model, fakta=fakta, poznamka=args.pokyn)
-
-    obrazek = foto = skore = zduvodneni = None
-    if args.obrazek:
-        print(f"🖼️  Používám vlastní obrázek {args.obrazek}")
-        obrazek = images.orizni_4x5(images.nacti_lokalni(args.obrazek))
-    elif not args.bez_obrazku:
-        obrazek, foto, skore, zduvodneni = _vyber_fotku(args, cfg, tema, post)
-
-    if obrazek is not None and not args.bez_titulku:
-        obrazek = images.pridej_titulek(obrazek, post.titulek_do_obrazku, cfg.font_path)
-
-    kredit = foto.kredit if (foto and cfg.pridat_zdroj_fota) else None
-    text = generator.sloz_text(post, kredit)
-    slozka = vystup.uloz(
-        cfg.vystup_dir, tema, post, text, obrazek, foto, skore, zduvodneni, cfg.licence
+    zadani = pipeline.Zadani(
+        tema=tema,
+        fakta=fakta,
+        pokyn=args.pokyn,
+        licence=args.licence,
+        titulek=not args.bez_titulku,
+        bez_obrazku=args.bez_obrazku,
+        vlastni_obrazek=images.nacti_lokalni(args.obrazek) if args.obrazek else None,
+        min_skore=args.min_skore,
     )
+    v = pipeline.vytvor_post(zadani, nacti_config())
 
-    print("\n" + "─" * 60 + f"\n{text}\n" + "─" * 60)
-    if post.k_overeni:
+    print("\n" + "─" * 60 + f"\n{v.text}\n" + "─" * 60)
+    if v.post.k_overeni:
         print("⚠️  Před publikací ověř:")
-        for x in post.k_overeni:
+        for x in v.post.k_overeni:
             print(f"   • {x}")
-    if foto and cfg.licence == "vse":
-        print(f"⚠️  Fotka je z webu bez licenčního filtru – ověř práva: {foto.stranka_url}")
-    print(f"\n📁 Uloženo do: {slozka}")
+    for u in v.upozorneni:
+        print(f"⚠️  {u}")
     if args.otevrit:
-        webbrowser.open((slozka / "nahled.html").resolve().as_uri())
+        webbrowser.open((v.slozka / "nahled.html").resolve().as_uri())
+    return 0
+
+
+def _cmd_web(args: argparse.Namespace) -> int:
+    from . import web
+
+    web.spust(host=args.host, port=args.port, otevrit=not args.neotvirat)
     return 0
 
 
@@ -158,10 +117,16 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--otevrit", action="store_true", help="Otevřít HTML náhled v prohlížeči")
     g.set_defaults(fn=_cmd_generuj)
 
+    w = sub.add_parser("web", help="Spustí webové rozhraní v prohlížeči")
+    w.add_argument("--host", default="127.0.0.1")
+    w.add_argument("--port", type=int, default=8000)
+    w.add_argument("--neotvirat", action="store_true", help="Neotevírat prohlížeč")
+    w.set_defaults(fn=_cmd_web)
+
     args = ap.parse_args(argv)
     if not getattr(args, "fn", None):
-        # Bez příkazu = interaktivní generování.
-        args = ap.parse_args(["generuj", "--otevrit"])
+        # Bez příkazu = webové rozhraní.
+        args = ap.parse_args(["web"])
     try:
         return args.fn(args)
     except (LLMChyba, FileNotFoundError, ValueError, RuntimeError) as e:

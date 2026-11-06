@@ -173,3 +173,33 @@ def test_gemini_limit_a_zalozni_model(monkeypatch):
     out = llm.strukturovane(model="neexistujici-model", system="s", content="c", schema=Prispevek)
     assert out.hook == _post().hook
     assert volani == ["neexistujici-model", "gemini-flash-latest", "gemini-flash-latest"]
+
+
+def test_web_rozhrani(tmp_path: Path, monkeypatch):
+    import time as _t
+
+    from postfabrika import web
+
+    monkeypatch.setattr("postfabrika.llm.strukturovane", lambda **kw: _post())
+    monkeypatch.setenv("VYSTUP_DIR", str(tmp_path))
+    c = web.app.test_client()
+
+    assert "DH Post Fabrika" in c.get("/").get_data(as_text=True)
+    assert c.get("/api/stav").json["profil"]["je_vychozi"] is True
+    assert c.post("/api/generuj", data={"tema": ""}).status_code == 400
+
+    obr = io.BytesIO(_jpeg(2000, 1500))
+    r = c.post("/api/generuj", data={"tema": "Test", "titulek": "1",
+                                     "obrazek": (obr, "foto.jpg")},
+               content_type="multipart/form-data")
+    uid = r.json["id"]
+    for _ in range(50):
+        u = c.get(f"/api/ukol/{uid}").json
+        if u["stav"] != "bezi":
+            break
+        _t.sleep(0.05)
+    assert u["stav"] == "hotovo", u
+    v = u["vysledek"]
+    assert v["text"].startswith("🚨") and v["obrazek"].endswith("obrazek.jpg")
+    assert c.get(v["obrazek"]).status_code == 200
+    assert len(c.get("/api/historie").json) == 1

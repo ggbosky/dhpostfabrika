@@ -18,7 +18,9 @@ Co aplikace udělá:
 dhpostfabrika/
 ├── postfabrika/
 │   ├── __main__.py     spuštění přes python -m postfabrika
-│   ├── cli.py          příkazy analyzuj / styl / modely / generuj
+│   ├── cli.py          příkazy web / analyzuj / styl / modely / generuj
+│   ├── web.py          webové rozhraní (Flask) na http://127.0.0.1:8000
+│   ├── pipeline.py     celý postup tvorby postu (sdílí ho web i příkazová řádka)
 │   ├── config.py       nastavení z .env
 │   ├── llm.py          Gemini API: strukturovaný JSON výstup, opakování při limitech
 │   ├── style.py        načtení IG exportu, analýza stylu, stylový profil
@@ -132,11 +134,21 @@ python -m postfabrika styl
 
 ## 4. Generování
 
-Interaktivně (zeptá se na téma a na konci otevře náhled):
+### Webové rozhraní (nejpohodlnější)
 
 ```bash
 python -m postfabrika
 ```
+
+Otevře se prohlížeč na <http://127.0.0.1:8000>:
+- **Nový post** – zadáš téma, fakta a filtr licence (případně nahraješ vlastní fotku),
+  vidíš průběh, hotový post ve stylu Instagramu, tlačítka *Kopírovat text* a
+  *Stáhnout obrázek* a všechny kandidáty s jejich skóre od Gemini Vision.
+- **Naučit styl** – nahraješ `posts_1.json` z exportu nebo vložíš své popisky.
+
+Server běží jen na tvém počítači; ukončíš ho v terminálu klávesami Ctrl+C.
+
+### Příkazová řádka
 
 Přímo s tématem a fakty (u výsledků a přestupů vždy doporučeno – Gemini nemá
 aktuální zprávy a nesmí si nic vymýšlet):
