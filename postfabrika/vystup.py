@@ -28,7 +28,9 @@ def uloz(
     text: str,
     obrazek: Image.Image | None,
     foto: Kandidat | None,
+    skore_fota: int | None,
     zduvodneni_fota: str | None,
+    licence: str,
 ) -> Path:
     slozka = koren / f"{dt.datetime.now():%Y-%m-%d_%H%M}_{_slug(tema)}"
     slozka.mkdir(parents=True, exist_ok=True)
@@ -45,30 +47,36 @@ def uloz(
         "foto": None
         if foto is None
         else {
-            "zdroj": foto.zdroj,
-            "id": foto.id,
-            "autor": foto.autor,
-            "autor_url": foto.autor_url,
+            "web": foto.domena,
             "stranka": foto.stranka_url,
+            "obrazek_url": foto.obrazek_url,
+            "popis": foto.titulek,
             "puvodni_rozliseni": f"{foto.sirka}x{foto.vyska}",
+            "skore": skore_fota,
             "proc_vybrana": zduvodneni_fota,
+            "filtr_licence": licence,
         },
     }
     (slozka / "post.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     (slozka / "nahled.html").write_text(
-        _nahled_html(text, prispevek, foto, obrazek is not None), encoding="utf-8"
+        _nahled_html(text, prispevek, foto, obrazek is not None, licence), encoding="utf-8"
     )
     return slozka
 
 
-def _nahled_html(text: str, p: Prispevek, foto: Kandidat | None, ma_obrazek: bool) -> str:
+def _nahled_html(
+    text: str, p: Prispevek, foto: Kandidat | None, ma_obrazek: bool, licence: str
+) -> str:
     e = html.escape
-    overit = "".join(f"<li>{e(x)}</li>" for x in p.k_overeni)
+    body = list(p.k_overeni)
+    if foto and licence == "vse":
+        body.append("Fotka je z webu bez licenčního filtru – ověř, že ji smíš použít.")
+    overit = "".join(f"<li>{e(x)}</li>" for x in body)
     kredit = (
-        f'<p class="meta">Foto: <a href="{e(foto.stranka_url)}">{e(foto.autor)}</a> '
-        f"({e(foto.zdroj)})</p>"
+        f'<p class="meta">Foto: <a href="{e(foto.stranka_url)}">{e(foto.domena)}</a> '
+        f"(filtr licence: {e(licence)})</p>"
         if foto
         else ""
     )

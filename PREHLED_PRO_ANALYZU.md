@@ -15,9 +15,9 @@ Repozitář: `github.com/ggbosky/dhpostfabrika`, větev `claude/intelligent-love
 
 | Oblast | Stav |
 |---|---|
-| Kód aplikace | hotový (Python, cca 700 řádků) |
-| Offline testy (Claude i fotobanky nahrazené maketami) | 6/6 prochází |
-| Ostrý běh s reálnými API | **zatím neproběhl** (v prostředí, kde vznikl kód, chyběly API klíče) |
+| Kód aplikace | hotový (Python), verze 2 – kompletně zdarma (Gemini free tier + DuckDuckGo) |
+| Offline testy (Gemini i DuckDuckGo nahrazené maketami) | 11/11 prochází |
+| Ostrý běh s reálnými API | **zatím neproběhl** (chyběl Gemini klíč; DuckDuckGo nešlo z vývojového prostředí zavolat kvůli jeho síťové proxy) |
 | Analýza reálného stylu účtu | **neproběhla** – viz níže |
 
 ### Proč není styl účtu zanalyzovaný
@@ -33,32 +33,33 @@ Do té doby se používá výchozí profil, který je pouze **odhad** (označen�
 ## 3. Technologie
 
 - **Python 3.10+**
-- **Claude API** (oficiální SDK `anthropic`), model `claude-opus-5-5` (lze změnit v `.env`)
-  – strukturovaný výstup validovaný přes Pydantic (`messages.parse`)
-  – server-side fallback při odmítnutí požadavku
-- **Pexels API + Unsplash API** – fotobanky s licencí pro bezplatné komerční použití
+- **Google Gemini API – free tier** (SDK `google-genai`), výchozí model `gemini-flash-latest`
+  (alias na aktuální Flash; při neexistujícím modelu automaticky zkusí záložní)
+  – text i vision, JSON výstup podle Pydantic schématu, automatické čekání při limitu (429)
+- **DuckDuckGo obrázky** (knihovna `ddgs`, nástupce `duckduckgo_search`) – bez klíče,
+  filtr licence (výchozí: volně použitelné komerčně vč. úprav), blokace fotobank s vodoznakem
 - **Pillow** – ořez, změna velikosti, titulek do obrázku
 - **requests, python-dotenv**
 
-Google Images záměrně nepoužité – většina obrázků je chráněná autorským právem.
+Jediný potřebný klíč: GEMINI_API_KEY zdarma z https://aistudio.google.com/apikey
 
 ## 4. Architektura a tok dat
 
 ```
 [A] analyzuj (jednorázově)
     IG export JSON / .txt  →  načtení a vyčištění popisků
-                           →  Claude: stylový profil + výběr 4–8 reprezentativních postů
+                           →  Gemini: stylový profil + výběr 4–8 reprezentativních postů
                            →  styl/profil.json
 
 [B] generuj "téma" [--fakta ...]
-    1. Claude (text):  téma + profil + ukázky  →  hook, tělo, CTA, hashtagy,
+    1. Gemini (text):  téma + profil + ukázky  →  hook, tělo, CTA, hashtagy,
                        titulek do obrázku, alt text, popis ideální fotky,
-                       3–4 anglické dotazy do fotobank, seznam faktů k ověření
-    2. Pexels + Unsplash: vyhledání podle dotazů, filtr min. 1080 px, bez duplicit
-    3. Claude (vision): až 16 náhledů (base64, 512 px) → skóre 0–100 pro každou fotku,
+                       3–4 anglické dotazy pro hledání fotek, seznam faktů k ověření
+    2. DuckDuckGo: vyhledání podle dotazů, filtr licence, min. 900 px, bez duplicit a vodoznaků
+    3. Gemini Vision: až 16 náhledů (512 px, pestře z různých webů) → skóre 0–100,
                         vítěz + souřadnice hlavního motivu (fokus_x, fokus_y)
-    4. Stažení v plném rozlišení → ořez 1080×1350 (4:5) kolem motivu
-       → volitelně titulek do spodní části fotky (tmavý přechod + bílé tučné písmo)
+    4. Stažení v plném rozlišení (když web blokuje → další v pořadí) → ořez 1080×1350 (4:5)
+       kolem motivu → titulek do spodní části fotky (tmavý přechod + bílé tučné písmo)
     5. Uložení: vystup/<datum>_<slug>/
          obrazek.jpg, post.txt, post.json, nahled.html
 ```
@@ -70,9 +71,9 @@ Google Images záměrně nepoužité – většina obrázků je chráněná auto
 | `postfabrika/cli.py` | příkazy `analyzuj`, `styl`, `generuj`; bez příkazu interaktivní režim |
 | `postfabrika/style.py` | načtení IG exportu (vč. opravy kódování), Pydantic model `StylProfil`, analýza, převod profilu do promptu |
 | `postfabrika/generator.py` | model `Prispevek`, systémový prompt copywritera, složení finálního textu |
-| `postfabrika/images.py` | vyhledání (Pexels, Unsplash), výběr fotky přes Claude vision, ořez 4:5, titulek do obrázku |
+| `postfabrika/images.py` | vyhledání (DuckDuckGo), skóre přes Gemini Vision, stažení s náhradníky, ořez 4:5, titulek do obrázku |
 | `postfabrika/vystup.py` | uložení výstupu, HTML náhled ve stylu Instagramu s tlačítkem „Kopírovat text“ |
-| `postfabrika/llm.py` | volání Claude API, ošetření chyb (klíč, limity, odmítnutí, useknutá odpověď) |
+| `postfabrika/llm.py` | volání Gemini API, JSON schéma, čekání při limitech free tieru, záložní modely |
 | `postfabrika/config.py` | konfigurace z `.env` |
 | `styl/profil.json` | aktuální stylový profil (zatím výchozí odhad) |
 | `tests/test_offline.py` | testy bez sítě |
@@ -109,16 +110,17 @@ na konci otázka na fanoušky, 5–10 hashtagů v jednom řádku
 
 1. **Styl zatím není naučený** – dokud neproběhne `analyzuj` na reálných postech,
    výstup nebude znít jako účet.
-2. **Fotobanky nemají konkrétní hráče, zápasy ani klubové dresy.** U zpráv
-   o konkrétních hráčích je fotka jen ilustrační; řešení je vlastní nebo licencovaná
-   fotka (`--obrazek`).
-3. **Neotestováno naostro** – reálná volání API (Claude, Pexels, Unsplash) zatím
-   neproběhla; možné drobné chyby v napojení.
+2. **Autorská práva k fotkám z webu.** Bez filtru licence je většina hokejových fotek
+   chráněná (ČTK, Getty, kluby). S filtrem jsou fotky bezpečnější, ale je jich méně
+   a filtr závisí na označení webu. Konkrétní hráči → vlastní/licencovaná fotka (`--obrazek`).
+3. **Neotestováno naostro** – reálná volání Gemini a DuckDuckGo zatím neproběhla.
+   DuckDuckGo nemá oficiální API; knihovna `ddgs` ho volá neoficiálně a může se rozbít
+   nebo narazit na omezení počtu dotazů.
 4. **Aktuálnost** – model nemá přístup k aktuálním výsledkům a zprávám; fakta musí
    dodat uživatel (`--fakta`).
 5. **Formát** – jen jedna fotka (žádný carousel, žádné Reels), žádné automatické
    publikování na Instagram.
-6. **Náklady** – cca 2 volání Claude na post (řádově jednotky Kč), analýza stylu jednorázově.
+6. **Limity free tieru Gemini** – 2 požadavky na post; ve free tieru může Google data použít ke zlepšování modelů.
 
 ## 10. Možná rozšíření
 
@@ -133,7 +135,8 @@ na konci otázka na fanoušky, 5–10 hashtagů v jednom řádku
 
 ```
 pip install -r requirements.txt
-cp .env.example .env        # doplnit ANTHROPIC_API_KEY + PEXELS_API_KEY a/nebo UNSPLASH_ACCESS_KEY
+cp .env.example .env        # doplnit GEMINI_API_KEY (zdarma)
+python -m postfabrika modely
 python -m postfabrika analyzuj styl/export          # nebo styl/ukazky s prispevky.txt
 python -m postfabrika generuj "Kometa podepsala útočníka z NHL" --fakta "..." --otevrit
 ```
@@ -142,7 +145,8 @@ python -m postfabrika generuj "Kometa podepsala útočníka z NHL" --fakta "..."
 
 1. Je dvoukrokový přístup (naučit styl z exportu → generovat) správný, nebo existuje
    lepší legální způsob, jak získat texty postů?
-2. Jsou Pexels/Unsplash pro hokejový zpravodajský účet dostačující, nebo je potřeba
-   jiný zdroj fotek (ČTK, Profimedia, klubové tiskové fotky, vlastní fotky)?
+2. Jaký zdroj fotek je pro hokejový zpravodajský účet nejlepší kompromis mezi kvalitou
+   a právní jistotou (DuckDuckGo s filtrem licence, Wikimedia Commons, klubové tiskové
+   fotky, vlastní fotky)?
 3. Které rozšíření z bodu 10 má největší přínos v poměru k práci?
 4. Je lepší držet nástroj jako příkazovou řádku, nebo udělat jednoduché webové rozhraní?

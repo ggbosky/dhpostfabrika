@@ -1,4 +1,5 @@
-anthropic>=2.6,<3
+google-genai>=1.50
+ddgs>=9.5
 pydantic>=2.7,<3
 requests>=2.32
 Pillow>=10.3

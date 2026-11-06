@@ -26,8 +26,9 @@ class Prispevek(BaseModel):
     )
     obrazek_dotazy: list[str] = Field(
         description=(
-            "3–4 ANGLICKÉ vyhledávací dotazy pro fotobanky (Pexels/Unsplash), od "
-            "nejkonkrétnějšího po obecný, vždy s 'ice hockey', pokud jde o lední hokej."
+            "3–4 ANGLICKÉ dotazy pro vyhledávání fotek na webu, od nejkonkrétnějšího "
+            "(jméno hráče/klubu, pokud je v zadání) po obecný; vždy s 'ice hockey', "
+            "pokud jde o lední hokej."
         )
     )
     k_overeni: list[str] = Field(
@@ -80,7 +81,6 @@ def generuj(
         ),
         content="\n\n".join(zadani),
         schema=Prispevek,
-        effort="high",
     )
     p.hashtagy = _normalizuj_hashtagy(p.hashtagy)
     return p

@@ -12,6 +12,14 @@ ROOT = Path(__file__).resolve().parent.parent
 
 load_dotenv(ROOT / ".env")
 
+# Hodnoty filtru licence v DuckDuckGo obrázcích.
+LICENCE = {
+    "vse": None,  # bez filtru – nejvíc fotek, ale většinou chráněné autorským právem
+    "komercni": "ShareCommercially",  # volně šiřitelné i komerčně (Creative Commons apod.)
+    "upravy": "ModifyCommercially",  # navíc povolené úpravy (ořez, titulek)
+    "verejne": "Public",  # public domain
+}
+
 
 def _bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
@@ -23,24 +31,23 @@ def _bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Config:
     model: str
-    pexels_key: str | None
-    unsplash_key: str | None
-    pridat_kredit_fota: bool
+    licence: str
+    region: str
+    pridat_zdroj_fota: bool
     font_path: str | None
     styl_soubor: Path
     vystup_dir: Path
 
-    @property
-    def ma_fotobanku(self) -> bool:
-        return bool(self.pexels_key or self.unsplash_key)
-
 
 def nacti_config() -> Config:
+    licence = os.getenv("FOTO_LICENCE", "upravy").strip().lower()
+    if licence not in LICENCE:
+        raise ValueError(f"FOTO_LICENCE musí být jedno z: {', '.join(LICENCE)}")
     return Config(
-        model=os.getenv("CLAUDE_MODEL", "claude-opus-5-5"),
-        pexels_key=os.getenv("PEXELS_API_KEY") or None,
-        unsplash_key=os.getenv("UNSPLASH_ACCESS_KEY") or None,
-        pridat_kredit_fota=_bool("PRIDAT_KREDIT_FOTA", True),
+        model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"),
+        licence=licence,
+        region=os.getenv("HLEDANI_REGION", "wt-wt"),
+        pridat_zdroj_fota=_bool("PRIDAT_ZDROJ_FOTA", True),
         font_path=os.getenv("FONT_PATH") or None,
         styl_soubor=Path(os.getenv("STYL_SOUBOR", ROOT / "styl" / "profil.json")),
         vystup_dir=Path(os.getenv("VYSTUP_DIR", ROOT / "vystup")),

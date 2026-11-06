@@ -1,144 +1,137 @@
-"""Vyhledání, výběr (Claude vision) a příprava fotky pro Instagram."""
+"""Vyhledání fotek (DuckDuckGo), výběr přes Gemini Vision a příprava pro Instagram."""
 
 from __future__ import annotations
 
-import base64
 import io
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
+from ddgs import DDGS
+from ddgs.exceptions import DDGSException, RatelimitException
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pydantic import BaseModel, Field
 
 from . import llm
-from .config import Config
+from .config import LICENCE, Config
 
 IG_SIRKA, IG_VYSKA = 1080, 1350  # formát 4:5 – na Instagramu zabírá nejvíc plochy
-UA = {"User-Agent": "dh-postfabrika/1.0"}
+MIN_KRATSI_STRANA = 900  # menší fotky by se musely moc zvětšovat
+MAX_VELIKOST = 20 * 1024 * 1024
 TIMEOUT = 20
+UA = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0 Safari/537.36 dh-postfabrika/2.0"
+}
+
+# Fotobanky/weby, jejichž obrázky jsou s vodoznakem nebo nejdou použít.
+BLOKOVANE_DOMENY = (
+    "gettyimages.", "istockphoto.", "shutterstock.", "alamy.", "dreamstime.",
+    "depositphotos.", "123rf.", "stock.adobe.", "agefotostock.", "vectorstock.",
+    "pinterest.", "pinimg.", "freepik.", "profimedia.", "ctkfoto.",
+)
 
 
 @dataclass
 class Kandidat:
-    zdroj: str  # "pexels" | "unsplash"
-    id: str
+    titulek: str
+    obrazek_url: str
+    nahled_url: str
+    stranka_url: str
     sirka: int
     vyska: int
-    popis: str
-    nahled_url: str
-    plna_url: str
-    autor: str
-    autor_url: str
-    stranka_url: str
-    download_location: str | None = None  # Unsplash vyžaduje "ping" při stažení
+
+    @property
+    def domena(self) -> str:
+        return urlparse(self.stranka_url or self.obrazek_url).netloc.removeprefix("www.")
 
     @property
     def kredit(self) -> str:
-        banka = "Pexels" if self.zdroj == "pexels" else "Unsplash"
-        return f"📸 {self.autor} / {banka}"
+        return f"📸 Foto: {self.domena}"
 
 
 # ------------------------------------------------------------- vyhledávání ---
 
 
-def _pexels(dotaz: str, key: str, pocet: int) -> list[Kandidat]:
-    r = requests.get(
-        "https://api.pexels.com/v1/search",
-        params={"query": dotaz, "per_page": pocet, "size": "large"},
-        headers={"Authorization": key, **UA},
-        timeout=TIMEOUT,
-    )
-    r.raise_for_status()
-    out = []
-    for p in r.json().get("photos", []):
-        src = p["src"]
-        out.append(
-            Kandidat(
-                zdroj="pexels",
-                id=str(p["id"]),
-                sirka=p["width"],
-                vyska=p["height"],
-                popis=p.get("alt") or "",
-                nahled_url=src["medium"],
-                plna_url=f"{src['original']}?auto=compress&cs=tinysrgb&w=2400",
-                autor=p.get("photographer", "neznámý"),
-                autor_url=p.get("photographer_url", ""),
-                stranka_url=p.get("url", ""),
+def _hledej(dotaz: str, cfg: Config, pocet: int) -> list[dict]:
+    for pokus in range(3):
+        try:
+            return DDGS().images(
+                dotaz,
+                region=cfg.region,
+                safesearch="moderate",
+                size="Large",
+                license_image=LICENCE[cfg.licence],
+                max_results=pocet,
+                backend="duckduckgo",
             )
-        )
-    return out
+        except RatelimitException:
+            time.sleep(5 * (pokus + 1))
+        except DDGSException as e:
+            if "no results" not in str(e).lower():  # ddgs hlásí prázdný výsledek výjimkou
+                print(f"  ! vyhledávání '{dotaz}' selhalo: {e}")
+            return []
+    print(f"  ! DuckDuckGo omezil počet dotazů ('{dotaz}'), zkus to za chvíli.")
+    return []
 
 
-def _unsplash(dotaz: str, key: str, pocet: int) -> list[Kandidat]:
-    r = requests.get(
-        "https://api.unsplash.com/search/photos",
-        params={"query": dotaz, "per_page": pocet, "content_filter": "high"},
-        headers={"Authorization": f"Client-ID {key}", "Accept-Version": "v1", **UA},
-        timeout=TIMEOUT,
-    )
-    r.raise_for_status()
-    utm = "?utm_source=dh_postfabrika&utm_medium=referral"
-    out = []
-    for p in r.json().get("results", []):
-        out.append(
-            Kandidat(
-                zdroj="unsplash",
-                id=p["id"],
-                sirka=p["width"],
-                vyska=p["height"],
-                popis=p.get("alt_description") or p.get("description") or "",
-                nahled_url=p["urls"]["small"],
-                plna_url=f"{p['urls']['raw']}&w=2400&q=90&fm=jpg",
-                autor=p["user"]["name"],
-                autor_url=p["user"]["links"]["html"] + utm,
-                stranka_url=p["links"]["html"] + utm,
-                download_location=p["links"].get("download_location"),
-            )
-        )
-    return out
-
-
-def vyhledej(dotazy: list[str], cfg: Config, na_dotaz: int = 8) -> list[Kandidat]:
-    ulohy = []
-    for d in dotazy:
-        if cfg.pexels_key:
-            ulohy.append((_pexels, d, cfg.pexels_key))
-        if cfg.unsplash_key:
-            ulohy.append((_unsplash, d, cfg.unsplash_key))
-
-    vysledky: list[Kandidat] = []
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        futures = [ex.submit(fn, d, k, na_dotaz) for fn, d, k in ulohy]
-        for f in futures:
+def vyhledej(dotazy: list[str], cfg: Config, na_dotaz: int = 25) -> list[Kandidat]:
+    out: list[Kandidat] = []
+    videno: set[str] = set()
+    for dotaz in dotazy:  # postupně, ať DuckDuckGo neblokuje
+        for r in _hledej(dotaz, cfg, na_dotaz):
+            url = r.get("image") or ""
             try:
-                vysledky += f.result()
-            except requests.RequestException as e:
-                print(f"  ! vyhledávání selhalo: {e}")
+                w, h = int(r.get("width") or 0), int(r.get("height") or 0)
+            except (TypeError, ValueError):
+                continue
+            k = Kandidat(
+                titulek=r.get("title") or "",
+                obrazek_url=url,
+                nahled_url=r.get("thumbnail") or url,
+                stranka_url=r.get("url") or "",
+                sirka=w,
+                vyska=h,
+            )
+            if (
+                not url.startswith("http")
+                or url in videno
+                or min(w, h) < MIN_KRATSI_STRANA
+                or any(b in url or b in k.stranka_url for b in BLOKOVANE_DOMENY)
+            ):
+                continue
+            videno.add(url)
+            out.append(k)
+    return out
 
-    # Bez duplicit + jen fotky s dostatečným rozlišením pro 1080×1350.
-    videno, out = set(), []
-    for k in vysledky:
-        klic = (k.zdroj, k.id)
-        if klic in videno or k.sirka < IG_SIRKA or k.vyska < IG_SIRKA:
-            continue
-        videno.add(klic)
-        out.append(k)
+
+def _pestry_vyber(kandidati: list[Kandidat], limit: int) -> list[Kandidat]:
+    """Střídá weby, ať do užšího výběru nejde 16 fotek z jednoho zdroje."""
+    po_domenach: dict[str, list[Kandidat]] = {}
+    for k in kandidati:
+        po_domenach.setdefault(k.domena, []).append(k)
+    out: list[Kandidat] = []
+    while len(out) < limit and any(po_domenach.values()):
+        for fronta in po_domenach.values():
+            if fronta and len(out) < limit:
+                out.append(fronta.pop(0))
     return out
 
 
 # ------------------------------------------------------------------- výběr ---
 
 
-class _Hodnoceni(BaseModel):
+class Hodnoceni(BaseModel):
     index: int
     skore: int = Field(description="0–100, celková vhodnost pro tento post.")
-    duvod: str
+    duvod: str = Field(description="Krátké zdůvodnění česky.")
 
 
-class _Vyber(BaseModel):
-    hodnoceni: list[_Hodnoceni] = Field(description="Hodnocení každé fotky.")
+class Vyber(BaseModel):
+    hodnoceni: list[Hodnoceni] = Field(description="Hodnocení každé fotky.")
     nejlepsi_index: int
     fokus_x: float = Field(description="Vodorovná pozice hlavního motivu vítězné fotky, 0.0–1.0.")
     fokus_y: float = Field(description="Svislá pozice hlavního motivu vítězné fotky, 0.0–1.0.")
@@ -146,100 +139,104 @@ class _Vyber(BaseModel):
 
 
 _SYSTEM_VYBER = """Jsi fotoeditor hokejového Instagram účtu. Vybíráš jednu fotku k \
-příspěvku. Hodnoť:
-1. Tematickou shodu s příspěvkem a zadáním (nejdůležitější). Fotka nesmí čtenáře \
-mýlit – např. pozemní hokej, florbal nebo NFL nejsou lední hokej; cizí znaky klubů, \
-které v příspěvku nejsou, jsou mínus.
-2. Profesionální vzhled: ostrost, světlo, kompozice, dynamika, emoce.
-3. Použitelnost pro Instagram ve formátu 4:5 (motiv jde oříznout na výšku), \
-místo pro případný titulek, žádné vodoznaky ani text.
-Fotky jsou očíslované indexem. Vrať hodnocení všech a vítěze. fokus_x/fokus_y \
-udávají střed hlavního motivu vítězné fotky (0,0 = levý horní roh)."""
+příspěvku. Hodnoť každou fotku 0–100 podle:
+1. Tematické shody s příspěvkem (nejdůležitější). Fotka nesmí čtenáře mýlit – pozemní \
+hokej, florbal, NFL nebo jiný klub/hráč, než o kterém je řeč, je velké mínus.
+2. Profesionálního vzhledu: ostrost, světlo, kompozice, dynamika, emoce.
+3. Použitelnosti pro Instagram ve formátu 4:5 (motiv jde oříznout na výšku).
+4. Čistoty: vodoznak, logo agentury, vložený text, koláž nebo screenshot = skóre max. 20.
+Fotky jsou označené indexem. Vrať hodnocení všech a vítěze. fokus_x/fokus_y udávají \
+střed hlavního motivu vítězné fotky (0,0 = levý horní roh)."""
 
 
 def _stahni(url: str) -> bytes:
-    r = requests.get(url, headers=UA, timeout=TIMEOUT)
-    r.raise_for_status()
-    return r.content
+    with requests.get(url, headers=UA, timeout=TIMEOUT, stream=True) as r:
+        r.raise_for_status()
+        typ = r.headers.get("Content-Type", "image/")
+        if not typ.startswith("image/"):
+            raise ValueError(f"není obrázek ({typ})")
+        data = r.raw.read(MAX_VELIKOST + 1, decode_content=True)
+    if len(data) > MAX_VELIKOST:
+        raise ValueError("obrázek je příliš velký")
+    return data
 
 
-def _jako_jpeg_b64(data: bytes, max_strana: int = 512) -> str:
-    img = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+def _otevri(data: bytes) -> Image.Image:
+    return ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+
+
+def _jako_jpeg(data: bytes, max_strana: int = 512) -> bytes:
+    img = _otevri(data)
     img.thumbnail((max_strana, max_strana))
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=80)
-    return base64.standard_b64encode(buf.getvalue()).decode("ascii")
+    return buf.getvalue()
 
 
-def vyber_nejlepsi(
+def _bezpecne(fn):
+    try:
+        return fn()
+    except Exception:  # noqa: BLE001 – jeden špatný obrázek nesmí shodit celý výběr
+        return None
+
+
+def ohodnot(
     kandidati: list[Kandidat],
     tema: str,
     text_postu: str,
     brief: str,
     model: str,
     max_kandidatu: int = 16,
-) -> tuple[Kandidat, _Vyber]:
-    kandidati = kandidati[:max_kandidatu]
+) -> tuple[list[tuple[Kandidat, int]], Vyber]:
+    """Vrátí kandidáty seřazené podle skóre od Gemini Vision a celé hodnocení."""
+    kandidati = _pestry_vyber(kandidati, max_kandidatu)
 
-    # Náhledy stahujeme lokálně a posíláme jako base64 – spolehlivější než URL.
     with ThreadPoolExecutor(max_workers=8) as ex:
-        nahledy = list(ex.map(lambda k: _bezpecne(lambda: _stahni(k.nahled_url)), kandidati))
+        nahledy = list(
+            ex.map(lambda k: _bezpecne(lambda: _jako_jpeg(_stahni(k.nahled_url))), kandidati)
+        )
     platne = [(k, n) for k, n in zip(kandidati, nahledy) if n]
     if not platne:
         raise RuntimeError("Nepodařilo se stáhnout žádný náhled fotky.")
 
-    obsah: list[dict] = []
+    obsah: list = []
     for i, (k, data) in enumerate(platne):
-        obsah.append({"type": "text", "text": f"Fotka index={i} ({k.sirka}×{k.vyska}, popis: {k.popis or '—'})"})
         obsah.append(
-            {
-                "type": "image",
-                "source": {"type": "base64", "media_type": "image/jpeg", "data": _jako_jpeg_b64(data)},
-            }
+            f"Fotka index={i} ({k.sirka}×{k.vyska}, web: {k.domena}, popis: {k.titulek or '—'})"
         )
+        obsah.append(llm.obrazek(data))
     obsah.append(
-        {
-            "type": "text",
-            "text": (
-                f"ZADANÉ TÉMA: {tema}\n\nCO MÁ FOTKA IDEÁLNĚ UKAZOVAT: {brief}\n\n"
-                f"TEXT PŘÍSPĚVKU:\n{text_postu}\n\nVyber nejlepší fotku."
-            ),
-        }
+        f"ZADANÉ TÉMA: {tema}\n\nCO MÁ FOTKA IDEÁLNĚ UKAZOVAT: {brief}\n\n"
+        f"TEXT PŘÍSPĚVKU:\n{text_postu}\n\nOhodnoť všechny fotky a vyber nejlepší."
     )
-    vyber = llm.strukturovane(
-        model=model,
-        system=_SYSTEM_VYBER,
-        content=obsah,
-        schema=_Vyber,
-        effort="medium",
+    vyber = llm.strukturovane(model=model, system=_SYSTEM_VYBER, content=obsah, schema=Vyber)
+
+    skore = {h.index: h.skore for h in vyber.hodnoceni}
+    vitez = vyber.nejlepsi_index if 0 <= vyber.nejlepsi_index < len(platne) else None
+    poradi = sorted(
+        range(len(platne)), key=lambda i: (i == vitez, skore.get(i, 0)), reverse=True
     )
-    idx = vyber.nejlepsi_index if 0 <= vyber.nejlepsi_index < len(platne) else 0
-    return platne[idx][0], vyber
+    return [(platne[i][0], skore.get(i, 0)) for i in poradi], vyber
 
 
-def _bezpecne(fn):
-    try:
-        return fn()
-    except Exception as e:  # noqa: BLE001 – jeden špatný náhled nesmí shodit výběr
-        print(f"  ! náhled se nepodařilo stáhnout: {e}")
-        return None
+def stahni_nejlepsi(
+    poradi: list[tuple[Kandidat, int]], vyber: Vyber, min_skore: int = 40
+) -> tuple[Kandidat, Image.Image, float, float, int] | None:
+    """Stáhne první fotku z pořadí, která jde opravdu stáhnout v dobrém rozlišení."""
+    for i, (k, s) in enumerate(poradi):
+        if s < min_skore:
+            break
+        img = _bezpecne(lambda: _otevri(_stahni(k.obrazek_url)))
+        if img is None or min(img.size) < MIN_KRATSI_STRANA:
+            print(f"   ✗ {k.domena}: nejde stáhnout v plném rozlišení, zkouším další")
+            continue
+        # Střed motivu zná Gemini jen u vítěze, náhradníky ořezáváme na střed.
+        fx, fy = (vyber.fokus_x, vyber.fokus_y) if i == 0 else (0.5, 0.45)
+        return k, img, fx, fy, s
+    return None
 
 
 # ----------------------------------------------------- stažení a ořez 4:5 ---
-
-
-def stahni_plne(k: Kandidat, cfg: Config) -> Image.Image:
-    if k.zdroj == "unsplash" and k.download_location and cfg.unsplash_key:
-        # Podmínka Unsplash API: při stažení fotky zavolat download_location.
-        _bezpecne(
-            lambda: requests.get(
-                k.download_location,
-                headers={"Authorization": f"Client-ID {cfg.unsplash_key}", **UA},
-                timeout=TIMEOUT,
-            )
-        )
-    data = _stahni(k.plna_url)
-    return ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
 
 
 def nacti_lokalni(cesta: str | Path) -> Image.Image:
@@ -298,7 +295,7 @@ def _zalom(text: str, font, max_sirka: int, draw: ImageDraw.ImageDraw) -> list[s
 
 
 def pridej_titulek(img: Image.Image, titulek: str, font_path: str | None) -> Image.Image:
-    """Ztmavení spodní části + bílý tučný titulek (volitelná funkce)."""
+    """Ztmavení spodní části + bílý tučný titulek."""
     img = img.copy().convert("RGBA")
     w, h = img.size
     gradient = Image.new("L", (1, h))

@@ -1,46 +1,73 @@
-# DH Post Fabrika 🏒
+# DH Post Fabrika 🏒 (verze zdarma)
 
-Lokální nástroj (Python), který podle zadaného tématu vygeneruje **hotový Instagram
-příspěvek ve stylu účtu [@denik_hokeje](https://www.instagram.com/denik_hokeje/)**:
+Lokální nástroj v Pythonu, který podle zadaného tématu vygeneruje **hotový Instagram
+příspěvek ve stylu účtu [@denik_hokeje](https://www.instagram.com/denik_hokeje/)**.
+**Celý běží zdarma:** jediný klíč je bezplatný Google Gemini API klíč, vyhledávání fotek
+přes DuckDuckGo žádný klíč nepotřebuje.
 
-- chytlavý hook, hlavní text, CTA a sadu hashtagů,
-- **sám najde a vybere nejvhodnější fotku** (Pexels + Unsplash, výběr dělá Claude
-  „očima“ fotoeditora), ořízne ji na Instagram formát **4:5 (1080 × 1350)**,
-- volitelně vloží krátký titulek přímo do fotky,
-- uloží vše do složky (`obrazek.jpg`, `post.txt`, `post.json`, `nahled.html`).
+Co aplikace udělá:
+- napíše chytlavý hook, hlavní text, CTA a sadu hashtagů podle naučeného stylu,
+- **sama najde fotky na webu (DuckDuckGo)**, nechá je **Gemini Vision ohodnotit 0–100**
+  a vybere nejlepší a nejtematičtější,
+- fotku ořízne na Instagram formát **4:5 (1080 × 1350)** a přidá titulek do spodní části,
+- uloží vše do složky: `obrazek.jpg`, `post.txt`, `post.json`, `nahled.html`.
+
+## Struktura projektu
+
+```
+dhpostfabrika/
+├── postfabrika/
+│   ├── __main__.py     spuštění přes python -m postfabrika
+│   ├── cli.py          příkazy analyzuj / styl / modely / generuj
+│   ├── config.py       nastavení z .env
+│   ├── llm.py          Gemini API: strukturovaný JSON výstup, opakování při limitech
+│   ├── style.py        načtení IG exportu, analýza stylu, stylový profil
+│   ├── generator.py    text postu ve stylu profilu
+│   ├── images.py       DuckDuckGo → Gemini Vision skóre → stažení → ořez 4:5 → titulek
+│   └── vystup.py       uložení výstupu + HTML náhled ve stylu Instagramu
+├── styl/
+│   ├── profil.json     stylový profil (dokud nespustíš analyzuj, jen výchozí odhad)
+│   └── ukazky/         sem můžeš vložit své příspěvky jako .txt
+├── vystup/             vygenerované posty
+├── tests/              testy bez sítě a bez klíčů
+├── requirements.txt
+└── .env.example
+```
 
 ## Jak to funguje
 
 ```
-                 ┌──────────────────────────┐
-  tvoje posty ──▶│ 1. analyzuj  (jednorázově)│──▶ styl/profil.json
- (IG export/txt) │   Claude: stylový profil  │    tón, hooky, délka, emoji,
-                 └──────────────────────────┘    CTA, hashtagy, reálné ukázky
-                                                        │
-   téma ──▶ 2. generuj ─────────────────────────────────┤
-              │                                          ▼
-              ├─▶ Claude: text postu + brief fotky + EN dotazy do fotobank
-              ├─▶ Pexels + Unsplash: až 16 kandidátů (filtr ≥ 1080 px)
-              ├─▶ Claude vision: ohodnotí všechny, vybere vítěze + střed motivu
-              ├─▶ stažení v plném rozlišení → ořez 4:5 kolem motivu (+ titulek)
-              └─▶ vystup/2026-11-06_1830_tema/ {obrazek.jpg, post.txt, post.json, nahled.html}
+ [1] analyzuj (jednorázově)
+     IG export / .txt ──▶ Gemini: stylový profil ──▶ styl/profil.json
+                          (tón, hooky, délka, emoji, CTA, hashtagy + reálné ukázky)
+
+ [2] generuj "téma" [--fakta "…"]
+     ├─▶ Gemini: hook, tělo, CTA, hashtagy, titulek do fotky, brief fotky, EN dotazy
+     ├─▶ DuckDuckGo obrázky: filtr licence, min. 900 px, bez fotobank s vodoznakem
+     ├─▶ Gemini Vision: až 16 náhledů → skóre 0–100 + střed hlavního motivu
+     ├─▶ stažení vítěze v plném rozlišení (když web blokuje, bere se další v pořadí)
+     ├─▶ ořez 1080×1350 kolem motivu + titulek do spodní části
+     └─▶ vystup/2026-11-06_1830_tema/ {obrazek.jpg, post.txt, post.json, nahled.html}
 ```
 
-| Soubor | Co dělá |
-|---|---|
-| `postfabrika/style.py` | načtení IG exportu / txt, analýza stylu, stylový profil |
-| `postfabrika/generator.py` | generování textu postu ve stylu profilu |
-| `postfabrika/images.py` | vyhledání fotek, výběr přes Claude vision, ořez 4:5, titulek v obrázku |
-| `postfabrika/vystup.py` | uložení výstupu a HTML náhled ve stylu Instagramu |
-| `postfabrika/llm.py` | volání Claude API se strukturovaným (validovaným) výstupem |
-| `postfabrika/cli.py` | příkazy `analyzuj`, `styl`, `generuj` |
+## 1. Bezplatný Gemini klíč (1 minuta)
 
-Proč Python: nejlepší podpora pro práci s obrázky (Pillow), oficiální Anthropic SDK
-se strukturovaným výstupem přes Pydantic a jednoduché spuštění na Windows/macOS/Linuxu.
+1. Otevři **<https://aistudio.google.com/apikey>** a přihlas se Google účtem.
+2. Klikni **Create API key** (případně potvrď vytvoření projektu).
+3. Klíč zkopíruj – vložíš ho do `.env` (viz níže).
 
-## Instalace
+Free tier nevyžaduje platební kartu. Má limity na počet požadavků za minutu a za den
+(aktuální čísla pro tvůj klíč najdeš v AI Studiu v sekci *Rate limit*). Jeden post
+= 2 požadavky, analýza stylu = 1 požadavek, takže na běžné použití to bohatě stačí.
+Když limit dojde, aplikace sama počká a zkusí to znovu.
 
-Potřebuješ Python 3.10+.
+> ⚠️ Ve free tieru může Google používat vstupy a výstupy ke zlepšování svých modelů.
+> Neposílej do aplikace nic důvěrného.
+
+## 2. Instalace
+
+Potřebuješ Python 3.10+ (<https://www.python.org/downloads/>, na Windows zaškrtni
+„Add Python to PATH“).
 
 ```bash
 git clone https://github.com/ggbosky/dhpostfabrika.git
@@ -54,121 +81,124 @@ cd dhpostfabrika
 python -m venv .venv
 ```
 
-Aktivace prostředí – macOS/Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-Windows (PowerShell):
+Aktivace – Windows (PowerShell):
 
 ```bash
 .venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
 ```
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Pak zkopíruj `.env.example` na `.env` a doplň klíče:
+Zkopíruj `.env.example` na `.env` a doplň `GEMINI_API_KEY=…`. Ověření, že klíč funguje
+(vypíše modely, které můžeš používat):
 
-| Proměnná | Kde ji získat | Nutné? |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | <https://console.anthropic.com/> → API Keys | ano |
-| `PEXELS_API_KEY` | <https://www.pexels.com/api/> (zdarma) | aspoň jedna fotobanka |
-| `UNSPLASH_ACCESS_KEY` | <https://unsplash.com/developers> → New Application → Access Key (zdarma) | aspoň jedna fotobanka |
+```bash
+python -m postfabrika modely
+```
 
-## Krok 1: Naučení stylu (jednou, pak občas zopakovat)
+## 3. Naučení stylu (jednou, pak občas zopakovat)
 
-Aplikace si styl odvodí z **tvých reálných textů**. Dokud to neuděláš, používá jen
-výchozí odhad (`styl/profil.json` s `"je_vychozi": true`) a při každém generování
-na to upozorní.
+Dokud tohle neuděláš, aplikace používá jen **výchozí odhad stylu** a při každém
+generování na to upozorní.
 
-**A) Oficiální export z Instagramu (nejlepší, všechny posty):**
-Instagram → Nastavení → Centrum účtů → Vaše informace a oprávnění →
-Stáhnout vaše informace → účet denik_hokeje → *Některé vaše informace* →
-zaškrtni **Obsah** → formát **JSON** → kvalita médií „nízká“ (stačí text).
-ZIP rozbal třeba do `styl/export/` a spusť:
+**A) Export z Instagramu (nejlepší):** Instagram → Nastavení → Centrum účtů →
+Vaše informace a oprávnění → Stáhnout vaše informace → účet denik_hokeje →
+*Některé vaše informace* → **Obsah** → formát **JSON** → kvalita médií nízká.
+ZIP rozbal do `styl/export/` a spusť:
 
 ```bash
 python -m postfabrika analyzuj styl/export
 ```
 
-**B) Ručně:** vlož 20–50 popisků do `styl/ukazky/prispevky.txt`, oddělených řádkem `---`
-(viz `styl/ukazky/README.md`), a spusť:
+**B) Ručně:** vlož 20–50 popisků do `styl/ukazky/prispevky.txt`, oddělených řádkem `---`:
 
 ```bash
 python -m postfabrika analyzuj styl/ukazky
 ```
 
-Výsledný profil si můžeš prohlédnout (a v `styl/profil.json` i ručně doladit):
+Kontrola výsledku (profil jde ručně doladit v `styl/profil.json`):
 
 ```bash
 python -m postfabrika styl
 ```
 
-## Krok 2: Generování příspěvků
+## 4. Generování
 
-Nejjednodušší – interaktivně (zeptá se na téma a na konci otevře náhled):
+Interaktivně (zeptá se na téma a na konci otevře náhled):
 
 ```bash
 python -m postfabrika
 ```
 
-Přímo s tématem:
+Přímo s tématem a fakty (u výsledků a přestupů vždy doporučeno – Gemini nemá
+aktuální zprávy a nesmí si nic vymýšlet):
 
 ```bash
-python -m postfabrika generuj "Kometa Brno podepsala nového útočníka z NHL" --otevrit
+python -m postfabrika generuj "Sparta porazila Pardubice" --fakta "4:3 pp, rozhodl Horák v 63. min" --otevrit
 ```
-
-S ověřenými fakty (doporučeno u výsledků a přestupů – model pak nemusí nic domýšlet):
-
-```bash
-python -m postfabrika generuj "Sparta porazila Pardubice" --fakta "Sparta–Pardubice 4:3 pp, rozhodl Horák v 63. min, 2 body Kousal"
-```
-
-Další volby:
 
 | Volba | Význam |
 |---|---|
-| `--fakta "…"` / `--fakta-soubor soubor.txt` | podklady, ze kterých má text vycházet |
+| `--fakta "…"` / `--fakta-soubor f.txt` | podklady, ze kterých má text vycházet |
 | `--pokyn "kratší, víc emocí"` | doplňující pokyn k tónu/délce |
-| `--titulek-v-obrazku` | vloží krátký titulek do spodní části fotky (ztmavený přechod) |
-| `--obrazek moje.jpg` | použije tvoji fotku (jen ořez 4:5), fotobanky se nevolají |
+| `--licence upravy\|komercni\|verejne\|vse` | filtr licence fotek (výchozí `upravy`) |
+| `--min-skore 60` | minimální skóre fotky od Gemini (výchozí 40) |
+| `--bez-titulku` | nevkládat titulek do fotky |
+| `--obrazek moje.jpg` | použít vlastní fotku (jen ořez 4:5 + titulek) |
 | `--bez-obrazku` | jen text |
-| `--otevrit` | otevře `nahled.html` v prohlížeči |
+| `--otevrit` | otevřít `nahled.html` v prohlížeči |
 
-### Výstup
+Výstup:
 
 ```
-vystup/2026-11-06_1830_kometa-brno-podepsala-noveho-utocnika/
-├── obrazek.jpg   1080×1350, připraveno k nahrání
-├── post.txt      hotový text (hook, tělo, CTA, kredit fotky, hashtagy)
-├── post.json     vše strukturovaně + proč byla vybrána daná fotka
+vystup/2026-11-06_1830_sparta-porazila-pardubice/
+├── obrazek.jpg   1080×1350 s titulkem, připraveno k nahrání
+├── post.txt      hook, tělo, CTA, zdroj fotky, hashtagy
+├── post.json     vše strukturovaně + skóre fotky, odkud je a proč vyhrála
 └── nahled.html   náhled ve stylu Instagramu s tlačítkem „Kopírovat text“
 ```
 
-Pokud text obsahuje údaje, které je potřeba ověřit, model je místo vymýšlení označí
-jako `[DOPLNIT: …]` a vypíše je v sekci **„Před publikací ověř“**.
+Údaje, které je potřeba ověřit, Gemini místo vymýšlení označí `[DOPLNIT: …]` a vypíšou
+se v sekci **„Před publikací ověř“**.
 
-## Důležité poznámky
+## ⚠️ Autorská práva k fotkám – přečti si
 
-- **Fotky konkrétních hráčů a zápasů ve fotobankách nejsou.** Pexels/Unsplash mají
-  obecné hokejové fotky (akce, brankář, hala, puk, fanoušci). Pro zprávy o konkrétních
-  hráčích použij vlastní nebo licencovanou fotku přes `--obrazek`.
-- **Google Images záměrně nepoužívám** – většina výsledků je chráněná autorským
-  právem a jejich použití na Instagramu by ti mohlo přinést nárok na odškodnění
-  nebo stažení postu. Pexels i Unsplash povolují bezplatné komerční použití.
-- **Kredit fotografa** se přidává do textu postu (`📸 Jméno / Unsplash`). Vypneš ho
-  v `.env` přes `PRIDAT_KREDIT_FOTA=0` (u Unsplash je ale uvedení autora žádoucí).
-- **Model:** výchozí je `claude-opus-5-5`, lze změnit přes `CLAUDE_MODEL` v `.env`.
-  Odmítnuté požadavky se automaticky zkusí na záložním modelu (server-side fallback).
-- **Náklady:** jeden post ≈ 2 volání Claude (text + výběr fotky), řádově jednotky
-  korun. Analýza stylu je jednorázová.
+Fotky z vyhledávače **nejsou automaticky volné**. Většina hokejových fotek na webu patří
+agenturám (ČTK, Getty, Profimedia) nebo klubům a jejich použití na Instagramu bez
+svolení může vést k nahlášení postu nebo k požadavku na odškodnění.
+
+Proto má aplikace ve výchozím stavu zapnutý **filtr licence `upravy`** – hledá jen
+obrázky označené jako volně použitelné včetně komerčního využití a úprav (ořez a titulek
+jsou úprava). Fotobanky s vodoznakem (Getty, Shutterstock, Alamy…) se rovnou vynechávají.
+
+- Filtr licence je jen tak dobrý jako označení na webu – u důležitých postů klikni
+  v náhledu na odkaz zdroje a licenci ověř.
+- `--licence vse` najde nejvíc a nejlepších fotek, ale **odpovědnost za práva je na tobě**;
+  aplikace pak výslovně upozorní, že je třeba práva ověřit.
+- Pro zprávy o konkrétních hráčích a zápasech je nejjistější vlastní nebo licencovaná
+  fotka přes `--obrazek`.
+
+## Řešení problémů
+
+| Problém | Řešení |
+|---|---|
+| `Chybí GEMINI_API_KEY` | doplň klíč do `.env` (ve složce projektu, ne `.env.example`) |
+| `Vyčerpaný limit free tieru` | počkej pár minut; denní limit se obnovuje o půlnoci pacifického času |
+| Model neexistuje | `python -m postfabrika modely` a nastav `GEMINI_MODEL` v `.env` |
+| `Žádná vhodná fotka nenalezena` | zkus `--licence komercni`, jiné téma nebo za pár minut (DuckDuckGo občas omezí počet dotazů) |
+| Titulek bez diakritiky | nastav `FONT_PATH` na tučný TTF font (např. `C:\Windows\Fonts\arialbd.ttf`) |
 
 ## Testy
 
-Testy běží bez sítě a bez API klíčů (Claude i fotobanky jsou nahrazené maketami):
+Bez sítě a bez klíčů (Gemini i DuckDuckGo jsou nahrazené maketami):
 
 ```bash
 pip install -r requirements-dev.txt

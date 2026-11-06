@@ -162,7 +162,6 @@ def analyzuj(prispevky: list[str], model: str, max_postu: int = 200) -> StylProf
             "reprezentují nejlépe (různé typy obsahu)."
         ),
         schema=_VyberUkazek,
-        effort="high",
     )
     profil = vysledek.profil
     profil.ukazky = [vzorek[i] for i in vysledek.indexy_ukazek if 0 <= i < len(vzorek)][:8]
