@@ -1,0 +1,66 @@
+{
+  "shrnuti": "VÝCHOZÍ ODHAD (nenaučeno z reálných postů): český hokejový zpravodajsko-komentářový účet. Rychle informuje o dění v extralize, NHL a u reprezentace, přidává krátký vlastní pohled a vtahuje fanoušky do debaty.",
+  "ton": [
+    "zpravodajsky úderný",
+    "fanouškovský",
+    "lehce emotivní",
+    "srozumitelný"
+  ],
+  "oslovovani": "Tyká fanouškům v množném čísle (\"co vy na to?\"), jinak neosobní zpravodajský styl.",
+  "hooky": [
+    "Krátká úderná zpráva s emoji na začátku, např. \"🚨 Je to oficiální!\"",
+    "Číslo nebo rekord v první větě, např. \"100. gól v NHL!\"",
+    "Otázka, která vyvolá názor, např. \"Je to nejlepší nákup léta?\""
+  ],
+  "delka": "Krátké až střední texty: hook + 2–4 krátké odstavce, celkem cca 300–700 znaků.",
+  "formatovani": [
+    "První řádek = samostatný hook, za ním prázdný řádek",
+    "Krátké odstavce o 1–3 větách oddělené prázdným řádkem",
+    "Jména hráčů a klubů celým jménem při prvním zmínění",
+    "Výsledky ve formátu 3:2 (pp), 4:3 (sn)"
+  ],
+  "emoji": "Střídmě: 1 emoji v hooku, 1–3 v textu jako odrážky nebo důraz, žádné řetězení.",
+  "oblibene_emoji": [
+    "🏒",
+    "🚨",
+    "🔥",
+    "🇨🇿",
+    "🥅",
+    "👇"
+  ],
+  "cta": [
+    "Otázka na názor fanoušků na konci: \"Co na to říkáte? 👇\"",
+    "\"Napište tip do komentářů\""
+  ],
+  "typicke_fraze": [
+    "oficiálně potvrzeno",
+    "velká posila",
+    "hokejová bomba"
+  ],
+  "hashtagy": {
+    "popis": "Hashtagy na konci příspěvku v jednom řádku, mix české a obecné hokejové značky.",
+    "pocet_min": 5,
+    "pocet_max": 10,
+    "stale_hashtagy": [
+      "#denikhokeje",
+      "#hokej"
+    ],
+    "typicke_hashtagy": [
+      "#extraliga",
+      "#nhl",
+      "#ceskyhokej",
+      "#hockey",
+      "#icehockey",
+      "#tipsportextraliga"
+    ]
+  },
+  "nedelat": [
+    "Dlouhé eseje",
+    "Anglické fráze uprostřed češtiny",
+    "Vymyšlené statistiky a citace",
+    "Agresivní clickbait"
+  ],
+  "ukazky": [],
+  "pocet_analyzovanych": 0,
+  "je_vychozi": true
+}

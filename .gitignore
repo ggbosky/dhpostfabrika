@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+vystup/*
+!vystup/.gitkeep
+styl/ukazky/*
+!styl/ukazky/README.md
+styl/export/
