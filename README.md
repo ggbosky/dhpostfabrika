@@ -1,46 +1,55 @@
-# DH Post Fabrika 🏒 (verze zdarma)
+# DH Post Fabrika 🏒
 
-Lokální nástroj v Pythonu, který podle zadaného tématu vygeneruje **hotový Instagram
-příspěvek ve stylu účtu [@denik_hokeje](https://www.instagram.com/denik_hokeje/)**.
-**Celý běží zdarma:** jediný klíč je bezplatný Google Gemini API klíč, vyhledávání fotek
-přes DuckDuckGo žádný klíč nepotřebuje.
+Nástroj, který z pár údajů vytvoří **hotový Instagram příspěvek pro
+[@denik_hokeje](https://www.instagram.com/denik_hokeje/)** – text s hashtagy
+a obrázek 1080×1350 s titulkem. Má dvě verze:
 
-Co aplikace udělá:
-- napíše chytlavý hook, hlavní text, CTA a sadu hashtagů podle naučeného stylu,
-- **sama najde fotky na webu (DuckDuckGo)**, nechá je **Gemini Vision ohodnotit 0–100**
-  a vybere nejlepší a nejtematičtější,
-- fotku ořízne na Instagram formát **4:5 (1080 × 1350)** a přidá titulek do spodní části,
-- uloží vše do složky: `obrazek.jpg`, `post.txt`, `post.json`, `nahled.html`.
+| | Webová verze (bez klíčů) | Verze v Pythonu s AI |
+|---|---|---|
+| Kde běží | v prohlížeči, <https://ggbosky.github.io/dhpostfabrika/> | na počítači |
+| Klíče / účty | žádné | bezplatný Google Gemini klíč |
+| Texty | šablony + tvoje hashtagy a výzvy | Gemini píše podle naučeného stylu |
+| Fotky | nahraješ vlastní | najde a ohodnotí sama (DuckDuckGo + Gemini Vision) |
 
-## ▶️ Spuštění přímo na GitHubu (nic neinstaluješ)
+## ▶️ Webová verze bez klíčů (doporučeno)
 
-[![Otevřít v GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ggbosky/dhpostfabrika?quickstart=1)
+**Adresa:** <https://ggbosky.github.io/dhpostfabrika/>
 
-Aplikace poběží v cloudu GitHubu (Codespaces), stačí prohlížeč.
+Běží jen v prohlížeči (počítač i mobil). Nepotřebuje žádný API klíč, účet ani server,
+nic se nikam neposílá. Texty se skládají z hokejových šablon, žádná AI.
 
-1. Klikni na tlačítko výše (musíš být přihlášený na GitHubu).
-2. GitHub se zeptá na **GEMINI_API_KEY** – vlož svůj klíč (viz krok 1 níže) a nech
-   zaškrtnuté uložení. Klíč se uloží jako tajný údaj tvého GitHub účtu, do repozitáře
-   se nedostane a příště už se nebude ptát. Pak klikni **Create codespace**.
-3. První start trvá 2–3 minuty (instalace). Pak se v nové záložce sama otevře
-   **DH Post Fabrika**. Kdyby ne: dole v editoru záložka **Ports** → řádek
-   *DH Post Fabrika (8000)* → ikona glóbusu.
+1. Vyber, co se stalo: **výsledek zápasu, přestup, rekord/milník, zranění, pozvánka
+   na zápas** nebo **obecná zpráva**, a vyplň pár políček.
+2. **Vytvořit post** → hotový text (hook, text, výzva pro fanoušky, hashtagy).
+   **🎲 Jiná varianta** napíše totéž jinými slovy. Text jde ručně upravit.
+3. **Nahraj fotku** (nebo ji přetáhni na náhled) → ořízne se na 1080×1350 (4:5),
+   přidá se titulek a podpis účtu. Výřez posuneš tažením, přiblížíš posuvníkem.
+   Bez fotky vznikne grafika s titulkem.
+4. **Kopírovat text** a **Stáhnout obrázek** → nahrát na Instagram.
 
-Příště stačí znovu kliknout na tlačítko (nebo <https://github.com/codespaces>) – otevře
-se ten samý codespace i s tvými posty a naučeným stylem.
+Záložka **Můj styl**: vlož svoje starší posty (export z Instagramu `posts_1.json`
+nebo zkopírované texty oddělené `---`). Stránka zjistí tvoje hashtagy, jejich počet,
+jestli používáš emoji a jaké otázky dáváš na konec – a od té doby je používá.
+Styl i historie se ukládají jen v tvém prohlížeči.
 
-- **Zdarma:** osobní GitHub účet má měsíčně 60 hodin běhu (2jádrový stroj) a 15 GB místa.
-- Po 30 minutách nečinnosti se codespace sám uspí (nic se neztratí), takže hodiny
-  zbytečně neubývají. Ručně ho zastavíš na <https://github.com/codespaces> → ⋯ → *Stop codespace*.
-- Adresa aplikace je soukromá – otevře ji jen tvůj přihlášený GitHub účet.
-- Klíč změníš v GitHubu: Settings → Codespaces → Secrets → `GEMINI_API_KEY`
-  (pak codespace restartuj).
+Kód webu je ve složce `web/`. Po každé změně ho GitHub sám znovu zveřejní
+(`.github/workflows/pages.yml`). Poprvé je potřeba jednou zapnout GitHub Pages:
+repozitář → **Settings → Pages → Source: GitHub Actions**.
+
+---
+
+Níže je **pokročilá verze v Pythonu s AI** (Google Gemini píše texty a sama hledá
+a hodnotí fotky). Ta potřebuje bezplatný Gemini API klíč.
 
 ## Struktura projektu
 
 ```
 dhpostfabrika/
-├── postfabrika/
+├── web/                webová verze bez klíčů (GitHub Pages)
+│   ├── index.html
+│   ├── sablony.js      šablony textů
+│   └── app.js          tvorba postu, ořez fotky, učení stylu
+├── postfabrika/        verze s AI (Python + Gemini)
 │   ├── __main__.py     spuštění přes python -m postfabrika
 │   ├── cli.py          příkazy web / analyzuj / styl / modely / generuj
 │   ├── web.py          webové rozhraní (Flask) na http://127.0.0.1:8000
