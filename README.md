@@ -12,6 +12,30 @@ Co aplikace udělá:
 - fotku ořízne na Instagram formát **4:5 (1080 × 1350)** a přidá titulek do spodní části,
 - uloží vše do složky: `obrazek.jpg`, `post.txt`, `post.json`, `nahled.html`.
 
+## ▶️ Spuštění přímo na GitHubu (nic neinstaluješ)
+
+[![Otevřít v GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ggbosky/dhpostfabrika?quickstart=1)
+
+Aplikace poběží v cloudu GitHubu (Codespaces), stačí prohlížeč.
+
+1. Klikni na tlačítko výše (musíš být přihlášený na GitHubu).
+2. GitHub se zeptá na **GEMINI_API_KEY** – vlož svůj klíč (viz krok 1 níže) a nech
+   zaškrtnuté uložení. Klíč se uloží jako tajný údaj tvého GitHub účtu, do repozitáře
+   se nedostane a příště už se nebude ptát. Pak klikni **Create codespace**.
+3. První start trvá 2–3 minuty (instalace). Pak se v nové záložce sama otevře
+   **DH Post Fabrika**. Kdyby ne: dole v editoru záložka **Ports** → řádek
+   *DH Post Fabrika (8000)* → ikona glóbusu.
+
+Příště stačí znovu kliknout na tlačítko (nebo <https://github.com/codespaces>) – otevře
+se ten samý codespace i s tvými posty a naučeným stylem.
+
+- **Zdarma:** osobní GitHub účet má měsíčně 60 hodin běhu (2jádrový stroj) a 15 GB místa.
+- Po 30 minutách nečinnosti se codespace sám uspí (nic se neztratí), takže hodiny
+  zbytečně neubývají. Ručně ho zastavíš na <https://github.com/codespaces> → ⋯ → *Stop codespace*.
+- Adresa aplikace je soukromá – otevře ji jen tvůj přihlášený GitHub účet.
+- Klíč změníš v GitHubu: Settings → Codespaces → Secrets → `GEMINI_API_KEY`
+  (pak codespace restartuj).
+
 ## Struktura projektu
 
 ```
