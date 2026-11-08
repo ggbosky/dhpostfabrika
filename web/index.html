@@ -40,8 +40,23 @@
   main { max-width: 1280px; margin: 0 auto; padding: 20px 24px 48px; }
   .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
-  #zalozkaPost { grid-template-rows: auto 1fr; }
-  #vysledek { grid-column: 2; grid-row: 1 / span 2; }
+  #zalozkaPost { grid-template-rows: auto auto 1fr; }
+  #vysledek { grid-column: 2; grid-row: 1 / span 3; }
+  #aiPostKarta, #formular { grid-column: 1; }
+  .ai-karta { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+  .zprava.varovani { background: var(--warn-bg); color: var(--warn-text); }
+  .zprava ul { margin: 6px 0 0; padding-left: 20px; }
+  dialog#fotoDialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); padding: 18px; }
+  dialog#fotoDialog::backdrop { background: rgba(0,0,0,.55); }
+  .dlg-hlava { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .dlg-hledat { flex-wrap: nowrap; }
+  .dlg-hledat input { flex: 1; }
+  .dlg-info { font-size: 13px; margin: 10px 0; }
+  .dlg-mrizka { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .dlg-mrizka button { position: relative; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; cursor: pointer; background: #000; aspect-ratio: 4 / 5; }
+  .dlg-mrizka button:hover { border-color: var(--accent); }
+  .dlg-mrizka img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .dlg-mrizka span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 11px; color: #fff; background: rgba(0,0,0,.6); padding: 3px 6px; }
   #historieKarta { grid-column: 1; }
   h2 { font-size: 17px; margin: 0 0 14px; }
   .muted { color: var(--muted); }
@@ -114,7 +129,7 @@
   .pocty .spatne { color: var(--err-text); font-weight: 600; }
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
-    #vysledek, #historieKarta { grid-column: auto; grid-row: auto; }
+    #vysledek, #historieKarta, #aiPostKarta, #formular { grid-column: auto; grid-row: auto; }
     .slide-pole .dva { grid-template-columns: 1fr; }
     #cVysledek { position: static; order: -1; }
     header, nav, main, footer { padding-left: 16px; padding-right: 16px; }
@@ -130,8 +145,8 @@
 <header>
   <h1>DH <span>Post</span> Fabrika</h1>
   <div class="pills">
-    <span class="pill ok">Bez klíčů · vše v prohlížeči</span>
     <span class="pill warn" id="pStyl">Styl: výchozí</span>
+    <span class="pill" id="pAI">AI: vypnuto</span>
   </div>
 </header>
 <nav>
@@ -142,6 +157,15 @@
 
 <main>
   <section id="zalozkaPost" class="grid" data-zalozka="post">
+      <div class="card ai-karta" id="aiPostKarta">
+        <h2>✨ Návrh od AI <span class="muted" style="font-weight:500;font-size:13px">volitelné</span></h2>
+        <textarea id="aiZadani" rows="3" placeholder="O čem má post být + fakta, např.: Kometa porazila Spartu 4:3 po prodloužení, rozhodl Zbořil v 63. minutě, Furch chytil 34 střel."></textarea>
+        <div class="akce" style="margin-top:12px">
+          <button type="button" class="btn" id="aiNavrhni">✨ Navrhnout post</button>
+          <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+        </div>
+        <div class="zprava" id="aiZprava" hidden></div>
+      </div>
       <form class="card" id="formular" novalidate>
         <h2>Co se stalo?</h2>
         <div id="typy"></div>
@@ -160,8 +184,9 @@
       <div class="ovladani">
         <div class="cela radek">
           <label class="btn ghost small" for="foto" style="color:var(--text);font-weight:600">📷 Nahrát fotku</label>
+          <button type="button" class="btn ghost small" id="webFoto">🔍 Najít jinou fotku</button>
           <input type="file" id="foto" accept="image/*">
-          <span class="muted" style="font-size:13px">nebo ji přetáhni na náhled · bez fotky vznikne grafika s titulkem</span>
+          <span class="muted" style="font-size:13px">nebo přetáhni na náhled · bez fotky vznikne grafika s titulkem</span>
         </div>
         <div class="cela" id="fotoOvl" hidden>
           <div class="radek">
@@ -198,6 +223,21 @@
 
   <section id="zalozkaCarousel" class="grid" hidden data-zalozka="carousel">
     <div>
+      <div class="card ai-karta">
+        <h2>✨ Návrh carouselu od AI <span class="muted" style="font-weight:500;font-size:13px">volitelné</span></h2>
+        <textarea id="cAiZadani" rows="3" placeholder="Téma + podklady, např.: Příběh Jaromíra Jágra a jeho návratu do Kladna. Nebo: 10 let od zlata v Naganu, rozhodl Hašek."></textarea>
+        <div class="akce" style="margin-top:12px;align-items:center">
+          <button type="button" class="btn" id="cAiNavrhni">✨ Navrhnout carousel</button>
+          <label class="radek" style="flex-direction:row;align-items:center;gap:8px">Slidů
+            <select id="cAiPocet" style="width:auto">
+              <option value="3">1 + 3</option><option value="4" selected>1 + 4</option><option value="5">1 + 5</option>
+              <option value="6">1 + 6</option><option value="8">1 + 8</option>
+            </select></label>
+          <span class="muted" style="font-size:13px" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+        </div>
+        <div class="zprava" id="cAiZprava" hidden></div>
+      </div>
+
       <div class="card">
         <div class="radek" style="justify-content:space-between;margin-bottom:6px">
           <h2 style="margin:0">Slidy</h2>
@@ -266,9 +306,28 @@
           </ol>
         </details>
       </div>
-      <div class="card">
-        <h2>Aktuální styl</h2>
-        <div id="profil"></div>
+      <div>
+        <div class="card">
+          <h2>Aktuální styl</h2>
+          <div id="profil"></div>
+        </div>
+        <div class="card" id="aiKarta" style="margin-top:20px">
+          <h2>✨ AI pomocník (volitelné)</h2>
+          <p class="muted" style="margin-top:0">Aby AI uměla navrhnout text postu nebo celý carousel, vlož svůj bezplatný Google Gemini klíč.
+            Bez klíče aplikace funguje dál, jen bez tlačítek ✨.</p>
+          <ol class="muted" style="margin:0 0 12px">
+            <li>Otevři <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> a přihlas se Google účtem.</li>
+            <li>Klikni <b>Create API key</b> a klíč zkopíruj.</li>
+            <li>Vlož ho sem a ulož. Zůstane jen v tomhle prohlížeči a posílá se jen Googlu.</li>
+          </ol>
+          <label>Gemini API klíč<input id="aiKlic" type="password" autocomplete="off" placeholder="AIza…"></label>
+          <div class="akce">
+            <button type="button" class="btn" id="aiUlozit">Uložit a ověřit</button>
+            <button type="button" class="btn ghost" id="aiSmazat">Smazat klíč</button>
+          </div>
+          <div class="zprava" id="aiKlicZprava" hidden></div>
+          <p class="muted" style="font-size:13px;margin:14px 0 0">Zdarma je asi 20 návrhů denně na model (aplikace sama střídá modely), limit se obnovuje v 9:00. Fotky hledá na Wikimedia Commons – tam jsou fotky, které se smí použít s uvedením autora; ten se do popisku přidá sám.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -277,6 +336,7 @@
 
 <script src="sablony.js"></script>
 <script src="grafika.js"></script>
+<script src="ai.js"></script>
 <script src="app.js"></script>
 <script src="carousel.js"></script>
 </body>

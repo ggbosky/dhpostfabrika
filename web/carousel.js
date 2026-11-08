@@ -29,7 +29,7 @@ let logoRezim = "auto";
 function ulozKoncept() {
   try {
     localStorage.setItem("dhpf_carousel", JSON.stringify({
-      slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text }) => ({ typ, cerveny, bily, swipe, nadpis, text })),
+      slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz }) => ({ typ, cerveny, bily, swipe, nadpis, text, dotaz })),
       popisek: $("#cPopisek").value,
       logo: logoRezim,
     }));
@@ -40,6 +40,9 @@ function novySlide(data) {
   const s = { typ: "obsah", cerveny: "", bily: "", swipe: true, nadpis: "", text: "", ...data };
   s.img = null;
   s.nazevFota = "";
+  s.kredit = "";
+  s.url = "";
+  s.dotaz = s.dotaz || "";
   s.pohled = { zoom: 1, cx: 0.5, cy: 0.45 };
   s.platno = document.createElement("canvas");
   s.platno.width = W;
@@ -167,19 +170,26 @@ const SWIPE_RUKA = [
 
 function kresliSwipe(ctx) {
   ctx.save();
-  ctx.translate(938, 1196);
-  ctx.scale(5, 5);
+  ctx.translate(944, 1216);
+  ctx.scale(4.6, 4.6);
   ctx.strokeStyle = BILA;
-  ctx.lineWidth = 1.3;
+  ctx.lineWidth = 1.4;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   for (const p of SWIPE_RUKA) ctx.stroke(p);
-  // šipka doleva nad prstem
+  // Oblouková šipka doleva nad prstem, s mezerou (špička prstu je v bodě 8, 2).
+  const sx = 8.6, sy = 3.2, r = 6.4;
+  const od = Math.PI * 1.82, k = Math.PI * 1.2;
   ctx.beginPath();
-  ctx.arc(11, 4.2, 6.5, Math.PI * 1.08, Math.PI * 1.9);
+  ctx.arc(sx, sy, r, od, k, true);
   ctx.stroke();
+  const hx = sx + r * Math.cos(k), hy = sy + r * Math.sin(k);
+  const smer = Math.atan2(-Math.cos(k), Math.sin(k)); // tečna ve směru pohybu (proti směru hodinek)
+  const hrot = 2.3;
   ctx.beginPath();
-  ctx.moveTo(6.6, -1.2); ctx.lineTo(4.6, 3.1); ctx.lineTo(9.2, 3.3);
+  ctx.moveTo(hx + hrot * Math.cos(smer + Math.PI - 0.6), hy + hrot * Math.sin(smer + Math.PI - 0.6));
+  ctx.lineTo(hx, hy);
+  ctx.lineTo(hx + hrot * Math.cos(smer + Math.PI + 0.6), hy + hrot * Math.sin(smer + Math.PI + 0.6));
   ctx.stroke();
   ctx.restore();
 }
@@ -293,8 +303,9 @@ function kartaSlidu(s, i) {
     <div class="slide-pole">
       ${pole}
       <div class="foto-radek">
-        <label class="btn ghost small" style="color:var(--text);font-weight:600">📷 ${s.img ? "Změnit fotku" : "Nahrát fotku"}<input type="file" accept="image/*" data-akce="foto"></label>
-        ${s.img ? `<span class="jmeno">${esc(s.nazevFota)}</span><button type="button" class="btn ghost small" data-akce="bezFota">Odebrat</button>` : "<span>bez fotky = tmavé pozadí</span>"}
+        <label class="btn ghost small" style="color:var(--text);font-weight:600">📷 ${s.img ? "Vlastní fotka" : "Nahrát fotku"}<input type="file" accept="image/*" data-akce="foto"></label>
+        <button type="button" class="btn ghost small" data-akce="webFoto">🔍 Najít fotku</button>
+        ${s.img ? `<span class="jmeno" title="${esc(s.kredit || s.nazevFota)}">${esc(s.kredit ? s.kredit.replace("📸 Foto: ", "") : s.nazevFota)}</span><button type="button" class="btn ghost small" data-akce="bezFota">Odebrat</button>` : "<span>bez fotky = tmavé pozadí</span>"}
       </div>
     </div>
   </div>`;
@@ -333,6 +344,8 @@ async function nastavFoto(i, soubor) {
     const s = slidy[i];
     s.img = img;
     s.nazevFota = soubor.name || "fotka";
+    s.kredit = "";
+    s.url = "";
     s.pohled = { zoom: 1, cx: 0.5, cy: 0.45 };
     vybrany = i;
     vykresliSeznam();
@@ -360,6 +373,8 @@ function vytvorPopisek() {
   }
   const cta = profil?.cta?.length ? profil.cta[Math.floor(Math.random() * profil.cta.length)] : "Co na to říkáte? 👇";
   casti.push(`👉 Swipe pro celý příběh\n\n${cta}`);
+  const kredity = [...new Set(slidy.map((s) => s.kredit).filter(Boolean))];
+  if (kredity.length) casti.push(kredity.join("\n"));
   const stale = profil?.stale?.length ? profil.stale : ["#denikhokeje", "#hokej"];
   const dalsi = profil?.hashtagy?.length ? profil.hashtagy : ["#ceskyhokej", "#hockey", "#icehockey"];
   const cil = profil?.pocetTagu ?? 8;
@@ -422,6 +437,151 @@ async function stahniVse() {
   }
 }
 
+
+// ------------------------------------------------------------------- AI --
+
+const SCHEMA_CAROUSEL = {
+  type: "object",
+  properties: {
+    cerveny: { type: "string", description: "titulní slide: 1–2 slova, hlavní pojem (místo, jméno, tým) – obří červené písmo" },
+    bily: { type: "string", description: "titulní slide: krátký doplněk 1–3 slova, např. rok s tečkou – bílé písmo" },
+    titul_foto_dotaz: { type: "string" },
+    slidy: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          nadpis: { type: "string" },
+          text: { type: "string" },
+          foto_dotaz: { type: "string" },
+        },
+        required: ["nadpis", "text", "foto_dotaz"],
+      },
+    },
+    popisek: { type: "string", description: "text pod příspěvek bez hashtagů: hook, 2–3 krátké odstavce, výzva pro fanoušky" },
+    hashtagy: { type: "array", items: { type: "string" } },
+    k_overeni: { type: "array", items: { type: "string" } },
+  },
+  required: ["cerveny", "bily", "titul_foto_dotaz", "slidy", "popisek", "hashtagy", "k_overeni"],
+};
+
+const SYSTEM_CAROUSEL = `Jsi redaktor Instagram účtu Deník hokeje (@denik_hokeje). Píšeš texty na příběhové carousely
+o hokeji: krátké, úderné, emotivní, každá věta končí tečkou.
+
+Formát:
+- Titulní slide: "cerveny" = 1–2 slova (hlavní pojem), "bily" = krátký doplněk (např. rok s tečkou).
+- Každý další slide:
+  - "nadpis": přesně 2 krátké věty (2–4 slova), každá na vlastním řádku (oddělené \\n), každá končí tečkou.
+    1–3 klíčová slova obal hvězdičkami *takhle* – zobrazí se červeně.
+  - "text": 1–3 krátké věty, celkem max 190 znaků, věty odděluj \\n. Jména, čísla, data a důležitá
+    slova obal hvězdičkami *takhle* – zobrazí se žlutě (zhruba každé 3.–4. slovo).
+  - "foto_dotaz": dotaz na fotku pro tenhle slide.
+- Slidy tvoří příběh: úvod → průběh → vyvrcholení → pointa/odkaz. Poslední slide má emoci.
+
+Ukázka (carousel o tragédii Lokomotivu Jaroslavl):
+  titul: cerveny "Jaroslavl", bily "2011."
+  slide: nadpis "Černé *září*.\\nOsudný *let* do *Minsku*."
+         text "*1. září 2011* mířil *Lokomotiv* na první zápas *sezóny*.\\nNa palubě seděl špičkový *evropský* tým.\\nVčetně tří *českých* mistrů světa."
+  slide: nadpis "Věčná *památka*.\\n*Legendy* žijí dál."
+         text "*Neštěstí* vzalo život *44* lidem včetně *trojice českých* šampionů.\\nČísla *Rachůnka*, *Vašíčka*, *Marka* byla v *reprezentaci* navždy vyřazena. *Nezapomeneme*."
+`;
+
+function cAiZprava(html, druh = "") {
+  const el = $("#cAiZprava");
+  el.innerHTML = html;
+  el.className = "zprava " + druh;
+  el.hidden = !html;
+}
+
+function aktualizujKredity() {
+  const el = $("#cPopisek");
+  if (!el.value.trim()) return;
+  const kredity = [...new Set(slidy.map((s) => s.kredit).filter(Boolean))];
+  let odstavce = el.value.split(/\n{2,}/).filter((o) => !o.trim().startsWith("📸 Foto:"));
+  if (kredity.length) {
+    const i = odstavce.length && odstavce[odstavce.length - 1].trim().startsWith("#") ? odstavce.length - 1 : odstavce.length;
+    odstavce.splice(i, 0, kredity.join("\n"));
+  }
+  el.value = odstavce.join("\n\n");
+  prepocitejPopisek();
+  ulozKoncept();
+}
+
+function nastavWebFoto(i, img, foto) {
+  const s = slidy[i];
+  s.img = img;
+  s.nazevFota = foto.nazev;
+  s.kredit = window.DHAI.kredit(foto);
+  s.url = foto.url;
+  s.pohled = { zoom: 1, cx: 0.5, cy: 0.4 };
+}
+
+async function najdiFotku(i) {
+  const s = slidy[i];
+  const vychozi = s.dotaz || (s.typ === "titul" ? [s.cerveny, s.bily].join(" ") : bezZnacek(s.nadpis)).trim();
+  const v = await window.DHAI.vyberFoto(vychozi);
+  if (!v) return;
+  nastavWebFoto(i, v.img, v.foto);
+  vybrany = i;
+  vykresliSeznam();
+  aktualizujKredity();
+}
+
+const maObsah = () => slidy.some((s) => [s.cerveny, s.bily, s.nadpis, s.text].some((x) => (x || "").trim()) || s.img);
+
+async function navrhniCarousel() {
+  const AI = window.DHAI;
+  const zadani = $("#cAiZadani").value.trim();
+  if (!zadani) { cAiZprava("Napiš téma carouselu.", "chyba"); $("#cAiZadani").focus(); return; }
+  if (!AI.maKlic()) { cAiZprava('AI pomocník potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
+  if (maObsah() && !confirm("Návrh od AI přepíše současné slidy. Pokračovat?")) return;
+  const pocet = Number($("#cAiPocet").value) || 4;
+  const b = $("#cAiNavrhni");
+  b.disabled = true;
+  b.textContent = "Píšu…";
+  cAiZprava("AI píše texty slidů… (obvykle 10–40 s)");
+  try {
+    const r = await AI.gemini({
+      system: `${SYSTEM_CAROUSEL}\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
+      zadani: `TÉMA A PODKLADY OD REDAKTORA:\n${zadani}\n\nVytvoř titulní slide a přesně ${pocet} dalších slidů.`,
+      schema: SCHEMA_CAROUSEL,
+    });
+    slidy = [
+      novySlide({ typ: "titul", cerveny: r.cerveny || "", bily: r.bily || "", swipe: true, dotaz: r.titul_foto_dotaz || "" }),
+      ...(r.slidy || []).slice(0, MAX_SLIDU - 1).map((x) => novySlide({ typ: "obsah", nadpis: x.nadpis || "", text: x.text || "", dotaz: x.foto_dotaz || "" })),
+    ];
+    vybrany = 0;
+    const tagy = window.DHAI.cisteHashtagy(r.hashtagy);
+    $("#cPopisek").value = [r.popisek || "", tagy.join(" ")].map((x) => x.trim()).filter(Boolean).join("\n\n");
+    prepocitejPopisek();
+    vykresliSeznam();
+    ulozKoncept();
+
+    const overit = (r.k_overeni || []).filter(Boolean);
+    const seznam = overit.length ? `<br><b>Před zveřejněním ověř:</b><ul>${overit.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>` : "";
+    const pouzite = new Set();
+    let nalezeno = 0;
+    for (let i = 0; i < slidy.length; i++) {
+      cAiZprava(`Texty hotové. Hledám fotky ${i + 1} / ${slidy.length}…${seznam}`, "varovani");
+      const s = slidy[i];
+      const nalez = await AI.prvniFoto([s.dotaz, s.typ === "titul" ? r.cerveny : "", r.titul_foto_dotaz], pouzite);
+      if (nalez) {
+        pouzite.add(nalez.foto.url);
+        nastavWebFoto(i, nalez.img, nalez.foto);
+        nalezeno++;
+        vykresliSeznam();
+      }
+    }
+    aktualizujKredity();
+    cAiZprava(`Hotovo ✓ Fotky: ${nalezeno} / ${slidy.length} (volně použitelné, autoři jsou v popisku). Texty i fotky teď uprav podle sebe – u každého slidu je <b>🔍 Najít fotku</b> a <b>📷 Vlastní fotka</b>.${seznam}`, overit.length ? "varovani" : "ok");
+  } catch (e) {
+    cAiZprava(esc(e.message), "chyba");
+  } finally {
+    b.disabled = false;
+    b.textContent = "✨ Navrhnout carousel";
+  }
+}
+
 // ------------------------------------------------------------------ start --
 
 function init() {
@@ -456,7 +616,8 @@ function init() {
       slidy.splice(i, 1);
       vybrany = Math.min(vybrany, slidy.length - 1);
       vykresliSeznam(); ulozKoncept();
-    } else if (akce === "bezFota") { slidy[i].img = null; vybrany = i; vykresliSeznam(); }
+    } else if (akce === "bezFota") { Object.assign(slidy[i], { img: null, kredit: "", url: "" }); vybrany = i; vykresliSeznam(); aktualizujKredity(); }
+    else if (akce === "webFoto") najdiFotku(i);
     else vyber(i);
   });
 
@@ -493,6 +654,8 @@ function init() {
   cil.addEventListener("dragleave", () => cil.classList.remove("drop"));
   cil.addEventListener("drop", (e) => { e.preventDefault(); cil.classList.remove("drop"); nastavFoto(vybrany, e.dataTransfer.files[0]); });
 
+  $("#cAiNavrhni").addEventListener("click", navrhniCarousel);
+  $("#cAiZadani").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) navrhniCarousel(); });
   $("#cPopisekZeSlidu").addEventListener("click", vytvorPopisek);
   $("#cPopisek").addEventListener("input", () => { prepocitejPopisek(); ulozKoncept(); });
   $("#cKopiruj").addEventListener("click", async () => {

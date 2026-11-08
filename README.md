@@ -7,7 +7,7 @@ a obrázek 1080×1350 s titulkem. Má dvě verze:
 | | Webová verze (bez klíčů) | Verze v Pythonu s AI |
 |---|---|---|
 | Kde běží | v prohlížeči, <https://ggbosky.github.io/dhpostfabrika/> | na počítači |
-| Klíče / účty | žádné | bezplatný Google Gemini klíč |
+| Klíče / účty | žádné (AI návrhy volitelně s bezplatným Gemini klíčem) | bezplatný Google Gemini klíč |
 | Texty | šablony + tvoje hashtagy a výzvy | Gemini píše podle naučeného stylu |
 | Fotky | nahraješ vlastní | najde a ohodnotí sama (DuckDuckGo + Gemini Vision) |
 
@@ -39,6 +39,20 @@ Záložka **Carousel** (podle šablony Deníku hokeje, až 20 slidů):
 
 Logo je i na jednoduchém postu (záložka **Nový post**).
 
+### ✨ AI pomocník (volitelné)
+
+Nahoře v záložkách **Nový post** i **Carousel** je pole **Návrh od AI**: napíšeš téma
+a fakta, AI napíše text (u carouselu všechny slidy i popisek) a stránka sama najde
+volně použitelné fotky (Wikimedia Commons, záložně Openverse). Autor a licence fotky
+se samy přidají do popisku. Pak všechno upravíš ručně jako obvykle – u každého slidu je
+**🔍 Najít fotku** (jiná fotka) a **📷 Vlastní fotka**.
+
+Potřebuje bezplatný Google Gemini klíč: záložka **Můj styl → AI pomocník**, vložit klíč
+z <https://aistudio.google.com/apikey>. Klíč zůstává jen v tvém prohlížeči. Bez klíče
+aplikace funguje dál, jen bez tlačítek ✨. Zdarma je asi 20 návrhů denně na model
+(aplikace modely střídá), limit se obnovuje v 9:00. Fakta, která má AI za nejistá,
+vypíše v seznamu **Před zveřejněním ověř**.
+
 Záložka **Můj styl**: vlož svoje starší posty (export z Instagramu `posts_1.json`
 nebo zkopírované texty oddělené `---`). Stránka zjistí tvoje hashtagy, jejich počet,
 jestli používáš emoji a jaké otázky dáváš na konec – a od té doby je používá.
@@ -61,6 +75,7 @@ dhpostfabrika/
 │   ├── index.html
 │   ├── sablony.js      šablony textů
 │   ├── grafika.js      logo, ořez fotky, stažení a sdílení
+│   ├── ai.js           volitelný AI pomocník (Gemini) + hledání volných fotek
 │   ├── app.js          tvorba postu, učení stylu
 │   └── carousel.js     carousel podle šablony
 ├── postfabrika/        verze s AI (Python + Gemini)

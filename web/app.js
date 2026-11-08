@@ -233,20 +233,115 @@ function kresli() {
   window.DHG.kresliLogo(ctx, nastaveni.logo);
 }
 
+function pouzijFoto(img) {
+  foto = img;
+  pohled = { zoom: 1, cx: 0.5, cy: 0.4 };
+  $("#zoom").value = 1;
+  $("#fotoOvl").hidden = false;
+  $("#fotoMalo").hidden = Math.min(img.naturalWidth / W, img.naturalHeight / H) >= 0.75;
+  kresli();
+}
+
 function nactiFoto(soubor) {
   if (!soubor || !soubor.type.startsWith("image/")) { zprava("Tohle není obrázek.", true); return; }
-  const url = URL.createObjectURL(soubor);
   const img = new Image();
-  img.onload = () => {
-    foto = img;
-    pohled = { zoom: 1, cx: 0.5, cy: 0.45 };
-    $("#zoom").value = 1;
-    $("#fotoOvl").hidden = false;
-    $("#fotoMalo").hidden = Math.min(img.naturalWidth / W, img.naturalHeight / H) >= 0.75;
-    kresli();
-  };
+  img.onload = () => { pouzijFoto(img); nastavKredit(""); };
   img.onerror = () => zprava("Obrázek se nepodařilo načíst.", true);
-  img.src = url;
+  img.src = URL.createObjectURL(soubor);
+}
+
+// Řádek „📸 Foto: autor / Wikimedia Commons, licence“ v textu postu.
+function nastavKredit(novy) {
+  const el = $("#text");
+  let odstavce = el.value.split(/\n{2,}/).filter((o) => !o.startsWith("📸 Foto:"));
+  if (novy) {
+    const i = odstavce.length && odstavce[odstavce.length - 1].trim().startsWith("#") ? odstavce.length - 1 : odstavce.length;
+    odstavce.splice(i, 0, novy);
+  }
+  el.value = odstavce.join("\n\n");
+  prepocitej();
+}
+
+// ------------------------------------------------------------------- AI --
+
+const SCHEMA_POST = {
+  type: "object",
+  properties: {
+    hook: { type: "string", description: "první řádek, který zastaví scrollování, s 1 emoji" },
+    telo: { type: "string", description: "2–4 krátké odstavce oddělené prázdným řádkem" },
+    cta: { type: "string", description: "otázka nebo výzva pro fanoušky na konec" },
+    hashtagy: { type: "array", items: { type: "string" } },
+    titulek: { type: "string", description: "titulek do obrázku, max 7 slov, bez emoji" },
+    foto_dotazy: { type: "array", items: { type: "string" }, description: "2–3 dotazy pro Wikimedia Commons" },
+    k_overeni: { type: "array", items: { type: "string" } },
+  },
+  required: ["hook", "telo", "cta", "hashtagy", "titulek", "foto_dotazy", "k_overeni"],
+};
+let fotoDotazy = [];
+
+function aiZprava(text, druh = "") {
+  const el = $("#aiZprava");
+  el.innerHTML = text;
+  el.className = "zprava " + druh;
+  el.hidden = !text;
+}
+
+async function navrhniPost() {
+  const zadani = $("#aiZadani").value.trim();
+  if (!zadani) { aiZprava("Napiš, o čem má post být.", "chyba"); $("#aiZadani").focus(); return; }
+  if (!window.DHAI.maKlic()) {
+    aiZprava('AI pomocník potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba");
+    return;
+  }
+  const b = $("#aiNavrhni");
+  b.disabled = true;
+  b.textContent = "Píšu…";
+  aiZprava("AI píše text… (obvykle 5–30 s)");
+  try {
+    const AI = window.DHAI;
+    const r = await AI.gemini({
+      system: `Jsi copywriter Instagram účtu @denik_hokeje (český hokej). Píšeš příspěvky k nerozeznání od reálných postů účtu.\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
+      zadani: `ZADÁNÍ OD REDAKTORA:\n${zadani}\n\nNapiš nový příspěvek.`,
+      schema: SCHEMA_POST,
+    });
+    const tagy = window.DHAI.cisteHashtagy(r.hashtagy);
+    $("#text").value = [r.hook, r.telo, r.cta, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
+    $("#titulek").value = r.titulek || "";
+    fotoDotazy = r.foto_dotazy || [];
+    prepocitej();
+    kresli();
+    $("#vysledek").hidden = false;
+    historie.unshift({ cas: new Date().toISOString(), typ: "ai", text: $("#text").value, titulek: $("#titulek").value });
+    historie = historie.slice(0, 20);
+    uloz("dhpf_historie", historie);
+    vykresliHistorii();
+
+    const overit = (r.k_overeni || []).filter(Boolean);
+    const seznam = overit.length ? `<br><b>Před zveřejněním ověř:</b><ul>${overit.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>` : "";
+    aiZprava(`Text je hotový, hledám fotku…${seznam}`, overit.length ? "varovani" : "ok");
+    const nalez = await AI.prvniFoto(fotoDotazy);
+    if (nalez) {
+      pouzijFoto(nalez.img);
+      nastavKredit(AI.kredit(nalez.foto));
+      aiZprava(`Hotovo ✓ Fotka je volně použitelná, autor a licence jsou v textu. Nesedí? Klikni na <b>🔍 Najít jinou fotku</b>.${seznam}`, overit.length ? "varovani" : "ok");
+    } else {
+      aiZprava(`Text je hotový. Vhodnou volnou fotku jsem nenašel – nahraj vlastní, nebo zkus <b>🔍 Najít jinou fotku</b>.${seznam}`, "varovani");
+    }
+    if (window.matchMedia("(max-width: 900px)").matches) $("#vysledek").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    aiZprava(esc(e.message), "chyba");
+  } finally {
+    b.disabled = false;
+    b.textContent = "✨ Navrhnout post";
+  }
+}
+
+async function jinaFoto() {
+  const vychozi = fotoDotazy[0] || $("#titulek").value;
+  const v = await window.DHAI.vyberFoto(vychozi);
+  if (!v) return;
+  pouzijFoto(v.img);
+  nastavKredit(window.DHAI.kredit(v.foto));
 }
 
 function nastavTahani() {
@@ -437,7 +532,7 @@ function vykresliHistorii() {
   el.innerHTML = historie.map((h, i) => {
     const s = SABLONY[h.typ];
     const datum = new Date(h.cas).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
-    return `<button type="button" class="hist" data-i="${i}"><span>${s ? s.ikona : "📝"} ${esc(h.titulek)}</span><small>${datum}</small></button>`;
+    return `<button type="button" class="hist" data-i="${i}"><span>${s ? s.ikona : h.typ === "ai" ? "✨" : "📝"} ${esc(h.titulek)}</span><small>${datum}</small></button>`;
   }).join("");
   $$("#historie .hist").forEach((b) => b.addEventListener("click", () => {
     const h = historie[Number(b.dataset.i)];
@@ -473,8 +568,11 @@ function init() {
   $("#kopiruj").addEventListener("click", kopiruj);
   $("#stahni").addEventListener("click", stahni);
   $("#foto").addEventListener("change", (e) => nactiFoto(e.target.files[0]));
+  $("#aiNavrhni").addEventListener("click", navrhniPost);
+  $("#aiZadani").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) navrhniPost(); });
+  $("#webFoto").addEventListener("click", jinaFoto);
   $("#odeberFoto").addEventListener("click", () => {
-    foto = null; $("#foto").value = ""; $("#fotoOvl").hidden = true; $("#fotoMalo").hidden = true; kresli();
+    foto = null; $("#foto").value = ""; $("#fotoOvl").hidden = true; $("#fotoMalo").hidden = true; nastavKredit(""); kresli();
   });
   $("#zoom").addEventListener("input", (e) => { pohled.zoom = Number(e.target.value); omezPohled(); kresli(); });
 
