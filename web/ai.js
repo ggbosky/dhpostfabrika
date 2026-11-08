@@ -64,6 +64,82 @@ async function gemini({ system, zadani, schema, teplota = 0.9 }) {
   throw chyba instanceof AIChyba ? chyba : new AIChyba("Gemini teď neodpovídá, zkus to za chvíli.");
 }
 
+// Volání s vyhledáváním Google (grounding). Vrací text + zdroje, ze kterých model čerpal.
+// Pozn.: hledání nejde kombinovat s JSON režimem, proto se JSON čte z textu.
+async function hledatNaWebu({ system, zadani, teplota = 0.3 }) {
+  if (!maKlic()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
+  const posledni = nacti("dhpf_gemini_model_web");
+  const poradi = [...new Set([posledni, "gemini-2.5-flash", ...MODELY].filter(Boolean))];
+  let limit = false, chyba = null;
+  for (const model of poradi) {
+    let odpoved;
+    try {
+      odpoved = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": klic() },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: zadani }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: teplota },
+        }),
+      });
+    } catch (e) { chyba = e; continue; }
+    if (odpoved.ok) {
+      const data = await odpoved.json();
+      const kandidat = data.candidates?.[0] || {};
+      const text = (kandidat.content?.parts || []).map((p) => p.text || "").join("");
+      const gm = kandidat.groundingMetadata || {};
+      const zdroje = (gm.groundingChunks || []).map((c) => ({ titulek: c.web?.title || c.web?.domain || "zdroj", uri: c.web?.uri || "" }));
+      if (!text) { chyba = new AIChyba("AI nevrátila žádný text."); continue; }
+      uloz("dhpf_gemini_model_web", model);
+      return {
+        text,
+        zdroje,
+        podpory: (gm.groundingSupports || []).map((s) => ({ text: s.segment?.text || "", indexy: s.groundingChunkIndices || [] })),
+        dotazy: gm.webSearchQueries || [],
+      };
+    }
+    const telo = await odpoved.text();
+    if (odpoved.status === 404) continue;
+    if (odpoved.status === 429) { limit = true; continue; }
+    if (odpoved.status >= 500) { chyba = new AIChyba(`Model ${model} je přetížený.`); continue; }
+    if (odpoved.status === 400 && /API key|API_KEY/i.test(telo)) throw new AIChyba("Neplatný Gemini klíč. Zkontroluj ho v záložce Můj styl → AI pomocník.");
+    if (odpoved.status === 403) throw new AIChyba("Google klíč odmítl (403).");
+    chyba = new AIChyba(`Gemini chyba ${odpoved.status}: ${telo.slice(0, 160)}`);
+  }
+  if (limit) throw new AIChyba("Dnešní bezplatný limit Gemini je vyčerpaný. Obnoví se v 9:00 českého času.");
+  throw chyba instanceof AIChyba ? chyba : new AIChyba("Gemini teď neodpovídá, zkus to za chvíli.");
+}
+
+// JSON z odpovědi typu "…```json [ … ] ```…".
+function jsonZTextu(text) {
+  const blok = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  let kus = blok ? blok[1] : text;
+  const zacatek = kus.search(/[[{]/);
+  const konec = Math.max(kus.lastIndexOf("]"), kus.lastIndexOf("}"));
+  if (zacatek < 0 || konec < zacatek) throw new AIChyba("AI nevrátila data v očekávaném tvaru, zkus to znovu.");
+  kus = kus.slice(zacatek, konec + 1);
+  try { return JSON.parse(kus); } catch { throw new AIChyba("AI vrátila poškozená data, zkus to znovu."); }
+}
+
+const normalizuj = (s) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+// Zdroje, o které se opírá daný kus textu (podle groundingSupports).
+// Úsek odpovědi se přiřadí, když většina jeho slov je i v textu položky.
+function zdrojeProText(vysledek, textPolozky) {
+  const slovaCile = new Set(normalizuj(textPolozky).split(" ").filter((w) => w.length >= 3));
+  const indexy = new Set();
+  for (const p of vysledek.podpory) {
+    const slova = normalizuj(p.text.replace(/"[a-z_]+"\s*:/gi, " ")).split(" ").filter((w) => w.length >= 3);
+    if (slova.length < 3) continue;
+    const shoda = slova.filter((w) => slovaCile.has(w)).length / slova.length;
+    if (shoda >= 0.7) p.indexy.forEach((i) => indexy.add(i));
+  }
+  const videne = new Set();
+  return [...indexy].map((i) => vysledek.zdroje[i]).filter((z) => z && !videne.has(z.titulek) && videne.add(z.titulek));
+}
+
 // Popis stylu z naučeného profilu pro prompt.
 function stylDoPromptu() {
   let p = null;
@@ -357,6 +433,6 @@ function init() {
   });
 }
 
-window.DHAI = { cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
+window.DHAI = { hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
 init();
 })();

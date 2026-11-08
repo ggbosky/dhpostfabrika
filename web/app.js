@@ -251,9 +251,12 @@ function nactiFoto(soubor) {
 }
 
 // Řádek „📸 Foto: autor / Wikimedia Commons, licence“ v textu postu.
-function nastavKredit(novy) {
+function nastavKredit(novy) { nastavRadek("📸 Foto:", novy); }
+
+// Odstavec začínající `prefix` (kredit fotky, zdroje) těsně před hashtagy.
+function nastavRadek(prefix, novy) {
   const el = $("#text");
-  let odstavce = el.value.split(/\n{2,}/).filter((o) => !o.startsWith("📸 Foto:"));
+  let odstavce = el.value.split(/\n{2,}/).filter((o) => !o.startsWith(prefix));
   if (novy) {
     const i = odstavce.length && odstavce[odstavce.length - 1].trim().startsWith("#") ? odstavce.length - 1 : odstavce.length;
     odstavce.splice(i, 0, novy);
@@ -278,6 +281,7 @@ const SCHEMA_POST = {
   required: ["hook", "telo", "cta", "hashtagy", "titulek", "foto_dotazy", "k_overeni"],
 };
 let fotoDotazy = [];
+let zdrojeNavrhu = []; // zdroje z hledání (záložka Témata)
 
 function aiZprava(text, druh = "") {
   const el = $("#aiZprava");
@@ -305,7 +309,8 @@ async function navrhniPost() {
       schema: SCHEMA_POST,
     });
     const tagy = window.DHAI.cisteHashtagy(r.hashtagy);
-    $("#text").value = [r.hook, r.telo, r.cta, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
+    const zdrojeRadek = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
+    $("#text").value = [r.hook, r.telo, r.cta, zdrojeRadek, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
     $("#titulek").value = r.titulek || "";
     fotoDotazy = r.foto_dotazy || [];
     prepocitej();
@@ -553,6 +558,17 @@ function prepniZalozku(kam) {
   try { localStorage.setItem("dhpf_zalozka", kam); } catch { /* nic */ }
 }
 
+window.DHPost = {
+  prepniZalozku: (kam) => prepniZalozku(kam),
+  navrhni(zadani, zdroje = []) {
+    prepniZalozku("post");
+    $("#aiZadani").value = zadani;
+    zdrojeNavrhu = zdroje;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    navrhniPost();
+  },
+};
+
 function init() {
   vykresliTypy();
   vykresliFormular();
@@ -570,6 +586,7 @@ function init() {
   $("#foto").addEventListener("change", (e) => nactiFoto(e.target.files[0]));
   $("#aiNavrhni").addEventListener("click", navrhniPost);
   $("#aiZadani").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) navrhniPost(); });
+  $("#aiZadani").addEventListener("input", () => { zdrojeNavrhu = []; });
   $("#webFoto").addEventListener("click", jinaFoto);
   $("#odeberFoto").addEventListener("click", () => {
     foto = null; $("#foto").value = ""; $("#fotoOvl").hidden = true; $("#fotoMalo").hidden = true; nastavKredit(""); kresli();

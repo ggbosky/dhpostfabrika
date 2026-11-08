@@ -529,12 +529,29 @@ async function najdiFotku(i) {
 
 const maObsah = () => slidy.some((s) => [s.cerveny, s.bily, s.nadpis, s.text].some((x) => (x || "").trim()) || s.img);
 
-async function navrhniCarousel() {
+let zdrojeNavrhu = []; // zdroje z hledání (záložka Témata)
+
+window.DHCarousel = {
+  navrhni(zadani, zdroje = [], pocet = 4) {
+    window.DHPost.prepniZalozku("carousel");
+    $("#cAiZadani").value = zadani;
+    $("#cAiPocet").value = String(pocet);
+    zdrojeNavrhu = zdroje;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    navrhniCarousel(true);
+  },
+  textKOvereni: () => [
+    ...slidy.map((s) => (s.typ === "titul" ? [s.cerveny, s.bily] : [s.nadpis, s.text]).join(" ").replace(/\*/g, "").replace(/\s+/g, " ").trim()),
+    $("#cPopisek").value,
+  ].filter(Boolean).join("\n\n"),
+};
+
+async function navrhniCarousel(bezPotvrzeni = false) {
   const AI = window.DHAI;
   const zadani = $("#cAiZadani").value.trim();
   if (!zadani) { cAiZprava("Napiš téma carouselu.", "chyba"); $("#cAiZadani").focus(); return; }
   if (!AI.maKlic()) { cAiZprava('AI pomocník potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
-  if (maObsah() && !confirm("Návrh od AI přepíše současné slidy. Pokračovat?")) return;
+  if (bezPotvrzeni !== true && maObsah() && !confirm("Návrh od AI přepíše současné slidy. Pokračovat?")) return;
   const pocet = Number($("#cAiPocet").value) || 4;
   const b = $("#cAiNavrhni");
   b.disabled = true;
@@ -552,7 +569,8 @@ async function navrhniCarousel() {
     ];
     vybrany = 0;
     const tagy = window.DHAI.cisteHashtagy(r.hashtagy);
-    $("#cPopisek").value = [r.popisek || "", tagy.join(" ")].map((x) => x.trim()).filter(Boolean).join("\n\n");
+    const zdrojeRadek = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
+    $("#cPopisek").value = [r.popisek || "", zdrojeRadek, tagy.join(" ")].map((x) => x.trim()).filter(Boolean).join("\n\n");
     prepocitejPopisek();
     vykresliSeznam();
     ulozKoncept();
@@ -654,7 +672,8 @@ function init() {
   cil.addEventListener("dragleave", () => cil.classList.remove("drop"));
   cil.addEventListener("drop", (e) => { e.preventDefault(); cil.classList.remove("drop"); nastavFoto(vybrany, e.dataTransfer.files[0]); });
 
-  $("#cAiNavrhni").addEventListener("click", navrhniCarousel);
+  $("#cAiNavrhni").addEventListener("click", () => navrhniCarousel());
+  $("#cAiZadani").addEventListener("input", () => { zdrojeNavrhu = []; });
   $("#cAiZadani").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) navrhniCarousel(); });
   $("#cPopisekZeSlidu").addEventListener("click", vytvorPopisek);
   $("#cPopisek").addEventListener("input", () => { prepocitejPopisek(); ulozKoncept(); });

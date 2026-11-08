@@ -127,11 +127,30 @@
   #cNahledy canvas.on { border-color: var(--accent); }
   .pocty { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
   .pocty .spatne { color: var(--err-text); font-weight: 600; }
+  .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  .filtry .cela { grid-column: 1 / -1; }
+  #tSeznam { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 20px; }
+  #tSeznam > p { grid-column: 1 / -1; }
+  .tema { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; }
+  .tema-hlava { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .tema h3 { margin: 0 0 8px; font-size: 17px; line-height: 1.3; }
+  .tema-hlava .muted { font-size: 13px; white-space: nowrap; }
+  .tema ul { margin: 0 0 8px; padding-left: 18px; }
+  .tema li { margin-bottom: 4px; }
+  .tema .proc { margin: 0 0 8px; font-size: 14px; }
+  .tema .zdroje, .overeni small { font-size: 13px; color: var(--muted); margin: auto 0 0; }
+  .zdroje a, .overeni a { color: var(--accent); }
+  .bez-zdroje { color: var(--warn-text); }
+  ul.overeni { list-style: none; padding: 0; margin: 10px 0 0; }
+  ul.overeni li { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
+  #overeniPost, #cOvereni { margin-top: 4px; }
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
     #vysledek, #historieKarta, #aiPostKarta, #formular { grid-column: auto; grid-row: auto; }
     .slide-pole .dva { grid-template-columns: 1fr; }
     #cVysledek { position: static; order: -1; }
+    .filtry { grid-template-columns: 1fr; }
+    #tSeznam { grid-template-columns: 1fr; }
     header, nav, main, footer { padding-left: 16px; padding-right: 16px; }
   }
   @media (max-width: 520px) {
@@ -150,12 +169,36 @@
   </div>
 </header>
 <nav>
+  <button type="button" class="tab" data-tab="temata">🔎 Témata</button>
   <button type="button" class="tab on" data-tab="post">Nový post</button>
   <button type="button" class="tab" data-tab="carousel">Carousel</button>
   <button type="button" class="tab" data-tab="styl">Můj styl</button>
 </nav>
 
 <main>
+  <section id="zalozkaTemata" hidden data-zalozka="temata">
+    <div class="card">
+      <h2>🔎 Co je v hokeji nového? <span class="muted" style="font-weight:500;font-size:13px">AI hledá na webu a ke každému faktu dává zdroj</span></h2>
+      <div class="filtry">
+        <label>Zaměření<select id="tZamereni">
+          <option value="vse">Vše (extraliga, NHL, repre)</option><option value="extraliga">Extraliga</option>
+          <option value="nhl">Češi a Slováci v NHL</option><option value="repre">Reprezentace</option>
+          <option value="prestupy">Přestupy a zranění</option></select></label>
+        <label>Období<select id="tObdobi">
+          <option value="2">Posledních 48 hodin</option><option value="7">Posledních 7 dní</option>
+          <option value="vyroci">Výročí – co se stalo v tento den</option></select></label>
+        <label class="cela">Upřesnění (nepovinné)<input id="tVlastni" placeholder="např. jen Kometa Brno, nebo: zajímavé statistiky brankářů"></label>
+      </div>
+      <div class="akce">
+        <button type="button" class="btn" id="tHledej">🔎 Najít témata</button>
+        <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+      </div>
+      <div class="zprava" id="tZprava" hidden></div>
+      <p class="muted" style="font-size:13px;margin:12px 0 0">AI vybírá jen to, co našla ve zdrojích. Zdroje si před zveřejněním proklikni – AI se může splést i s nimi.</p>
+    </div>
+    <div id="tSeznam"></div>
+  </section>
+
   <section id="zalozkaPost" class="grid" data-zalozka="post">
       <div class="card ai-karta" id="aiPostKarta">
         <h2>✨ Návrh od AI <span class="muted" style="font-weight:500;font-size:13px">volitelné</span></h2>
@@ -208,7 +251,9 @@
         <textarea id="text" placeholder="Vyplň údaje vlevo a klikni na Vytvořit post."></textarea>
       </label>
       <div id="pocty"></div>
-      <div class="akce"><button type="button" class="btn" id="kopiruj">Kopírovat text</button></div>
+      <div class="akce"><button type="button" class="btn" id="kopiruj">Kopírovat text</button>
+        <button type="button" class="btn ghost" id="overitPost" title="AI ověří fakta v textu na webu">🔎 Ověřit fakta</button></div>
+      <div id="overeniPost"></div>
       <p class="muted" style="font-size:13px;margin:14px 0 0">Před zveřejněním si text přečti – šablona neví víc, než co jsi vyplnil. U fotek používej jen ty, ke kterým máš práva.</p>
     </div>
 
@@ -256,7 +301,9 @@
         </div>
         <textarea id="cPopisek" rows="9" placeholder="Klikni na Vytvořit ze slidů, nebo napiš vlastní."></textarea>
         <div id="cPocty" class="pocty"></div>
-        <div class="akce"><button type="button" class="btn" id="cKopiruj">Kopírovat text</button></div>
+        <div class="akce"><button type="button" class="btn" id="cKopiruj">Kopírovat text</button>
+          <button type="button" class="btn ghost" id="cOverit" title="AI ověří fakta ve slidech i popisku na webu">🔎 Ověřit fakta</button></div>
+        <div id="cOvereni"></div>
       </div>
     </div>
 
@@ -339,5 +386,6 @@
 <script src="ai.js"></script>
 <script src="app.js"></script>
 <script src="carousel.js"></script>
+<script src="zpravy.js"></script>
 </body>
 </html>

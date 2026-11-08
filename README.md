@@ -39,6 +39,18 @@ Záložka **Carousel** (podle šablony Deníku hokeje, až 20 slidů):
 
 Logo je i na jednoduchém postu (záložka **Nový post**).
 
+### 🔎 Témata a ověřování faktů (s AI klíčem)
+
+- Záložka **🔎 Témata**: AI prohledá web (Google) a najde 6 zajímavých témat – za posledních
+  48 hodin, 7 dní, nebo **výročí** (co se v hokeji stalo v tento den). U každého jsou
+  konkrétní fakta a **odkazy na zdroje**. Tlačítkem **✍️ Post** nebo **🎞️ Carousel** z tématu
+  rovnou vznikne příspěvek, do popisku se přidá řádek `ℹ️ Zdroj: …`. Témata bez přímého
+  zdroje jsou označená ⚠️.
+- Tlačítko **🔎 Ověřit fakta** (u textu postu i u popisku carouselu): AI dohledá každé
+  tvrzení na webu a označí ho ✅ potvrzeno / ❌ rozpor (se správnou hodnotou) / ⚠️ nepotvrzeno,
+  vždy s odkazy na zdroje.
+- AI se může splést i se zdroji – před zveřejněním si je proklikni.
+
 ### ✨ AI pomocník (volitelné)
 
 Nahoře v záložkách **Nový post** i **Carousel** je pole **Návrh od AI**: napíšeš téma
@@ -76,6 +88,7 @@ dhpostfabrika/
 │   ├── sablony.js      šablony textů
 │   ├── grafika.js      logo, ořez fotky, stažení a sdílení
 │   ├── ai.js           volitelný AI pomocník (Gemini) + hledání volných fotek
+│   ├── zpravy.js       živé hledání témat na webu a ověřování faktů se zdroji
 │   ├── app.js          tvorba postu, učení stylu
 │   └── carousel.js     carousel podle šablony
 ├── postfabrika/        verze s AI (Python + Gemini)
