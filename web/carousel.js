@@ -139,16 +139,8 @@ function pozadi(ctx, s) {
   }
 }
 
-function ztmaveni(ctx, odY, plneY) {
-  const g = ctx.createLinearGradient(0, odY, 0, plneY);
-  g.addColorStop(0, "rgba(0,0,0,0)");
-  g.addColorStop(0.55, "rgba(0,0,0,0.75)");
-  g.addColorStop(1, "rgba(0,0,0,1)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, odY, W, plneY - odY);
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, plneY, W, H - plneY);
-}
+// Plynulý přechod do černé (stejná křivka jako šablona „Dnes před X lety“).
+const ztmaveni = (ctx, odY, plneY) => G.ztmaveni(ctx, odY, plneY, W, H);
 
 function velikostNaSirku(ctx, text, vaha, pismo, max, sirka) {
   let v = max;
@@ -203,7 +195,7 @@ function kresliTitul(ctx, s) {
   const yBily = H - 100;
   const yCerveny = bily ? yBily - vBily * 0.72 - 75 : H - 110;
   const horni = cerveny ? yCerveny - vCerveny * 0.72 : yBily - vBily * 0.72;
-  ztmaveni(ctx, Math.max(200, horni - 420), Math.min(H - 40, horni + 120));
+  ztmaveni(ctx, horni - 600, horni + 150);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   if (cerveny) {
@@ -247,7 +239,7 @@ function kresliObsah(ctx, s) {
   const posledniNadpis = radkyText.length ? prvniText - vText * 0.75 - 70 : H - 110;
   const prvniNadpis = posledniNadpis - (radkyNadpis.length - 1) * rozestupNadpis;
   const horni = radkyNadpis.length ? prvniNadpis - vNadpis * 0.75 : prvniText - vText * 0.75;
-  if (radkyNadpis.length || radkyText.length) ztmaveni(ctx, Math.max(150, horni - 380), Math.min(H - 40, horni + 170));
+  if (radkyNadpis.length || radkyText.length) ztmaveni(ctx, horni - 565, horni + 185);
 
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";

@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#090909">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600;700&family=Montserrat:wght@800;900&family=Roboto+Condensed:ital,wght@0,500;0,700;0,800;1,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600;700&family=Anton&family=Montserrat:ital,wght@0,800;0,900;1,800&family=Roboto+Condensed:ital,wght@0,500;0,700;0,800;1,700&display=swap" rel="stylesheet">
 <style>
   /* Deník hokeje – brand: krvavě červená, černá, bílá, žlutá na zvýraznění */
   :root {
@@ -222,10 +222,19 @@
   .footer-in { max-width: 1280px; margin: 0 auto; padding: 22px 24px 34px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
   .footer-in .wordmark { width: 64px; fill: #555; }
 
+  #vVysledek { position: sticky; top: 64px; }
+  #zalozkaVyroci > div > .card + .card { margin-top: 22px; }
+  .foto-blok { display: grid; gap: 10px; padding: 12px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  .foto-blok b { font: 800 13px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
+  .barva-vzor { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #000; box-shadow: 0 0 0 1px var(--line-2); cursor: pointer; padding: 0; }
+  .barva-vzor:hover { box-shadow: 0 0 0 2px #fff; }
+  input[type=radio] { width: auto; accent-color: var(--red-hot); }
+  input:disabled { opacity: .55; }
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
     #vysledek, #historieKarta, #aiPostKarta, #formular { grid-column: auto; grid-row: auto; }
-    #vysledek, #cVysledek { position: static; }
+    #vysledek, #cVysledek, #vVysledek { position: static; }
+    #vVysledek { order: -1; }
     #cVysledek { order: -1; }
     .slide-pole .dva { grid-template-columns: 1fr; }
     .filtry, .filtry.tri { grid-template-columns: 1fr; }
@@ -261,6 +270,7 @@
   <button type="button" class="tab" data-tab="temata">🔎 Témata</button>
   <button type="button" class="tab on" data-tab="post">Nový post</button>
   <button type="button" class="tab" data-tab="carousel">Carousel</button>
+  <button type="button" class="tab" data-tab="vyroci">📅 Dnes před lety</button>
   <button type="button" class="tab" data-tab="styl">Můj styl</button>
 </div></nav>
 
@@ -425,6 +435,86 @@
     </div>
   </section>
 
+  <section id="zalozkaVyroci" class="grid" hidden data-zalozka="vyroci">
+    <div>
+      <div class="card ai-karta">
+        <h2>✨ Návrh od AI <span class="muted">volitelné</span></h2>
+        <textarea id="vAiZadani" rows="3" placeholder="Jaké výročí? Např.: 10. 8. 1995 – Quebec Nordiques se stěhují do Denveru a vzniká Colorado Avalanche."></textarea>
+        <div class="akce" style="margin-top:12px">
+          <button type="button" class="btn" id="vAiNavrhni">✨ Navrhnout</button>
+          <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+        </div>
+        <div class="zprava" id="vAiZprava" hidden></div>
+      </div>
+
+      <div class="card">
+        <h2>Obsah postu</h2>
+        <div class="filtry">
+          <label>Datum události<input id="vDatum" placeholder="např. 10.8.1995" autocomplete="off"></label>
+          <label>Nadpis vpravo nahoře<input id="vNadpis" placeholder="DNES PŘED 31 LETY"></label>
+          <label class="check cela"><input type="checkbox" id="vNadpisAuto"> Nadpis počítat automaticky z data („Dnes před 31 lety“)</label>
+          <label class="cela">Text do obrázku <span class="muted" style="text-transform:none;letter-spacing:0">– slovo v *hvězdičkách* bude barevně, Enter = nový řádek</span>
+            <textarea id="vText" rows="4"></textarea></label>
+          <label>Barva zvýraznění a rámečku
+            <span class="radek" id="vBarvy">
+              <input type="color" id="vBarva" style="width:64px">
+              <button type="button" class="barva-vzor" data-barva="#005db8" style="background:#005db8" title="Modrá"></button>
+              <button type="button" class="barva-vzor" data-barva="#d0161e" style="background:#d0161e" title="Červená"></button>
+              <button type="button" class="barva-vzor" data-barva="#ffc000" style="background:#ffc000" title="Žlutá"></button>
+              <button type="button" class="barva-vzor" data-barva="#1fa34a" style="background:#1fa34a" title="Zelená"></button>
+              <button type="button" class="barva-vzor" data-barva="#ff6a00" style="background:#ff6a00" title="Oranžová"></button>
+            </span></label>
+          <label>Logo vlevo nahoře<select id="vLogo">
+            <option value="seda">Šedé (jako šablona)</option><option value="auto">Automaticky</option>
+            <option value="bila">Bílé</option><option value="cerna">Černé</option><option value="vypnuto">Bez loga</option></select></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Fotky</h2>
+        <div class="foto-blok">
+          <b>Hlavní fotka (pozadí)</b>
+          <div class="foto-radek">
+            <label class="btn ghost small">📷 Nahrát<input type="file" accept="image/*" id="vFotoSoubor"></label>
+            <button type="button" class="btn ghost small" id="vFotoNajdi">🔍 Najít</button>
+            <span class="jmeno" id="vFotoInfo"></span>
+          </div>
+          <label>Přiblížení<input type="range" id="vZoomFoto" min="1" max="3" step="0.01" value="1"></label>
+        </div>
+        <div class="foto-blok">
+          <b>Malá kulatá fotka (nepovinné)</b>
+          <div class="foto-radek">
+            <label class="btn ghost small">📷 Nahrát<input type="file" accept="image/*" id="vVlozkaSoubor"></label>
+            <button type="button" class="btn ghost small" id="vVlozkaNajdi">🔍 Najít</button>
+            <button type="button" class="btn ghost small" id="vBezVlozky">Odebrat</button>
+            <span class="jmeno" id="vVlozkaInfo"></span>
+          </div>
+          <label id="vVlozkaOvl">Přiblížení<input type="range" id="vZoomVlozka" min="1" max="3" step="0.01" value="1"></label>
+        </div>
+        <div class="radek" style="margin-top:6px">
+          <span class="muted" style="font-size:13px">Tažením po náhledu posouvám:</span>
+          <label class="check"><input type="radio" name="vTahani" value="foto" checked> hlavní fotku</label>
+          <label class="check"><input type="radio" name="vTahani" value="vlozka"> kulatou fotku</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="vVysledek">
+      <h2>Náhled</h2>
+      <div id="vNahled" class="nahled"><canvas id="vPlatno" width="1080" height="1350" aria-label="Náhled postu Dnes před X lety"></canvas></div>
+      <div class="akce">
+        <button type="button" class="btn" id="vStahni">⬇️ Stáhnout obrázek</button>
+        <button type="button" class="btn ghost" id="vSdilej" hidden>📲 Uložit do telefonu</button>
+      </div>
+      <label style="margin-top:20px">Popisek pod post
+        <textarea id="vPopisek" rows="9" placeholder="Napiš popisek, nebo ho nech navrhnout AI."></textarea></label>
+      <div id="vPocty" class="pocty"></div>
+      <div class="akce"><button type="button" class="btn" id="vKopiruj">Kopírovat text</button>
+        <button type="button" class="btn ghost" id="vOverit">🔎 Ověřit fakta</button></div>
+      <div id="vOvereni"></div>
+    </div>
+  </section>
+
   <section id="zalozkaStyl" hidden data-zalozka="styl">
     <div class="grid">
       <div class="card">
@@ -484,6 +574,7 @@
 <script src="ai.js"></script>
 <script src="app.js"></script>
 <script src="carousel.js"></script>
+<script src="vyroci.js"></script>
 <script src="zpravy.js"></script>
 </body>
 </html>

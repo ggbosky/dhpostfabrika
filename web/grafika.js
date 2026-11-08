@@ -22,15 +22,16 @@ function jasOblasti(ctx, x, y, w, h) {
   } catch { return 0; }
 }
 
-// rezim: "auto" (podle jasu pozadí) | "bila" | "cerna" | "vypnuto"
-function kresliLogo(ctx, rezim = "auto") {
+// rezim: "auto" (podle jasu pozadí) | "bila" | "cerna" | "seda" | "vypnuto"
+function kresliLogo(ctx, rezim = "auto", poloha = LOGO) {
   if (rezim === "vypnuto") return;
-  const m = LOGO.sirka / LOGO_W;
+  const m = poloha.sirka / LOGO_W;
   const vyska = LOGO_H * m;
-  let barva = rezim === "cerna" ? "#1d1d1b" : "#ffffff";
-  if (rezim === "auto") barva = jasOblasti(ctx, LOGO.x, LOGO.y, LOGO.sirka, vyska) > 0.6 ? "#1d1d1b" : "#ffffff";
+  let barva = rezim === "cerna" ? "#1d1d1b" : rezim === "seda" ? "#b7b7b7" : "#ffffff";
+  if (rezim === "auto") barva = jasOblasti(ctx, poloha.x, poloha.y, poloha.sirka, vyska) > 0.6 ? "#1d1d1b" : "#ffffff";
   ctx.save();
-  ctx.translate(LOGO.x, LOGO.y);
+  if (rezim === "seda") ctx.globalAlpha = 0.88;
+  ctx.translate(poloha.x, poloha.y);
   ctx.scale(m, m);
   ctx.fillStyle = barva;
   if (barva === "#ffffff") { ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 10 / m; }
@@ -71,11 +72,12 @@ function tahani(platno, W, H, ziskej, zmena) {
   platno.addEventListener("pointermove", (e) => {
     if (!start) return;
     const { img, pohled } = start.s;
+    const w = start.s.w || W, h = start.s.h || H; // vložená fotka má vlastní rozměr
     const naPlatno = W / platno.getBoundingClientRect().width;
-    const { meritko, iw, ih } = vyrez(img, pohled, W, H);
+    const { meritko, iw, ih } = vyrez(img, pohled, w, h);
     pohled.cx = start.cx - ((e.clientX - start.x) * naPlatno) / meritko / iw;
     pohled.cy = start.cy - ((e.clientY - start.y) * naPlatno) / meritko / ih;
-    omezPohled(img, pohled, W, H);
+    omezPohled(img, pohled, w, h);
     zmena();
   });
   const konec = () => { start = null; };
@@ -127,5 +129,64 @@ async function sdilej(platna, nazvy) {
   try { await navigator.share({ files: soubory }); } catch { /* uživatel zrušil */ }
 }
 
-window.DHG = { LOGO, kresliLogo, vyrez, kresliFoto, omezPohled, tahani, nactiObrazek, slug, naBlob, stahniBlob, stahniPlatno, lzeSdilet, sdilej };
+// Plynulé ztmavení do černé podle šablony (PSD „Dnes před X lety“): křivka průhlednosti
+// naměřená z Photoshopu, žádný viditelný zlom.
+const KRIVKA = [[0, 0], [0.067, 0.09], [0.133, 0.19], [0.2, 0.28], [0.267, 0.38], [0.333, 0.49], [0.4, 0.59],
+  [0.467, 0.68], [0.533, 0.76], [0.6, 0.83], [0.667, 0.88], [0.733, 0.93], [0.8, 0.96], [0.867, 0.98], [1, 1]];
+function ztmaveni(ctx, odY, plneY, W, H) {
+  odY = Math.max(0, odY);
+  plneY = Math.max(odY + 50, Math.min(H, plneY));
+  const g = ctx.createLinearGradient(0, odY, 0, plneY);
+  for (const [t, a] of KRIVKA) g.addColorStop(t, `rgba(0,0,0,${a})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, odY, W, plneY - odY);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, plneY - 1, W, H - plneY + 1);
+}
+
+// Bohatý text: slova v *hvězdičkách* se kreslí barvou zvýraznění.
+function naSlova(radek) {
+  const slova = [];
+  let slovo = [], zv = false;
+  for (const z of radek) {
+    if (z === "*") { zv = !zv; continue; }
+    if (z === " " || z === "\t") { if (slovo.length) slova.push(slovo); slovo = []; continue; }
+    const posl = slovo[slovo.length - 1];
+    if (posl && posl.a === zv) posl.t += z; else slovo.push({ t: z, a: zv });
+  }
+  if (slovo.length) slova.push(slovo);
+  return slova;
+}
+const sirkaSlova = (ctx, s) => s.reduce((a, u) => a + ctx.measureText(u.t).width, 0);
+function zalomBohaty(ctx, text, maxSirka) {
+  const radky = [];
+  const mezera = ctx.measureText(" ").width;
+  for (const odstavec of text.split("\n")) {
+    let radek = [], sirka = 0;
+    for (const s of naSlova(odstavec.trim())) {
+      const ws = sirkaSlova(ctx, s);
+      if (radek.length && sirka + mezera + ws > maxSirka) { radky.push(radek); radek = [s]; sirka = ws; }
+      else { sirka += (radek.length ? mezera : 0) + ws; radek.push(s); }
+    }
+    if (radek.length) radky.push(radek);
+  }
+  return radky;
+}
+function sirkaRadku(ctx, radek) {
+  const mezera = ctx.measureText(" ").width;
+  return radek.reduce((a, s) => a + sirkaSlova(ctx, s), 0) + mezera * (radek.length - 1);
+}
+function kresliBohatyRadek(ctx, radek, x, y, barvaZv, zaklad = "#fff") {
+  const mezera = ctx.measureText(" ").width;
+  for (const slovo of radek) {
+    for (const u of slovo) {
+      ctx.fillStyle = u.a ? barvaZv : zaklad;
+      ctx.fillText(u.t, x, y);
+      x += ctx.measureText(u.t).width;
+    }
+    x += mezera;
+  }
+}
+
+window.DHG = { ztmaveni, zalomBohaty, sirkaRadku, kresliBohatyRadek, LOGO, kresliLogo, vyrez, kresliFoto, omezPohled, tahani, nactiObrazek, slug, naBlob, stahniBlob, stahniPlatno, lzeSdilet, sdilej };
 })();

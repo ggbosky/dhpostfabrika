@@ -101,7 +101,8 @@ function vykresli(r) {
       <p class="zdroje">Zdroje: ${zdrojeHtml(t.zdroje)}</p>
       <div class="akce" style="margin-top:10px">
         <button type="button" class="btn small" data-post="${i}">✍️ Post</button>
-        <button type="button" class="btn small ghost" data-carousel="${i}">🎞️ Carousel${t.format === "carousel" ? " (doporučeno)" : ""}</button>
+        <button type="button" class="btn small ghost" data-carousel="${i}">🎞️ Carousel</button>
+        <button type="button" class="btn small ghost" data-vyroci="${i}">📅 Dnes před lety</button>
       </div>
     </article>`).join("") +
     (r.dotazy?.length ? `<p class="muted" style="font-size:12px">Hledáno: ${r.dotazy.map(esc).join(" · ")}</p>` : "");
@@ -142,7 +143,7 @@ Odpověz POUZE blokem \`\`\`json s polem:
   vykresli(r);
   const ok = temata.filter((t) => t.kontrola.stav === "overeno").length;
   const spatne = temata.filter((t) => t.kontrola.stav === "rozpor").length;
-  zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Klikni na <b>✍️ Post</b> nebo <b>🎞️ Carousel</b>.`, spatne ? "varovani" : "ok");
+  zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b>, <b>🎞️ Carousel</b> nebo <b>📅 Dnes před lety</b>.`, spatne ? "varovani" : "ok");
 }
 
 function zadaniZTematu(t) {
@@ -206,6 +207,9 @@ function init() {
     if (b.dataset.post) {
       const t = temata[Number(b.dataset.post)];
       window.DHPost.navrhni(zadaniZTematu(t), t.zdroje);
+    } else if (b.dataset.vyroci) {
+      const t = temata[Number(b.dataset.vyroci)];
+      window.DHVyroci.navrhni(zadaniZTematu(t), t.zdroje);
     } else if (b.dataset.carousel) {
       const t = temata[Number(b.dataset.carousel)];
       window.DHCarousel.navrhni(zadaniZTematu(t), t.zdroje, Math.min(6, Math.max(3, t.fakta.length)));
@@ -213,6 +217,7 @@ function init() {
   });
   $("#overitPost").addEventListener("click", (e) => overFakta($("#text").value, $("#overeniPost"), e.currentTarget));
   $("#cOverit").addEventListener("click", (e) => overFakta(window.DHCarousel.textKOvereni(), $("#cOvereni"), e.currentTarget));
+  $("#vOverit").addEventListener("click", (e) => overFakta(window.DHVyroci.textKOvereni(), $("#vOvereni"), e.currentTarget));
 }
 
 init();

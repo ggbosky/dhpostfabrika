@@ -39,6 +39,12 @@ Záložka **Carousel** (podle šablony Deníku hokeje, až 20 slidů):
 
 Logo je i na jednoduchém postu (záložka **Nový post**).
 
+Záložka **📅 Dnes před lety** – single post podle šablony „Dnes před X lety“ (PSD Deníku hokeje):
+velká fotka nahoře, plynulý přechod do černé, vpravo nahoře `DNES PŘED 31 LETY` (počítá se sám
+z data) a žluté datum, malá kulatá fotka s barevným rámečkem a text písmem Anton, kde slova
+v `*hvězdičkách*` mají barvu zvýraznění (modrá, červená, žlutá… nebo vlastní). AI umí navrhnout
+text, popisek, barvu týmu i obě fotky; z **Témat** se sem jde tlačítkem **📅 Dnes před lety**.
+
 ### 🔎 Témata a ověřování faktů (s AI klíčem)
 
 - Záložka **🔎 Témata**: AI prohledá web (Google) a najde 6 **zajímavostí** – milníky, rekordy,
