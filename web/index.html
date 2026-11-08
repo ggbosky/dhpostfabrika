@@ -4,190 +4,285 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DH Post Fabrika</title>
-<meta name="description" content="Tvorba Instagram příspěvků pro @denik_hokeje – bez AI, bez klíčů, vše v prohlížeči.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏒</text></svg>">
+<meta name="description" content="Redakční nástroj Deníku hokeje: posty, carousely, zajímavosti se zdroji.">
+<link rel="icon" type="image/png" href="brand/favicon.png">
+<link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
+<meta name="theme-color" content="#090909">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600;700&family=Montserrat:wght@900&family=Roboto+Condensed:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600;700&family=Montserrat:wght@800;900&family=Roboto+Condensed:ital,wght@0,500;0,700;0,800;1,700&display=swap" rel="stylesheet">
 <style>
+  /* Deník hokeje – brand: krvavě červená, černá, bílá, žlutá na zvýraznění */
   :root {
-    --bg: #f3f4f6; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
-    --accent: #d90429; --accent-text: #ffffff; --input: #ffffff; --soft: #f9fafb;
-    --ok-bg: #dcfce7; --ok-text: #166534; --warn-bg: #fef3c7; --warn-text: #92400e;
-    --err-bg: #fee2e2; --err-text: #991b1b;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0b0f17; --card: #141a24; --text: #e5e7eb; --muted: #9ca3af; --line: #263041;
-      --accent: #ef233c; --input: #0f141d; --soft: #111722;
-      --ok-bg: #12301f; --ok-text: #86efac; --warn-bg: #3a2a0c; --warn-text: #fcd34d;
-      --err-bg: #3b1214; --err-text: #fca5a5;
-    }
+    color-scheme: dark;
+    --bg: #090909; --card: #131313; --card-2: #181818; --soft: #1c1c1c; --input: #0d0d0d;
+    --line: #272727; --line-2: #333; --text: #f4f4f4; --muted: #9b9b9b;
+    --red: #b0121a; --red-hot: #e01e26; --red-deep: #5c070b; --yellow: #ffc000;
+    --accent: var(--red-hot); --accent-text: #fff;
+    --ok-bg: rgba(46, 160, 67, .14); --ok-text: #8fe3a0;
+    --warn-bg: rgba(255, 192, 0, .12); --warn-text: #ffd24d;
+    --err-bg: rgba(224, 30, 38, .16); --err-text: #ff8d92;
+    --nadpis: "Montserrat", "Arial Black", Impact, sans-serif;
+    --uzke: "Roboto Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+    --zkosen: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 24px; max-width: 1280px; margin: 0 auto; }
-  header h1 { font: 700 26px/1.1 Oswald, Impact, sans-serif; letter-spacing: .02em; margin: 0; text-transform: uppercase; }
-  header h1 span { color: var(--accent); }
+  html { background: var(--bg); }
+  body {
+    margin: 0; color: var(--text); font: 15px/1.55 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(1100px 520px at 50% -260px, rgba(176, 18, 26, .38), transparent 70%),
+      linear-gradient(180deg, #0b0b0b 0, var(--bg) 600px);
+    min-height: 100vh;
+  }
+  ::selection { background: var(--red-hot); color: #fff; }
+  a { color: var(--red-hot); }
+
+  /* ------------------------------------------------------------ hlavička */
+  .hero {
+    position: relative; overflow: hidden; border-bottom: 1px solid #000;
+    background: linear-gradient(90deg, rgba(9,9,9,.97) 0%, rgba(9,9,9,.82) 45%, rgba(92,7,11,.55) 100%), url("brand/praha.webp") center 60% / cover no-repeat, #1a0204;
+  }
+  .hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(90deg, var(--red-hot), var(--red) 60%, transparent); }
+  .hero-in { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 22px 24px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+  .avatar { width: 68px; height: 68px; border-radius: 50%; box-shadow: 0 0 0 3px #000, 0 0 0 5px var(--red), 0 10px 30px rgba(224, 30, 38, .35); flex: none; }
+  .znacka { display: flex; flex-direction: column; gap: 6px; }
+  .wordmark { width: 92px; height: auto; fill: #fff; display: block; }
+  .hero h1 { margin: 0; font: 900 clamp(26px, 4.2vw, 42px)/.95 var(--nadpis); letter-spacing: -.01em; text-transform: uppercase; }
+  .hero h1 span { color: var(--red-hot); text-shadow: 0 0 24px rgba(224, 30, 38, .45); }
+  .podtitul { font: 700 12px var(--uzke); letter-spacing: .18em; text-transform: uppercase; color: #cfcfcf; }
   .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
-  .pill { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); }
-  .pill.ok { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
-  .pill.warn { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
-  nav { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-  .tab { background: none; border: 0; color: var(--muted); font: 600 15px Inter, sans-serif; padding: 10px 14px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
-  .tab.on { color: var(--text); border-bottom-color: var(--accent); }
-  main { max-width: 1280px; margin: 0 auto; padding: 20px 24px 48px; }
-  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .pill { font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; padding: 6px 11px; border-radius: 999px; background: rgba(0,0,0,.55); border: 1px solid var(--line-2); color: #cfcfcf; backdrop-filter: blur(6px); }
+  .pill::before { content: "●"; margin-right: 6px; color: #666; }
+  .pill.ok { color: var(--ok-text); border-color: rgba(143, 227, 160, .35); }
+  .pill.ok::before { color: #3fd16a; }
+  .pill.warn { color: var(--warn-text); border-color: rgba(255, 210, 77, .3); }
+  .pill.warn::before { color: var(--yellow); }
+
+  /* -------------------------------------------------------------- záložky */
+  nav { position: sticky; top: 0; z-index: 20; background: rgba(9, 9, 9, .86); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  .nav-in { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .tab { background: none; border: 0; color: var(--muted); font: 700 15px var(--uzke); letter-spacing: .07em; text-transform: uppercase; padding: 15px 16px 13px; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; transition: color .15s; }
+  .tab:hover { color: #fff; }
+  .tab.on { color: #fff; border-bottom-color: var(--red-hot); text-shadow: 0 0 18px rgba(224, 30, 38, .6); }
+
+  main { max-width: 1280px; margin: 0 auto; padding: 26px 24px 56px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+
+  /* --------------------------------------------------------------- karty */
+  .card { position: relative; background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: 0 18px 40px rgba(0, 0, 0, .35); }
+  .ai-karta { border-color: rgba(224, 30, 38, .45); background: linear-gradient(180deg, rgba(176, 18, 26, .16), var(--card) 70%); }
+  .ai-karta::before { content: ""; position: absolute; left: 22px; right: 22px; top: -1px; height: 2px; background: linear-gradient(90deg, var(--red-hot), transparent); }
+  h2 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font: 900 18px/1.2 var(--nadpis); text-transform: uppercase; letter-spacing: .01em; margin: 0 0 16px; }
+  h2::before { content: ""; width: 5px; height: 16px; background: var(--red-hot); align-self: center; transform: skewX(-14deg); flex: none; }
+  h2 .muted { font: 600 12px var(--uzke) !important; letter-spacing: .05em; text-transform: none; }
+  .muted { color: var(--muted); }
+  code { background: #000; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 12.5px; }
+
   #zalozkaPost { grid-template-rows: auto auto 1fr; }
-  #vysledek { grid-column: 2; grid-row: 1 / span 3; }
+  #vysledek { grid-column: 2; grid-row: 1 / span 3; position: sticky; top: 64px; }
   #aiPostKarta, #formular { grid-column: 1; }
-  .ai-karta { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
-  .zprava.varovani { background: var(--warn-bg); color: var(--warn-text); }
+  #historieKarta { grid-column: 1; }
+  #zalozkaCarousel > div > .card + .card { margin-top: 22px; }
+  #cVysledek { position: sticky; top: 64px; }
+
+  /* ---------------------------------------------------------- formuláře */
+  #typy { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .chip { border: 1px solid var(--line-2); background: #101010; color: #ddd; border-radius: 999px; padding: 8px 14px; font: 700 14px var(--uzke); letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: all .15s; }
+  .chip:hover { border-color: var(--red-hot); color: #fff; }
+  .chip.on { background: linear-gradient(180deg, var(--red-hot), var(--red)); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(224, 30, 38, .35); }
+  #pole { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 14px; }
+  label { display: flex; flex-direction: column; gap: 6px; font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  label.cela { grid-column: 1 / -1; }
+  .req { color: var(--red-hot); }
+  input, select, textarea { font: 400 15px/1.45 Inter, system-ui, sans-serif; letter-spacing: 0; text-transform: none; color: var(--text); background: var(--input); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; width: 100%; transition: border-color .15s, box-shadow .15s; }
+  input::placeholder, textarea::placeholder { color: #5f5f5f; }
+  select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #999 50%), linear-gradient(135deg, #999 50%, transparent 50%); background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 34px; }
+  textarea { resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--red-hot); box-shadow: 0 0 0 3px rgba(224, 30, 38, .22); }
+  .chyba { border-color: var(--red-hot) !important; background: var(--err-bg) !important; }
+  .check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font: 600 14px Inter, sans-serif; letter-spacing: 0; text-transform: none; }
+  .check input { width: auto; accent-color: var(--red-hot); }
+  input[type=range] { accent-color: var(--red-hot); padding: 0; border: 0; background: none; box-shadow: none; }
+  input[type=color] { padding: 3px; height: 42px; }
+  input[type=file] { display: none; }
+
+  /* ------------------------------------------------------------ tlačítka */
+  .akce { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; background: linear-gradient(180deg, var(--red-hot), var(--red)); color: #fff; clip-path: var(--zkosen); padding: 12px 24px; font: 800 15px var(--uzke); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: filter .15s, transform .15s; }
+  .btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { filter: grayscale(.6) brightness(.7); cursor: progress; transform: none; }
+  .btn.ghost { background: #222; color: #eee; }
+  .btn.ghost:hover { background: #2c2c2c; filter: none; }
+  .btn.small { padding: 8px 16px; font-size: 13px; }
+  label.btn { color: #eee !important; }
+  .ikona { border: 1px solid var(--line-2); background: #101010; color: #ddd; border-radius: 8px; width: 34px; height: 32px; cursor: pointer; font-size: 15px; }
+  .ikona:hover:not(:disabled) { border-color: var(--red-hot); color: #fff; }
+  .ikona:disabled { opacity: .3; cursor: default; }
+
+  /* -------------------------------------------------------------- zprávy */
+  .zprava { margin-top: 14px; padding: 11px 14px; border-radius: 10px; background: var(--soft); border-left: 3px solid #555; }
+  .zprava.chyba { background: var(--err-bg); color: var(--err-text); border-left-color: var(--red-hot); }
+  .zprava.ok { background: var(--ok-bg); color: var(--ok-text); border-left-color: #3fd16a; }
+  .zprava.varovani { background: var(--warn-bg); color: var(--warn-text); border-left-color: var(--yellow); }
   .zprava ul { margin: 6px 0 0; padding-left: 20px; }
-  dialog#fotoDialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); padding: 18px; }
-  dialog#fotoDialog::backdrop { background: rgba(0,0,0,.55); }
-  .dlg-hlava { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .upozorneni { font-size: 13px; background: var(--warn-bg); color: var(--warn-text); padding: 8px 10px; border-radius: 8px; margin-top: 10px; }
+
+  /* ------------------------------------------------------------- náhledy */
+  #nahled, .nahled { position: relative; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px #000, 0 20px 50px rgba(0, 0, 0, .6); }
+  #nahled.drop, .nahled.drop { outline: 3px dashed var(--red-hot); outline-offset: 3px; }
+  #platno, .nahled canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
+  .ovladani { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; margin-top: 16px; }
+  .ovladani .cela { grid-column: 1 / -1; }
+  .radek { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  #text { min-height: 300px; }
+  #pocty, .pocty { display: flex; gap: 14px; font: 600 12px var(--uzke); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+  #pocty .spatne, .pocty .spatne { color: var(--err-text); }
+  #cNahledy { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0 4px; }
+  #cNahledy canvas { width: 72px; height: 90px; border-radius: 6px; border: 2px solid #222; cursor: pointer; flex: none; background: #000; transition: transform .15s; }
+  #cNahledy canvas:hover { transform: translateY(-2px); }
+  #cNahledy canvas.on { border-color: var(--red-hot); box-shadow: 0 0 14px rgba(224, 30, 38, .5); }
+
+  /* ------------------------------------------------------------- historie */
+  #historie { display: flex; flex-direction: column; gap: 6px; }
+  .hist { display: flex; justify-content: space-between; gap: 10px; text-align: left; background: #101010; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 9px 12px; cursor: pointer; font: 500 14px Inter, sans-serif; transition: border-color .15s; }
+  .hist:hover { border-color: var(--red-hot); }
+  .hist span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist small { color: var(--muted); white-space: nowrap; }
+
+  /* ---------------------------------------------------------------- styl */
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0 0 16px; }
+  dt { color: var(--muted); font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; padding-top: 2px; }
+  dd { margin: 0; word-break: break-word; }
+  ol { padding-left: 20px; margin: 8px 0 0; }
+  details summary { cursor: pointer; font-weight: 600; }
+
+  /* ------------------------------------------------------------ carousel */
+  .napoveda { font-size: 13px; margin: 0 0 14px; }
+  .cervena { color: #ff4d4d; }
+  .zluta { color: var(--yellow); }
+  .slide-karta { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #0f0f0f; cursor: pointer; transition: border-color .15s; }
+  .slide-karta:hover { border-color: var(--line-2); }
+  .slide-karta.on { border-color: var(--red-hot); box-shadow: inset 3px 0 0 var(--red-hot), 0 0 0 1px rgba(224, 30, 38, .35); background: #141010; }
+  .slide-hlava { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .slide-hlava b { font: 800 14px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
+  .slide-hlava .ikony { display: flex; gap: 4px; }
+  .slide-pole { display: grid; gap: 10px; }
+  .slide-pole .dva { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .foto-radek { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .foto-radek .jmeno { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+
+  /* -------------------------------------------------------------- témata */
+  .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .filtry .cela { grid-column: 1 / -1; }
+  .filtry.tri { grid-template-columns: repeat(3, 1fr); }
+  #tSeznam { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; margin-top: 22px; }
+  #tSeznam > p { grid-column: 1 / -1; }
+  .tema { position: relative; background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--line); border-radius: 16px; padding: 20px 20px 18px; display: flex; flex-direction: column; overflow: hidden; transition: border-color .15s, transform .15s; }
+  .tema::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--red-hot), var(--red-deep)); }
+  .tema:hover { border-color: #3a3a3a; transform: translateY(-2px); }
+  .tema-hlava { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .tema h3 { margin: 0 0 10px; font: 900 17px/1.25 var(--nadpis); text-transform: uppercase; }
+  .tema-hlava .muted { font: 700 12px var(--uzke); letter-spacing: .06em; white-space: nowrap; color: var(--yellow); }
+  .tema ul { margin: 0 0 10px; padding-left: 18px; }
+  .tema li { margin-bottom: 5px; }
+  .tema li::marker { color: var(--red-hot); }
+  .tema .proc { margin: 0 0 10px; font-size: 14px; color: #d6d6d6; }
+  .tema .zdroje, .overeni small { font-size: 13px; color: var(--muted); margin: auto 0 0; }
+  .zdroje a, .overeni a { color: #ff6b70; text-decoration: none; border-bottom: 1px solid rgba(255, 107, 112, .4); }
+  .zdroje a:hover, .overeni a:hover { color: #fff; border-color: #fff; }
+  .bez-zdroje { color: var(--warn-text); }
+  .kontrola { font: 700 13px var(--uzke); letter-spacing: .03em; margin: 0 0 10px; padding: 7px 10px; border-radius: 8px; background: #0e0e0e; border: 1px solid var(--line); }
+  .kontrola.overeno { color: var(--ok-text); border-color: rgba(143, 227, 160, .3); background: var(--ok-bg); }
+  .kontrola.rozpor { color: var(--err-text); border-color: rgba(255, 141, 146, .35); background: var(--err-bg); }
+  .kontrola.nejiste, .kontrola.chyba { color: var(--warn-text); border-color: rgba(255, 210, 77, .3); background: var(--warn-bg); }
+  .kontrola.ceka { color: var(--muted); }
+  .tema.spatne { opacity: .72; }
+  ul.overeni { list-style: none; padding: 0; margin: 10px 0 0; }
+  ul.overeni li { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid rgba(255, 255, 255, .08); }
+  #overeniPost, #cOvereni { margin-top: 4px; }
+
+  /* -------------------------------------------------------------- dialog */
+  dialog#fotoDialog { width: min(940px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--line-2); border-radius: 16px; background: var(--card); color: var(--text); padding: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .7); }
+  dialog#fotoDialog::backdrop { background: rgba(0, 0, 0, .75); backdrop-filter: blur(3px); }
+  .dlg-hlava { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; font: 800 15px var(--uzke); letter-spacing: .05em; text-transform: uppercase; }
   .dlg-hledat { flex-wrap: nowrap; }
   .dlg-hledat input { flex: 1; }
   .dlg-info { font-size: 13px; margin: 10px 0; }
   .dlg-mrizka { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
   .dlg-mrizka button { position: relative; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; cursor: pointer; background: #000; aspect-ratio: 4 / 5; }
-  .dlg-mrizka button:hover { border-color: var(--accent); }
+  .dlg-mrizka button:hover { border-color: var(--red-hot); }
   .dlg-mrizka img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .dlg-mrizka span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 11px; color: #fff; background: rgba(0,0,0,.6); padding: 3px 6px; }
-  #historieKarta { grid-column: 1; }
-  h2 { font-size: 17px; margin: 0 0 14px; }
-  .muted { color: var(--muted); }
-  #typy { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-  .chip { border: 1px solid var(--line); background: var(--soft); color: var(--text); border-radius: 999px; padding: 7px 12px; font: 500 14px Inter, sans-serif; cursor: pointer; }
-  .chip.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-  #pole { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
-  label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; font-weight: 600; color: var(--muted); }
-  label.cela { grid-column: 1 / -1; }
-  .req { color: var(--accent); }
-  input, select, textarea { font: 400 15px/1.45 Inter, system-ui, sans-serif; color: var(--text); background: var(--input); border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; width: 100%; }
-  textarea { resize: vertical; }
-  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-  .chyba { border-color: var(--accent) !important; background: var(--err-bg) !important; }
-  .akce { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); border-radius: 10px; padding: 11px 18px; font: 600 16px Inter, sans-serif; cursor: pointer; text-decoration: none; }
-  .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
-  .btn.small { padding: 7px 12px; font-size: 14px; }
-  .btn:hover { filter: brightness(1.06); }
-  .zprava { margin-top: 14px; padding: 10px 12px; border-radius: 9px; background: var(--soft); }
-  .zprava.chyba { background: var(--err-bg); color: var(--err-text); }
-  .zprava.ok { background: var(--ok-bg); color: var(--ok-text); }
-  #nahled { position: relative; border-radius: 10px; overflow: hidden; background: #000; }
-  #nahled.drop { outline: 3px dashed var(--accent); }
-  #platno { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
-  .ovladani { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 14px; }
-  .ovladani .cela { grid-column: 1 / -1; }
-  .radek { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-weight: 500; }
-  .check input { width: auto; }
-  input[type=color] { padding: 2px; height: 40px; }
-  input[type=file] { display: none; }
-  #text { min-height: 300px; }
-  #pocty { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
-  #pocty .spatne { color: var(--err-text); font-weight: 600; }
-  .upozorneni { font-size: 13px; background: var(--warn-bg); color: var(--warn-text); padding: 8px 10px; border-radius: 8px; margin-top: 10px; }
-  #historie { display: flex; flex-direction: column; gap: 6px; }
-  .hist { display: flex; justify-content: space-between; gap: 10px; text-align: left; background: var(--soft); border: 1px solid var(--line); color: var(--text); border-radius: 9px; padding: 8px 10px; cursor: pointer; font: 500 14px Inter, sans-serif; }
-  .hist span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .hist small { color: var(--muted); white-space: nowrap; }
-  dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 16px; }
-  dt { color: var(--muted); font-size: 13px; font-weight: 600; }
-  dd { margin: 0; word-break: break-word; }
-  ol { padding-left: 20px; margin: 8px 0 0; }
-  footer { max-width: 1280px; margin: 0 auto; padding: 0 24px 32px; font-size: 13px; color: var(--muted); }
-  .napoveda { font-size: 13px; margin: 0 0 14px; }
-  .cervena { color: #c81414; }
-  .zluta { color: #b98900; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .zluta { color: #ffc000; } :root:not([data-theme="light"]) .cervena { color: #ff4d4d; } }
-  #zalozkaCarousel > div > .card + .card { margin-top: 20px; }
-  #cVysledek { position: sticky; top: 12px; }
-  .slide-karta { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; background: var(--soft); cursor: pointer; }
-  .slide-karta.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--card); }
-  .slide-hlava { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-  .slide-hlava b { font-size: 14px; }
-  .slide-hlava .ikony { display: flex; gap: 4px; }
-  .ikona { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; width: 34px; height: 32px; cursor: pointer; font-size: 15px; }
-  .ikona:disabled { opacity: .35; cursor: default; }
-  .slide-pole { display: grid; gap: 10px; }
-  .slide-pole .dva { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .foto-radek { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
-  .foto-radek .jmeno { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-  .nahled { position: relative; border-radius: 10px; overflow: hidden; background: #000; }
-  .nahled.drop { outline: 3px dashed var(--accent); }
-  .nahled canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
-  #cNahledy { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 4px; }
-  #cNahledy canvas { width: 72px; height: 90px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; flex: none; background: #000; }
-  #cNahledy canvas.on { border-color: var(--accent); }
-  .pocty { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
-  .pocty .spatne { color: var(--err-text); font-weight: 600; }
-  .filtry { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
-  .filtry .cela { grid-column: 1 / -1; }
-  #tSeznam { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 20px; }
-  #tSeznam > p { grid-column: 1 / -1; }
-  .tema { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; }
-  .tema-hlava { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-  .tema h3 { margin: 0 0 8px; font-size: 17px; line-height: 1.3; }
-  .tema-hlava .muted { font-size: 13px; white-space: nowrap; }
-  .tema ul { margin: 0 0 8px; padding-left: 18px; }
-  .tema li { margin-bottom: 4px; }
-  .tema .proc { margin: 0 0 8px; font-size: 14px; }
-  .tema .zdroje, .overeni small { font-size: 13px; color: var(--muted); margin: auto 0 0; }
-  .zdroje a, .overeni a { color: var(--accent); }
-  .bez-zdroje { color: var(--warn-text); }
-  ul.overeni { list-style: none; padding: 0; margin: 10px 0 0; }
-  ul.overeni li { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
-  #overeniPost, #cOvereni { margin-top: 4px; }
+  .dlg-mrizka span { position: absolute; left: 0; right: 0; bottom: 0; font-size: 11px; color: #fff; background: rgba(0, 0, 0, .7); padding: 3px 6px; }
+
+  /* -------------------------------------------------------------- patička */
+  footer { border-top: 1px solid var(--line); }
+  .footer-in { max-width: 1280px; margin: 0 auto; padding: 22px 24px 34px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+  .footer-in .wordmark { width: 64px; fill: #555; }
+
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
     #vysledek, #historieKarta, #aiPostKarta, #formular { grid-column: auto; grid-row: auto; }
+    #vysledek, #cVysledek { position: static; }
+    #cVysledek { order: -1; }
     .slide-pole .dva { grid-template-columns: 1fr; }
-    #cVysledek { position: static; order: -1; }
-    .filtry { grid-template-columns: 1fr; }
+    .filtry, .filtry.tri { grid-template-columns: 1fr; }
     #tSeznam { grid-template-columns: 1fr; }
-    header, nav, main, footer { padding-left: 16px; padding-right: 16px; }
+    .hero-in, .nav-in, main, .footer-in { padding-left: 16px; padding-right: 16px; }
+    .pills { margin-left: 0; width: 100%; }
   }
   @media (max-width: 520px) {
     #pole, .ovladani { grid-template-columns: 1fr; }
     dl { grid-template-columns: 1fr; }
     dd { margin-bottom: 8px; }
+    .avatar { width: 56px; height: 56px; }
+    .card { padding: 18px; }
+    .tab { padding: 13px 12px 11px; font-size: 14px; }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>DH <span>Post</span> Fabrika</h1>
-  <div class="pills">
+<header class="hero">
+  <div class="hero-in">
+    <img class="avatar" src="brand/dh-avatar.webp" alt="Deník hokeje" width="68" height="68">
+    <div class="znacka">
+      <svg class="wordmark" viewBox="0 0 392.64 210.62" role="img" aria-label="Deník hokeje"><path d="M56.6,46.41c-1.6-5.55-3.8-10.06-6.61-13.54-2.81-3.48-5.88-5.95-9.22-7.41-3.34-1.47-8.28-2.2-14.84-2.2H0V109.16H26.69c5.74,0,10.43-.81,14.08-2.43s6.76-4.03,9.34-7.24c2.57-3.2,4.7-7.55,6.38-13.04,1.68-5.48,2.52-11.94,2.52-19.36,0-8.24-.8-15.14-2.41-20.68Zm-13.53,34.81c-.86,3.75-1.95,6.49-3.25,8.23-1.31,1.74-2.99,3.03-5.04,3.89s-5.36,1.29-9.93,1.29H14.18V37.79h6.45c5.7,0,9.55,.26,11.54,.76,2.66,.67,4.91,2.05,6.77,4.16,1.85,2.11,3.22,5,4.1,8.66,.88,3.67,1.32,8.69,1.32,15.05s-.43,11.06-1.29,14.8Z"/><path d="M85.31,94.63v-23.32h35.39v-14.47h-35.39v-19.05h38.09v-14.53h-52.27V109.16h53.56v-14.53h-39.38Z"/><path d="M191.85,89.64c-.28-.07-.56-.12-.85-.13-.3,.04-.61,.07-.92,.12-.55,.1-1.07,.29-1.56,.56-.61,.32-1.14,.75-1.61,1.26-.26,.28-.43,.6-.52,.97-.18,.79-.04,1.54,.25,2.28,.07,.16,.17,.32,.24,.48,.28,.61,.47,1.23,.44,1.91-.01,.18-.01,.36,0,.54,.02,.54-.1,1.06-.24,1.56-.18,.63-.4,1.23-.72,1.8-.08,.13-.14,.28-.21,.41-.17,.33-.21,.69-.22,1.06,0,.12,.03,.26,.09,.37,.12,.22,.26,.44,.4,.66,.23,.36,.56,.59,.96,.74,.92,.37,1.75,.88,2.42,1.63,.13,.14,.25,.29,.3,.48,.24,.86,.59,1.68,.94,2.5,.05,.11,.09,.21,.14,.32h1.59v-19.28c-.3-.08-.61-.17-.92-.24Zm-12.32-66.38v48.09c.48-.1,.97-.19,1.45-.29,.14-.03,.28-.04,.42-.05,.19-.02,.38-.04,.58-.06,.14-.01,.28-.02,.42-.02,.35,0,.7,.01,1.04-.06,.13-.03,.26-.02,.39-.02h4.26c.2,.01,.39,.03,.58,.05,.14,.01,.28,.02,.43,.03,.38,0,.77,0,1.16,0,.23,.01,.46,.04,.69,.05,.25,0,.49,.02,.74,.03,.35,0,.69-.02,1.04,.06h.04V23.26h-13.24Zm-28.83,0h-13.82V88.91c.54-.7,1.17-1.3,1.8-1.93,.72-.74,1.52-1.39,2.32-2.05,1.21-.99,2.51-1.86,3.82-2.72,.3-.2,.6-.39,.89-.6,.19-.14,.37-.29,.55-.44,.53-.44,1.11-.8,1.71-1.13,.35-.19,.73-.32,1.11-.45,.45-.17,.5-.15,.43-.65-.05-.35-.05-.72,.03-1.08,.01-.09,.02-.18,.02-.27,0-.47,.08-.92,.14-1.39,.04-.37,.05-.74,.02-1.12-.01-.12-.05-.22-.16-.29-.14-.08-.21-.22-.31-.34-.2-.25-.41-.5-.6-.76-.25-.33-.49-.66-.72-1.01-.12-.18-.22-.38-.34-.56-.23-.35-.38-.73-.51-1.12-.14-.41-.27-.81-.39-1.22-.03-.13-.06-.26-.06-.38,0-.4-.03-.8,.04-1.2,.03-.14,.03-.28,.03-.43,0-.62,.21-1.19,.5-1.73,.19-.34,.44-.63,.69-.93,.32-.36,.64-.71,.98-1.04,.39-.39,.81-.76,1.25-1.09v-9.84l3.76,7.42s.04-.02,.06-.03c.76-.4,1.53-.8,2.3-1.19,.31-.16,.63-.31,.95-.43,.47-.19,.97-.28,1.48-.31,.2-.01,.41,.01,.62,0,1.08-.03,2.05,.32,2.93,.93,.27,.19,.57,.25,.87,.31,.55,.1,1.1,.18,1.64,.3,1.15,.27,2.25,.69,3.2,1.41,.75,.56,1.37,1.25,1.8,2.1,.4,.78,.63,1.61,.75,2.47,.05,.33,.06,.67,.09,1v.04c-.09,.83-.11,1.67-.35,2.48-.32,1.07-.58,2.15-.77,3.25-.03,.16-.06,.32-.05,.53,.09-.01,.14-.01,.19-.02,1.49-.32,2.98-.65,4.47-.96,.41-.08,.82-.17,1.23-.25l-24.59-48.93Z"/><path d="M207.31,23.26v52.49c.71,.28,1.39,.6,2.03,1.03,.5,.34,.93,.74,1.28,1.22,.31,.41,.53,.86,.63,1.36,.04,.2,.12,.37,.2,.55,.66,1.39,1.31,2.78,1.97,4.17,.24,.51,.49,1.02,.73,1.54,.42,.91,.86,1.82,1.27,2.74,.24,.55,.44,1.13,.62,1.71,.21,.66,.4,1.34,.56,2.01,.16,.63,.26,1.27,.34,1.91,.09,.67,.05,1.34,.06,2.01,0,.14-.03,.28-.06,.42-.05,.26-.07,.52-.01,.77,.15,.61,.04,1.21-.13,1.8-.26,.91-.7,1.74-1.26,2.51-.01,.02-.03,.05-.04,.06-.25,.27-.34,.58-.24,.93,.01,.05,.01,.11,.01,.16-.03,.34-.06,.69-.08,1.04-.01,.12-.01,.25,0,.38,.03,.4,.08,.8,.1,1.2,.02,.24,.06,.49,.17,.71,.29,.64,.26,1.31,.17,1.98-.01,.1-.03,.2-.06,.3-.06,.22-.03,.43,.06,.64,.03,.08,.07,.17,.09,.26h5.77V23.26h-14.18ZM213.53,0l-6.63,17.52h8.57L228.75,0h-15.22Z"/><path d="M270.83,56.74l26.56-33.48h-19.16l-28.79,38.24V23.26h-14.18V109.16h14.18v-25.96l11.52-14.41,19.44,40.37h18.4l-27.97-52.42Z"/><path d="M42.25,123.26v33.81H14.3v-33.81H.12v85.9H14.3v-37.56h27.95v37.56h14.18V123.26h-14.18Z"/><path d="M136.02,156.98c-.77,.46-1.54,.93-2.31,1.39-1.46,.89-2.91,1.78-4.37,2.67-1.28,.78-2.56,1.55-3.84,2.32-.99,.61-1.98,1.21-2.98,1.82-.21,.13-.42,.26-.64,.39v.29c0,10.16-1.84,17.68-5.52,22.59-3.68,4.9-8.31,7.35-13.91,7.35s-10.21-2.47-13.96-7.41c-1.34-1.77-2.45-3.85-3.31-6.25-.32-.06-.65-.12-.97-.19-1.02-.22-2.04-.45-3.03-.77-.59-.19-1.19-.37-1.78-.57-.95-.33-1.89-.68-2.8-1.12-.44-.21-.89-.41-1.33-.63-.95-.49-1.87-1.04-2.76-1.65-.56-.38-.89-.93-1.13-1.54-.38-.99-.3-1.97,.13-2.93,.19-.43,.42-.83,.72-1.2,.31-.38,.66-.72,1.11-.93,.54-.26,1.1-.35,1.7-.24,.45,.09,.86,.26,1.24,.51,.48,.3,.98,.59,1.48,.85,.78,.4,1.57,.79,2.37,1.14,1.02,.45,2.04,.88,3.07,1.3,.05,.02,.09,.04,.14,.06-.33-2.48-.49-5.17-.49-8.08,0-10.08,1.82-17.52,5.46-22.32,3.64-4.81,8.35-7.21,14.14-7.21s10.48,2.38,14.06,7.15c3.12,4.16,4.88,10.29,5.29,18.41,1.29-.77,2.58-1.55,3.87-2.32,1.41-.85,2.83-1.71,4.24-2.56,1.75-1.05,3.5-2.1,5.25-3.15,.15-.09,.29-.18,.44-.26-1.36-8.4-4.23-15.25-8.6-20.55-6.34-7.7-14.56-11.54-24.64-11.54-6.95,0-12.87,1.62-17.75,4.86-4.88,3.24-8.84,8.17-11.86,14.79-3.03,6.63-4.55,15.05-4.55,25.29,0,14.1,3.36,25.19,10.08,33.28,5.9,7.07,13.95,10.6,24.14,10.6s18.13-3.57,24.03-10.72c6.71-8.08,10.07-19.31,10.07-33.69,0-3.25-.16-6.32-.5-9.23Z"/><path d="M199.6,123.26c.13,.25,.27,.5,.4,.75,.1,.18,.19,.36,.28,.55,.55,1.08,1.1,2.17,1.64,3.25,.44,.87,.87,1.73,1.29,2.61,.14,.29,.27,.57,.4,.86l6.36-8.02h-10.37Zm-10.37,44.38c-.11-.07-.22-.14-.34-.21-.5-.29-1.01-.57-1.49-.9-.68-.48-1.3-1.02-1.79-1.7-.08-.12-.17-.22-.27-.34-.08,.05-.15,.1-.21,.14-.25,.17-.5,.36-.77,.52-.46,.28-.97,.34-1.49,.26-.14-.02-.27-.08-.39-.16-.67-.42-1.33-.84-1.98-1.29-.77-.52-1.52-1.07-2.28-1.61-.61-.43-1.22-.87-1.83-1.3-.84-.6-1.67-1.21-2.51-1.81-1-.72-1.99-1.44-2.98-2.17-.49-.35-.98-.72-1.47-1.07-.7-.52-1.42-1.03-2.12-1.54l-5.3,7.04v-12.2c-.06-.1-.11-.2-.16-.31-.3-.65-.61-1.31-.91-1.97-.2-.44-.39-.9-.58-1.35-.11-.25-.22-.49-.33-.74-.23-.55-.45-1.1-.68-1.65-.02-.05-.03-.1-.06-.14-.07-.15-.16-.18-.31-.1-.24,.13-.47,.27-.7,.41-.91,.55-1.81,1.1-2.72,1.65-1.15,.71-2.31,1.41-3.47,2.12-1.19,.72-2.39,1.44-3.58,2.16-.23,.14-.45,.28-.68,.42v59.36h14.18v-25.96l11.53-14.41,19.43,40.37h18.41l-22.15-41.52Zm-31.16-27.58c-.08-.21-.18-.28-.41-.19-.71,.27-1.43,.47-2.15,.65-.86,.21-1.71,.42-2.56,.64-.42,.11-.84,.11-1.27,.05-.27-.04-.54-.07-.8-.13-.3-.06-.56-.18-.72-.48-.04-.08-.11-.14-.17-.21-.66-.71-1.27-1.46-1.81-2.26-.12-.18-.24-.37-.35-.55v8.95c.68-.41,1.35-.83,2.03-1.24,1.26-.75,2.52-1.51,3.79-2.27,1.36-.81,2.72-1.63,4.08-2.45,.08-.04,.16-.09,.23-.14,.16-.11,.18-.19,.11-.37Z"/><path d="M234.3,194.63c.61,.6,1.24,1.19,1.86,1.79,.05,.05,.09,.1,.14,.14,.06,.07,.13,.14,.1,.24-.04,.1-.14,.11-.23,.11-.21-.01-.41-.01-.62-.03-1.11-.12-2.16-.48-3.2-.89-.12-.05-.24-.09-.36-.15-.2-.09-.39-.1-.59-.01-.14,.07-.29,.12-.43,.18-.75,.27-1.52,.46-2.31,.43-1.13-.04-2.13-.4-2.93-1.22-.43-.45-.91-.85-1.38-1.24-.03-.03-.06-.05-.09-.08-.41-.38-.81-.76-1.22-1.13-.32-.3-.66-.58-.99-.87-.02-.01-.04-.03-.06-.05-.39-.35-.79-.71-1.16-1.08-.54-.52-1.11-1-1.69-1.48-.14-.11-.27-.22-.41-.33v20.2h53.56v-14.53h-37.99Zm-13.73-16.51c.33,.3,.66,.61,.99,.91,.4,.35,.8,.69,1.19,1.05,.61,.56,1.27,1.06,1.9,1.59,.37,.31,.71,.65,1.06,.96,.34,.31,.68,.6,1.02,.9,.04,.03,.08,.06,.12,.1,.48,.45,.95,.91,1.44,1.35,.53,.48,1.04,1,1.58,1.48,.39,.36,.77,.73,1.15,1.1,.62,.61,1.26,1.21,1.89,1.81v-18.06h35.39v-14.48h-35.39v-19.04h38.09v-14.53h-52.27v53.22c.36,.33,.72,.65,1.08,.97,.25,.22,.51,.44,.76,.67Z"/><path d="M309.79,123.26v55.49c0,7.19-.71,11.83-2.12,13.91-1.41,2.09-3.61,3.14-6.58,3.14s-5.36-1.44-6.88-4.34c-1.14-2.11-1.79-5.68-1.94-10.72l-13.42,1.88c.04,9.37,1.97,16.38,5.8,21.03s9.12,6.97,15.88,6.97c5.12,0,9.42-1.15,12.92-3.45,3.49-2.31,6.12-5.61,7.88-9.91,1.76-4.29,2.64-10.84,2.64-19.62v-54.38h-14.18Z"/><path d="M353.26,194.63v-23.32h35.39v-14.48h-35.39v-19.04h38.09v-14.53h-52.27v85.9h53.56v-14.53h-39.38Z"/><path d="M234.07,194.41c-.1-.09-.19-.17-.29-.26,.02-.07,.03-.14,.05-.2,.19-.52,.33-1.05,.41-1.61,.05-.42,.05-.82-.04-1.23-.11-.53-.37-.96-.79-1.29-.08-.07-.17-.12-.24-.2-.09-.08-.17-.16-.26-.25v5.26h1.39c-.08-.07-.15-.15-.23-.22Z"/></svg>
+      <h1>Post <span>Fabrika</span></h1>
+    </div>
+    <div class="pills">
     <span class="pill warn" id="pStyl">Styl: výchozí</span>
     <span class="pill" id="pAI">AI: vypnuto</span>
   </div>
+  </div>
 </header>
-<nav>
+<nav><div class="nav-in">
   <button type="button" class="tab" data-tab="temata">🔎 Témata</button>
   <button type="button" class="tab on" data-tab="post">Nový post</button>
   <button type="button" class="tab" data-tab="carousel">Carousel</button>
   <button type="button" class="tab" data-tab="styl">Můj styl</button>
-</nav>
+</div></nav>
 
 <main>
   <section id="zalozkaTemata" hidden data-zalozka="temata">
     <div class="card">
-      <h2>🔎 Co je v hokeji nového? <span class="muted" style="font-weight:500;font-size:13px">AI hledá na webu a ke každému faktu dává zdroj</span></h2>
-      <div class="filtry">
-        <label>Zaměření<select id="tZamereni">
-          <option value="vse">Vše (extraliga, NHL, repre)</option><option value="extraliga">Extraliga</option>
-          <option value="nhl">Češi a Slováci v NHL</option><option value="repre">Reprezentace</option>
-          <option value="prestupy">Přestupy a zranění</option></select></label>
-        <label>Období<select id="tObdobi">
-          <option value="2">Posledních 48 hodin</option><option value="7">Posledních 7 dní</option>
-          <option value="vyroci">Výročí – co se stalo v tento den</option></select></label>
-        <label class="cela">Upřesnění (nepovinné)<input id="tVlastni" placeholder="např. jen Kometa Brno, nebo: zajímavé statistiky brankářů"></label>
+      <h2>🔎 Najdi zajímavost <span class="muted">milníky · rekordy · výročí · příběhy – AI hledá na webu a dává zdroje</span></h2>
+      <div class="filtry tri">
+        <label>Co hledat<select id="tZamereni">
+          <option value="mix">Mix: milníky, rekordy, příběhy</option>
+          <option value="rekordy">Rekordy a statistické kuriozity</option>
+          <option value="milniky">Milníky a jubilea</option>
+          <option value="pribehy">Historické příběhy a legendy</option>
+          <option value="kuriozity">Kuriozity a perličky</option></select></label>
+        <label>Kdy<select id="tObdobi">
+          <option value="vyroci">Výročí – stalo se v tento den</option>
+          <option value="historie">Kdykoliv v historii</option>
+          <option value="aktualne">Aktuálně (posledních 14 dní)</option></select></label>
+        <label>Kde<select id="tKde">
+          <option value="cz">Český hokej a Češi ve světě</option>
+          <option value="svet">Světový hokej</option></select></label>
+        <label class="cela">Upřesnění (nepovinné)<input id="tVlastni" placeholder="např. jen brankáři, Jaromír Jágr, Kometa Brno, olympiády…"></label>
       </div>
       <div class="akce">
         <button type="button" class="btn" id="tHledej">🔎 Najít témata</button>
@@ -379,7 +474,10 @@
     </div>
   </section>
 </main>
-<footer>DH Post Fabrika · texty ze šablon, žádná AI, žádné klíče. Data (styl, historie) se ukládají jen v tomhle prohlížeči.</footer>
+<footer><div class="footer-in">
+  <svg class="wordmark" viewBox="0 0 392.64 210.62" role="img" aria-label="Deník hokeje"><path d="M56.6,46.41c-1.6-5.55-3.8-10.06-6.61-13.54-2.81-3.48-5.88-5.95-9.22-7.41-3.34-1.47-8.28-2.2-14.84-2.2H0V109.16H26.69c5.74,0,10.43-.81,14.08-2.43s6.76-4.03,9.34-7.24c2.57-3.2,4.7-7.55,6.38-13.04,1.68-5.48,2.52-11.94,2.52-19.36,0-8.24-.8-15.14-2.41-20.68Zm-13.53,34.81c-.86,3.75-1.95,6.49-3.25,8.23-1.31,1.74-2.99,3.03-5.04,3.89s-5.36,1.29-9.93,1.29H14.18V37.79h6.45c5.7,0,9.55,.26,11.54,.76,2.66,.67,4.91,2.05,6.77,4.16,1.85,2.11,3.22,5,4.1,8.66,.88,3.67,1.32,8.69,1.32,15.05s-.43,11.06-1.29,14.8Z"/><path d="M85.31,94.63v-23.32h35.39v-14.47h-35.39v-19.05h38.09v-14.53h-52.27V109.16h53.56v-14.53h-39.38Z"/><path d="M191.85,89.64c-.28-.07-.56-.12-.85-.13-.3,.04-.61,.07-.92,.12-.55,.1-1.07,.29-1.56,.56-.61,.32-1.14,.75-1.61,1.26-.26,.28-.43,.6-.52,.97-.18,.79-.04,1.54,.25,2.28,.07,.16,.17,.32,.24,.48,.28,.61,.47,1.23,.44,1.91-.01,.18-.01,.36,0,.54,.02,.54-.1,1.06-.24,1.56-.18,.63-.4,1.23-.72,1.8-.08,.13-.14,.28-.21,.41-.17,.33-.21,.69-.22,1.06,0,.12,.03,.26,.09,.37,.12,.22,.26,.44,.4,.66,.23,.36,.56,.59,.96,.74,.92,.37,1.75,.88,2.42,1.63,.13,.14,.25,.29,.3,.48,.24,.86,.59,1.68,.94,2.5,.05,.11,.09,.21,.14,.32h1.59v-19.28c-.3-.08-.61-.17-.92-.24Zm-12.32-66.38v48.09c.48-.1,.97-.19,1.45-.29,.14-.03,.28-.04,.42-.05,.19-.02,.38-.04,.58-.06,.14-.01,.28-.02,.42-.02,.35,0,.7,.01,1.04-.06,.13-.03,.26-.02,.39-.02h4.26c.2,.01,.39,.03,.58,.05,.14,.01,.28,.02,.43,.03,.38,0,.77,0,1.16,0,.23,.01,.46,.04,.69,.05,.25,0,.49,.02,.74,.03,.35,0,.69-.02,1.04,.06h.04V23.26h-13.24Zm-28.83,0h-13.82V88.91c.54-.7,1.17-1.3,1.8-1.93,.72-.74,1.52-1.39,2.32-2.05,1.21-.99,2.51-1.86,3.82-2.72,.3-.2,.6-.39,.89-.6,.19-.14,.37-.29,.55-.44,.53-.44,1.11-.8,1.71-1.13,.35-.19,.73-.32,1.11-.45,.45-.17,.5-.15,.43-.65-.05-.35-.05-.72,.03-1.08,.01-.09,.02-.18,.02-.27,0-.47,.08-.92,.14-1.39,.04-.37,.05-.74,.02-1.12-.01-.12-.05-.22-.16-.29-.14-.08-.21-.22-.31-.34-.2-.25-.41-.5-.6-.76-.25-.33-.49-.66-.72-1.01-.12-.18-.22-.38-.34-.56-.23-.35-.38-.73-.51-1.12-.14-.41-.27-.81-.39-1.22-.03-.13-.06-.26-.06-.38,0-.4-.03-.8,.04-1.2,.03-.14,.03-.28,.03-.43,0-.62,.21-1.19,.5-1.73,.19-.34,.44-.63,.69-.93,.32-.36,.64-.71,.98-1.04,.39-.39,.81-.76,1.25-1.09v-9.84l3.76,7.42s.04-.02,.06-.03c.76-.4,1.53-.8,2.3-1.19,.31-.16,.63-.31,.95-.43,.47-.19,.97-.28,1.48-.31,.2-.01,.41,.01,.62,0,1.08-.03,2.05,.32,2.93,.93,.27,.19,.57,.25,.87,.31,.55,.1,1.1,.18,1.64,.3,1.15,.27,2.25,.69,3.2,1.41,.75,.56,1.37,1.25,1.8,2.1,.4,.78,.63,1.61,.75,2.47,.05,.33,.06,.67,.09,1v.04c-.09,.83-.11,1.67-.35,2.48-.32,1.07-.58,2.15-.77,3.25-.03,.16-.06,.32-.05,.53,.09-.01,.14-.01,.19-.02,1.49-.32,2.98-.65,4.47-.96,.41-.08,.82-.17,1.23-.25l-24.59-48.93Z"/><path d="M207.31,23.26v52.49c.71,.28,1.39,.6,2.03,1.03,.5,.34,.93,.74,1.28,1.22,.31,.41,.53,.86,.63,1.36,.04,.2,.12,.37,.2,.55,.66,1.39,1.31,2.78,1.97,4.17,.24,.51,.49,1.02,.73,1.54,.42,.91,.86,1.82,1.27,2.74,.24,.55,.44,1.13,.62,1.71,.21,.66,.4,1.34,.56,2.01,.16,.63,.26,1.27,.34,1.91,.09,.67,.05,1.34,.06,2.01,0,.14-.03,.28-.06,.42-.05,.26-.07,.52-.01,.77,.15,.61,.04,1.21-.13,1.8-.26,.91-.7,1.74-1.26,2.51-.01,.02-.03,.05-.04,.06-.25,.27-.34,.58-.24,.93,.01,.05,.01,.11,.01,.16-.03,.34-.06,.69-.08,1.04-.01,.12-.01,.25,0,.38,.03,.4,.08,.8,.1,1.2,.02,.24,.06,.49,.17,.71,.29,.64,.26,1.31,.17,1.98-.01,.1-.03,.2-.06,.3-.06,.22-.03,.43,.06,.64,.03,.08,.07,.17,.09,.26h5.77V23.26h-14.18ZM213.53,0l-6.63,17.52h8.57L228.75,0h-15.22Z"/><path d="M270.83,56.74l26.56-33.48h-19.16l-28.79,38.24V23.26h-14.18V109.16h14.18v-25.96l11.52-14.41,19.44,40.37h18.4l-27.97-52.42Z"/><path d="M42.25,123.26v33.81H14.3v-33.81H.12v85.9H14.3v-37.56h27.95v37.56h14.18V123.26h-14.18Z"/><path d="M136.02,156.98c-.77,.46-1.54,.93-2.31,1.39-1.46,.89-2.91,1.78-4.37,2.67-1.28,.78-2.56,1.55-3.84,2.32-.99,.61-1.98,1.21-2.98,1.82-.21,.13-.42,.26-.64,.39v.29c0,10.16-1.84,17.68-5.52,22.59-3.68,4.9-8.31,7.35-13.91,7.35s-10.21-2.47-13.96-7.41c-1.34-1.77-2.45-3.85-3.31-6.25-.32-.06-.65-.12-.97-.19-1.02-.22-2.04-.45-3.03-.77-.59-.19-1.19-.37-1.78-.57-.95-.33-1.89-.68-2.8-1.12-.44-.21-.89-.41-1.33-.63-.95-.49-1.87-1.04-2.76-1.65-.56-.38-.89-.93-1.13-1.54-.38-.99-.3-1.97,.13-2.93,.19-.43,.42-.83,.72-1.2,.31-.38,.66-.72,1.11-.93,.54-.26,1.1-.35,1.7-.24,.45,.09,.86,.26,1.24,.51,.48,.3,.98,.59,1.48,.85,.78,.4,1.57,.79,2.37,1.14,1.02,.45,2.04,.88,3.07,1.3,.05,.02,.09,.04,.14,.06-.33-2.48-.49-5.17-.49-8.08,0-10.08,1.82-17.52,5.46-22.32,3.64-4.81,8.35-7.21,14.14-7.21s10.48,2.38,14.06,7.15c3.12,4.16,4.88,10.29,5.29,18.41,1.29-.77,2.58-1.55,3.87-2.32,1.41-.85,2.83-1.71,4.24-2.56,1.75-1.05,3.5-2.1,5.25-3.15,.15-.09,.29-.18,.44-.26-1.36-8.4-4.23-15.25-8.6-20.55-6.34-7.7-14.56-11.54-24.64-11.54-6.95,0-12.87,1.62-17.75,4.86-4.88,3.24-8.84,8.17-11.86,14.79-3.03,6.63-4.55,15.05-4.55,25.29,0,14.1,3.36,25.19,10.08,33.28,5.9,7.07,13.95,10.6,24.14,10.6s18.13-3.57,24.03-10.72c6.71-8.08,10.07-19.31,10.07-33.69,0-3.25-.16-6.32-.5-9.23Z"/><path d="M199.6,123.26c.13,.25,.27,.5,.4,.75,.1,.18,.19,.36,.28,.55,.55,1.08,1.1,2.17,1.64,3.25,.44,.87,.87,1.73,1.29,2.61,.14,.29,.27,.57,.4,.86l6.36-8.02h-10.37Zm-10.37,44.38c-.11-.07-.22-.14-.34-.21-.5-.29-1.01-.57-1.49-.9-.68-.48-1.3-1.02-1.79-1.7-.08-.12-.17-.22-.27-.34-.08,.05-.15,.1-.21,.14-.25,.17-.5,.36-.77,.52-.46,.28-.97,.34-1.49,.26-.14-.02-.27-.08-.39-.16-.67-.42-1.33-.84-1.98-1.29-.77-.52-1.52-1.07-2.28-1.61-.61-.43-1.22-.87-1.83-1.3-.84-.6-1.67-1.21-2.51-1.81-1-.72-1.99-1.44-2.98-2.17-.49-.35-.98-.72-1.47-1.07-.7-.52-1.42-1.03-2.12-1.54l-5.3,7.04v-12.2c-.06-.1-.11-.2-.16-.31-.3-.65-.61-1.31-.91-1.97-.2-.44-.39-.9-.58-1.35-.11-.25-.22-.49-.33-.74-.23-.55-.45-1.1-.68-1.65-.02-.05-.03-.1-.06-.14-.07-.15-.16-.18-.31-.1-.24,.13-.47,.27-.7,.41-.91,.55-1.81,1.1-2.72,1.65-1.15,.71-2.31,1.41-3.47,2.12-1.19,.72-2.39,1.44-3.58,2.16-.23,.14-.45,.28-.68,.42v59.36h14.18v-25.96l11.53-14.41,19.43,40.37h18.41l-22.15-41.52Zm-31.16-27.58c-.08-.21-.18-.28-.41-.19-.71,.27-1.43,.47-2.15,.65-.86,.21-1.71,.42-2.56,.64-.42,.11-.84,.11-1.27,.05-.27-.04-.54-.07-.8-.13-.3-.06-.56-.18-.72-.48-.04-.08-.11-.14-.17-.21-.66-.71-1.27-1.46-1.81-2.26-.12-.18-.24-.37-.35-.55v8.95c.68-.41,1.35-.83,2.03-1.24,1.26-.75,2.52-1.51,3.79-2.27,1.36-.81,2.72-1.63,4.08-2.45,.08-.04,.16-.09,.23-.14,.16-.11,.18-.19,.11-.37Z"/><path d="M234.3,194.63c.61,.6,1.24,1.19,1.86,1.79,.05,.05,.09,.1,.14,.14,.06,.07,.13,.14,.1,.24-.04,.1-.14,.11-.23,.11-.21-.01-.41-.01-.62-.03-1.11-.12-2.16-.48-3.2-.89-.12-.05-.24-.09-.36-.15-.2-.09-.39-.1-.59-.01-.14,.07-.29,.12-.43,.18-.75,.27-1.52,.46-2.31,.43-1.13-.04-2.13-.4-2.93-1.22-.43-.45-.91-.85-1.38-1.24-.03-.03-.06-.05-.09-.08-.41-.38-.81-.76-1.22-1.13-.32-.3-.66-.58-.99-.87-.02-.01-.04-.03-.06-.05-.39-.35-.79-.71-1.16-1.08-.54-.52-1.11-1-1.69-1.48-.14-.11-.27-.22-.41-.33v20.2h53.56v-14.53h-37.99Zm-13.73-16.51c.33,.3,.66,.61,.99,.91,.4,.35,.8,.69,1.19,1.05,.61,.56,1.27,1.06,1.9,1.59,.37,.31,.71,.65,1.06,.96,.34,.31,.68,.6,1.02,.9,.04,.03,.08,.06,.12,.1,.48,.45,.95,.91,1.44,1.35,.53,.48,1.04,1,1.58,1.48,.39,.36,.77,.73,1.15,1.1,.62,.61,1.26,1.21,1.89,1.81v-18.06h35.39v-14.48h-35.39v-19.04h38.09v-14.53h-52.27v53.22c.36,.33,.72,.65,1.08,.97,.25,.22,.51,.44,.76,.67Z"/><path d="M309.79,123.26v55.49c0,7.19-.71,11.83-2.12,13.91-1.41,2.09-3.61,3.14-6.58,3.14s-5.36-1.44-6.88-4.34c-1.14-2.11-1.79-5.68-1.94-10.72l-13.42,1.88c.04,9.37,1.97,16.38,5.8,21.03s9.12,6.97,15.88,6.97c5.12,0,9.42-1.15,12.92-3.45,3.49-2.31,6.12-5.61,7.88-9.91,1.76-4.29,2.64-10.84,2.64-19.62v-54.38h-14.18Z"/><path d="M353.26,194.63v-23.32h35.39v-14.48h-35.39v-19.04h38.09v-14.53h-52.27v85.9h53.56v-14.53h-39.38Z"/><path d="M234.07,194.41c-.1-.09-.19-.17-.29-.26,.02-.07,.03-.14,.05-.2,.19-.52,.33-1.05,.41-1.61,.05-.42,.05-.82-.04-1.23-.11-.53-.37-.96-.79-1.29-.08-.07-.17-.12-.24-.2-.09-.08-.17-.16-.26-.25v5.26h1.39c-.08-.07-.15-.15-.23-.22Z"/></svg>
+  <span>Post Fabrika · redakční nástroj Deníku hokeje. Styl, historie i AI klíč zůstávají jen v tomhle prohlížeči.</span>
+</div></footer>
 
 <script src="sablony.js"></script>
 <script src="grafika.js"></script>

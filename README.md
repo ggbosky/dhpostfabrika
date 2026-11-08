@@ -1,4 +1,4 @@
-# DH Post Fabrika 🏒
+# DH Post Fabrika 🏒 – Deník hokeje
 
 Nástroj, který z pár údajů vytvoří **hotový Instagram příspěvek pro
 [@denik_hokeje](https://www.instagram.com/denik_hokeje/)** – text s hashtagy
@@ -41,11 +41,13 @@ Logo je i na jednoduchém postu (záložka **Nový post**).
 
 ### 🔎 Témata a ověřování faktů (s AI klíčem)
 
-- Záložka **🔎 Témata**: AI prohledá web (Google) a najde 6 zajímavých témat – za posledních
-  48 hodin, 7 dní, nebo **výročí** (co se v hokeji stalo v tento den). U každého jsou
-  konkrétní fakta a **odkazy na zdroje**. Tlačítkem **✍️ Post** nebo **🎞️ Carousel** z tématu
-  rovnou vznikne příspěvek, do popisku se přidá řádek `ℹ️ Zdroj: …`. Témata bez přímého
-  zdroje jsou označená ⚠️.
+- Záložka **🔎 Témata**: AI prohledá web (Google) a najde 6 **zajímavostí** – milníky, rekordy,
+  statistické kuriozity, výročí („stalo se v tento den“) a historické příběhy; žádné běžné
+  zpravodajství. Doporučené zdroje: thehockeywriters.com, sport.ceskatelevize.cz,
+  sportrevue.isport.blesk.cz, nhl.cz (a další). U každého tématu jsou fakta a **odkazy na zdroje**
+  a potom **druhá nezávislá kontrola**: ✅ ověřeno / ❌ rozpor (co nesedí) / ⚠️ nejisté.
+  Tlačítkem **✍️ Post** nebo **🎞️ Carousel** z tématu rovnou vznikne příspěvek, do popisku se
+  přidá řádek `ℹ️ Zdroj: …`.
 - Tlačítko **🔎 Ověřit fakta** (u textu postu i u popisku carouselu): AI dohledá každé
   tvrzení na webu a označí ho ✅ potvrzeno / ❌ rozpor (se správnou hodnotou) / ⚠️ nepotvrzeno,
   vždy s odkazy na zdroje.

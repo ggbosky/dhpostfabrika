@@ -6,17 +6,22 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 const ZAMERENI = {
-  vse: "český hokej obecně (extraliga, Češi v NHL, reprezentace)",
-  extraliga: "česká Tipsport extraliga",
-  nhl: "čeští a slovenští hráči v NHL",
-  repre: "česká hokejová reprezentace",
-  prestupy: "přestupy, podpisy smluv a zranění v českém hokeji a u Čechů v NHL",
+  mix: "mix zajímavostí: milníky, rekordy, statistické kuriozity a silné příběhy",
+  rekordy: "rekordy a statistické kuriozity (nejvíc, nejrychleji, nejmladší, série, unikátní čísla)",
+  milniky: "milníky a jubilea hráčů a týmů (kulaté počty bodů, gólů, zápasů, výher, výročí kariér)",
+  pribehy: "silné historické příběhy a legendy (osudy hráčů, slavné zápasy, zákulisí, dramata)",
+  kuriozity: "kuriozity a perličky, které skoro nikdo nezná",
 };
 const OBDOBI = {
-  "2": "za posledních 48 hodin",
-  "7": "za posledních 7 dní",
-  vyroci: "VÝROČÍ: co se v historii českého a světového hokeje stalo přesně v dnešní den (a v nejbližších dnech) – kulatá výročí slavných zápasů, titulů, rekordů a osobností",
+  vyroci: "VÝROČÍ: události, které se staly přesně v dnešní den nebo v nejbližších 7 dnech (v libovolném roce) – ideálně kulatá výročí",
+  historie: "kdykoliv v historii hokeje",
+  aktualne: "aktuální dění za posledních 14 dní (nové rekordy, právě dosažené milníky, unikátní statistiky)",
 };
+const KDE = {
+  cz: "český hokej a Češi ve světě (NHL, KHL, reprezentace, extraliga)",
+  svet: "světový hokej (NHL, olympiády, MS) – nejlépe s českou stopou, ale není podmínkou",
+};
+const ZDROJE_TIPY = "thehockeywriters.com, sport.ceskatelevize.cz, sportrevue.isport.blesk.cz/hokej, nhl.cz, nhl.com, hokej.cz, idnes.cz, isport.cz, hockey-reference.com, quanthockey.com, eliteprospects.com, iihf.com, Wikipedie";
 
 let temata = [];
 
@@ -37,28 +42,32 @@ async function najdiTemata() {
   if (!AI.maKlic()) { zprava('Hledání potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
   const zamereni = ZAMERENI[$("#tZamereni").value];
   const obdobi = OBDOBI[$("#tObdobi").value];
+  const oblast = KDE[$("#tKde").value];
   const vlastni = $("#tVlastni").value.trim();
   const b = $("#tHledej");
   b.disabled = true;
   b.textContent = "Hledám na webu…";
-  zprava("AI prohledává web a ověřuje fakta… (obvykle 15–60 s)");
+  zprava("AI prohledává web a hledá zajímavosti se zdroji… (obvykle 15–60 s)");
   $("#tSeznam").innerHTML = "";
   try {
     const r = await AI.hledatNaWebu({
-      system: `Jsi rešeršista redakce Instagramu Deník hokeje. Hledáš na webu (Google) aktuální a ověřitelné hokejové
-zprávy a zajímavosti, ze kterých půjde udělat poutavý post. Dnešní datum: ${AI.dnes()}.
+      system: `Jsi rešeršista Instagramu Deník hokeje. Účet NEDĚLÁ zpravodajství (výsledky, přestupy, zranění),
+ale zajímavosti: milníky, rekordy, statistické kuriozity, výročí a silné historické příběhy – věci, u kterých
+fanoušek řekne „to jsem nevěděl“. Hledáš je na webu (Google). Dnešní datum: ${AI.dnes()}.
 Zásady:
-- Uváděj JEN fakta, která jsi našel ve zdrojích: konkrétní skóre, čísla, jména, data. Nic nedomýšlej.
-- Každé téma musí být podložené alespoň jedním důvěryhodným zdrojem (hokej.cz, idnes.cz, isport.cz, sport.cz,
-  livesport.cz, ct24/ctsport, nhl.com, eliteprospects, oficiální weby klubů apod.).
-- Když si nejsi jistý datem nebo číslem, téma vynech.
-- Vybírej to, co fanoušky opravdu zaujme: drama, rekordy a milníky, výkony Čechů, přestupy, zranění klíčových
-  hráčů, zajímavé statistiky, výročí.`,
-      zadani: `Najdi 6 nejzajímavějších témat. Zaměření: ${zamereni}. Období: ${obdobi}.${vlastni ? `\nUpřesnění od redaktora: ${vlastni}` : ""}
+- Uváděj JEN fakta, která jsi našel ve zdrojích: přesná čísla, data, jména, soupeře. Nic nedomýšlej.
+- Každé téma musí být podložené alespoň jedním důvěryhodným zdrojem. Doporučené zdroje (ale můžeš hledat kdekoliv):
+  ${ZDROJE_TIPY}.
+- Když si nejsi jistý číslem nebo datem, téma vynech.
+- Žádná běžná zpravodajská témata (výsledky kola, přestupy, zranění), pokud v nich není rekord nebo milník.`,
+      zadani: `Najdi 6 nejzajímavějších témat.
+Druh: ${zamereni}.
+Období: ${obdobi}.
+Oblast: ${oblast}.${vlastni ? `\nUpřesnění od redaktora: ${vlastni}` : ""}
 
 Odpověz POUZE blokem \`\`\`json s polem objektů:
-[{"titulek": "krátký titulek", "datum": "den. měsíc. rok události", "fakta": ["věta s konkrétním ověřeným faktem", "…"],
-  "proc_zajimave": "1 věta, proč to fanoušky zaujme", "format": "post" nebo "carousel"}]`,
+[{"titulek": "krátký úderný titulek", "datum": "kdy se to stalo (den. měsíc. rok, nebo rok)", "fakta": ["věta s konkrétním ověřeným faktem", "…" (3–5 faktů)],
+  "proc_zajimave": "1 věta, proč to fanoušky zaujme", "format": "post" nebo "carousel" (příběh s více fakty = carousel)}]`,
     });
     const data = AI.jsonZTextu(r.text);
     temata = (Array.isArray(data) ? data : data.temata || []).map((t) => {
@@ -68,8 +77,9 @@ Odpověz POUZE blokem \`\`\`json s polem objektů:
     });
     if (!temata.length) { zprava("Nic jsem nenašel. Zkus jiné zaměření nebo delší období.", "varovani"); return; }
     vykresli(r);
-    const bez = temata.filter((t) => !t.zdroje.length).length;
-    zprava(`Nalezeno ${temata.length} témat${bez ? ` – u ${bez} chybí přímý zdroj, ty ověř ručně` : ", každé se zdrojem"}. Klikni na <b>✍️ Post</b> nebo <b>🎞️ Carousel</b>.`, bez ? "varovani" : "ok");
+    zprava(`Nalezeno ${temata.length} témat. Teď je AI ještě jednou nezávisle ověřuje…`, "varovani");
+    b.textContent = "Ověřuju fakta…";
+    await overTemata(r);
   } catch (e) {
     zprava(esc(e.message), "chyba");
   } finally {
@@ -80,13 +90,14 @@ Odpověz POUZE blokem \`\`\`json s polem objektů:
 
 function vykresli(r) {
   $("#tSeznam").innerHTML = temata.map((t, i) => `
-    <article class="tema">
+    <article class="tema ${t.kontrola?.stav === "rozpor" ? "spatne" : ""}">
       <div class="tema-hlava">
         <h3>${esc(t.titulek)}</h3>
         ${t.datum ? `<span class="muted">${esc(t.datum)}</span>` : ""}
       </div>
       <ul>${t.fakta.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
       ${t.proc_zajimave ? `<p class="proc">💡 ${esc(t.proc_zajimave)}</p>` : ""}
+      <p class="kontrola ${t.kontrola?.stav || "ceka"}">${kontrolaHtml(t)}</p>
       <p class="zdroje">Zdroje: ${zdrojeHtml(t.zdroje)}</p>
       <div class="akce" style="margin-top:10px">
         <button type="button" class="btn small" data-post="${i}">✍️ Post</button>
@@ -96,11 +107,50 @@ function vykresli(r) {
     (r.dotazy?.length ? `<p class="muted" style="font-size:12px">Hledáno: ${r.dotazy.map(esc).join(" · ")}</p>` : "");
 }
 
+function kontrolaHtml(t) {
+  const k = t.kontrola;
+  if (!k) return "⏳ Druhá kontrola faktů probíhá…";
+  if (k.stav === "overeno") return "✅ Ověřeno druhým nezávislým hledáním";
+  if (k.stav === "rozpor") return `❌ Rozpor: ${esc(k.problem || "některá fakta nesedí")}`;
+  if (k.stav === "chyba") return `⚠️ Druhou kontrolu se nepodařilo udělat (${esc(k.problem)}) – ověř ručně`;
+  return `⚠️ Nejisté: ${esc(k.problem || "nepodařilo se potvrdit")} – ověř ručně`;
+}
+
+// Druhé, nezávislé hledání: ověří fakta všech témat najednou.
+async function overTemata(r) {
+  const AI = window.DHAI;
+  try {
+    const k = await AI.hledatNaWebu({
+      system: `Jsi přísný fact-checker hokejové redakce. Nezávisle ověř fakta vyhledáváním na webu. Dnešní datum: ${AI.dnes()}.
+Za "overeno" označ téma jen tehdy, když jsi našel potvrzení klíčových čísel, dat, týmů i soupeřů.
+Pokud cokoliv nesedí (rok, datum, tým, soupeř, číslo, pořadí), je to "rozpor" a napiš, co je správně.`,
+      zadani: `Ověř tato témata:
+${JSON.stringify(temata.map((t, id) => ({ id, titulek: t.titulek, datum: t.datum, fakta: t.fakta })), null, 1)}
+
+Odpověz POUZE blokem \`\`\`json s polem:
+[{"id": 0, "stav": "overeno" | "rozpor" | "nejiste", "problem": "u rozporu co nesedí a jak je to správně, u nejistého co se nepodařilo potvrdit, jinak prázdné"}]`,
+    });
+    const data = AI.jsonZTextu(k.text);
+    for (const v of Array.isArray(data) ? data : []) {
+      const t = temata[Number(v.id)];
+      if (t) t.kontrola = { stav: ["overeno", "rozpor", "nejiste"].includes(v.stav) ? v.stav : "nejiste", problem: v.problem || "" };
+    }
+    temata.forEach((t) => { if (!t.kontrola) t.kontrola = { stav: "nejiste", problem: "kontrola téma vynechala" }; });
+  } catch (e) {
+    temata.forEach((t) => { t.kontrola = { stav: "chyba", problem: e.message }; });
+  }
+  vykresli(r);
+  const ok = temata.filter((t) => t.kontrola.stav === "overeno").length;
+  const spatne = temata.filter((t) => t.kontrola.stav === "rozpor").length;
+  zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Klikni na <b>✍️ Post</b> nebo <b>🎞️ Carousel</b>.`, spatne ? "varovani" : "ok");
+}
+
 function zadaniZTematu(t) {
   return `${t.titulek}${t.datum ? ` (${t.datum})` : ""}
 Ověřená fakta (používej jen tato, nic nepřidávej):
 ${t.fakta.map((f) => `- ${f}`).join("\n")}
-Zdroje: ${t.zdroje.map((z) => z.titulek).join(", ") || "neuvedeny"}`;
+Zdroje: ${t.zdroje.map((z) => z.titulek).join(", ") || "neuvedeny"}${t.kontrola?.stav === "rozpor" ? `
+POZOR – kontrola faktů našla rozpor: ${t.kontrola.problem}. Použij opravené údaje.` : ""}`;
 }
 
 // ---------------------------------------------------------- ověření faktů --

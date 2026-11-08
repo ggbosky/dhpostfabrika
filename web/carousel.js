@@ -131,9 +131,9 @@ function pozadi(ctx, s) {
     G.kresliFoto(ctx, s.img, s.pohled, W, H);
   } else {
     const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, "#2a3446");
-    g.addColorStop(0.6, "#10151f");
-    g.addColorStop(1, "#05070d");
+    g.addColorStop(0, "#4a0a0e");
+    g.addColorStop(0.55, "#160607");
+    g.addColorStop(1, "#050505");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
