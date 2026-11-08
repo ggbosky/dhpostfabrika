@@ -63,7 +63,7 @@ function vykresliFormular() {
     } else if (druh === "textarea") {
       vstup = `<textarea id="${id}" name="${klic}" rows="3" placeholder="${esc(extra)}">${esc(hodnota)}</textarea>`;
     } else {
-      vstup = `<input id="${id}" name="${klic}" value="${esc(hodnota)}" placeholder="${esc(extra)}"${povinne ? " required" : ""} autocomplete="off">`;
+      vstup = `<input id="${id}" name="${klic}" value="${esc(hodnota)}" placeholder="např. ${esc(extra)}"${povinne ? " required" : ""} autocomplete="off">`;
     }
     return `<label class="${druh === "textarea" ? "cela" : ""}" for="${id}"><span>${esc(popisek)}${povinne ? ' <b class="req">*</b>' : ""}</span>${vstup}</label>`;
   }).join("");
