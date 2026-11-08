@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏒</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600;700&family=Montserrat:wght@900&family=Roboto+Condensed:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #f3f4f6; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
@@ -25,6 +25,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
   header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 24px; max-width: 1280px; margin: 0 auto; }
   header h1 { font: 700 26px/1.1 Oswald, Impact, sans-serif; letter-spacing: .02em; margin: 0; text-transform: uppercase; }
@@ -86,9 +87,36 @@
   dd { margin: 0; word-break: break-word; }
   ol { padding-left: 20px; margin: 8px 0 0; }
   footer { max-width: 1280px; margin: 0 auto; padding: 0 24px 32px; font-size: 13px; color: var(--muted); }
+  .napoveda { font-size: 13px; margin: 0 0 14px; }
+  .cervena { color: #c81414; }
+  .zluta { color: #b98900; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .zluta { color: #ffc000; } :root:not([data-theme="light"]) .cervena { color: #ff4d4d; } }
+  #zalozkaCarousel > div > .card + .card { margin-top: 20px; }
+  #cVysledek { position: sticky; top: 12px; }
+  .slide-karta { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; background: var(--soft); cursor: pointer; }
+  .slide-karta.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--card); }
+  .slide-hlava { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .slide-hlava b { font-size: 14px; }
+  .slide-hlava .ikony { display: flex; gap: 4px; }
+  .ikona { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px; width: 34px; height: 32px; cursor: pointer; font-size: 15px; }
+  .ikona:disabled { opacity: .35; cursor: default; }
+  .slide-pole { display: grid; gap: 10px; }
+  .slide-pole .dva { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .foto-radek { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .foto-radek .jmeno { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .nahled { position: relative; border-radius: 10px; overflow: hidden; background: #000; }
+  .nahled.drop { outline: 3px dashed var(--accent); }
+  .nahled canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
+  #cNahledy { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 4px; }
+  #cNahledy canvas { width: 72px; height: 90px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; flex: none; background: #000; }
+  #cNahledy canvas.on { border-color: var(--accent); }
+  .pocty { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .pocty .spatne { color: var(--err-text); font-weight: 600; }
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
     #vysledek, #historieKarta { grid-column: auto; grid-row: auto; }
+    .slide-pole .dva { grid-template-columns: 1fr; }
+    #cVysledek { position: static; order: -1; }
     header, nav, main, footer { padding-left: 16px; padding-right: 16px; }
   }
   @media (max-width: 520px) {
@@ -108,11 +136,12 @@
 </header>
 <nav>
   <button type="button" class="tab on" data-tab="post">Nový post</button>
+  <button type="button" class="tab" data-tab="carousel">Carousel</button>
   <button type="button" class="tab" data-tab="styl">Můj styl</button>
 </nav>
 
 <main>
-  <section id="zalozkaPost" class="grid">
+  <section id="zalozkaPost" class="grid" data-zalozka="post">
       <form class="card" id="formular" novalidate>
         <h2>Co se stalo?</h2>
         <div id="typy"></div>
@@ -143,8 +172,9 @@
         <div class="cela upozorneni" id="fotoMalo" hidden>Fotka má nízké rozlišení, na Instagramu může být rozmazaná.</div>
         <label class="cela">Titulek do obrázku<input id="titulek" placeholder="Vytvoří se sám, můžeš ho přepsat"></label>
         <label class="check"><input type="checkbox" id="titulekZap"> Zobrazit titulek</label>
-        <label class="check"><input type="checkbox" id="ukazPodpis"> Podpis účtu</label>
-        <label>Text podpisu<input id="podpis"></label>
+        <label>Logo vlevo nahoře<select id="logo">
+          <option value="auto">Automaticky (podle fotky)</option><option value="bila">Bílé</option>
+          <option value="cerna">Černé</option><option value="vypnuto">Bez loga</option></select></label>
         <label>Barva proužku / pozadí<input type="color" id="barva"></label>
       </div>
       <div class="akce"><button type="button" class="btn" id="stahni">⬇️ Stáhnout obrázek</button></div>
@@ -166,7 +196,54 @@
       </div>
   </section>
 
-  <section id="zalozkaStyl" hidden>
+  <section id="zalozkaCarousel" class="grid" hidden data-zalozka="carousel">
+    <div>
+      <div class="card">
+        <div class="radek" style="justify-content:space-between;margin-bottom:6px">
+          <h2 style="margin:0">Slidy</h2>
+          <button type="button" class="btn ghost small" id="cReset">Začít znovu</button>
+        </div>
+        <p class="muted napoveda">Slovo mezi hvězdičkami <code>*takhle*</code> bude v nadpisu <b class="cervena">červeně</b>
+          a v textu <b class="zluta">žlutě</b>. Enter v nadpisu = nový řádek. Fotku posuneš tažením po náhledu.</p>
+        <div id="slidy"></div>
+        <div class="akce"><button type="button" class="btn ghost" id="cPridat">＋ Přidat slide</button></div>
+      </div>
+
+      <div class="card">
+        <div class="radek" style="justify-content:space-between;margin-bottom:10px">
+          <h2 style="margin:0">Popisek pod carousel</h2>
+          <button type="button" class="btn ghost small" id="cPopisekZeSlidu">Vytvořit ze slidů</button>
+        </div>
+        <textarea id="cPopisek" rows="9" placeholder="Klikni na Vytvořit ze slidů, nebo napiš vlastní."></textarea>
+        <div id="cPocty" class="pocty"></div>
+        <div class="akce"><button type="button" class="btn" id="cKopiruj">Kopírovat text</button></div>
+      </div>
+    </div>
+
+    <div class="card" id="cVysledek">
+      <div class="radek" style="justify-content:space-between;margin-bottom:14px">
+        <h2 style="margin:0">Náhled <span class="muted" id="cCislo"></span></h2>
+        <label class="radek" style="flex-direction:row;align-items:center;gap:8px">Logo
+          <select id="cLogo" style="width:auto">
+            <option value="auto">Automaticky</option><option value="bila">Bílé</option>
+            <option value="cerna">Černé</option><option value="vypnuto">Bez loga</option>
+          </select></label>
+      </div>
+      <div id="cNahled" class="nahled"><canvas id="cPlatno" width="1080" height="1350" aria-label="Náhled slidu 1080×1350"></canvas></div>
+      <div class="cela radek" id="cZoomRadek" hidden style="margin-top:12px">
+        <label style="flex:1">Přiblížení fotky<input type="range" id="cZoom" min="1" max="3" step="0.01" value="1"></label>
+      </div>
+      <div id="cNahledy"></div>
+      <div class="akce">
+        <button type="button" class="btn" id="cStahniVse">⬇️ Stáhnout všechny slidy</button>
+        <button type="button" class="btn ghost" id="cStahniJeden">Stáhnout tento slide</button>
+        <button type="button" class="btn ghost" id="cSdilej" hidden>📲 Uložit do telefonu</button>
+      </div>
+      <p class="muted" style="font-size:13px;margin:14px 0 0">Všechny slidy se stáhnou jako ZIP (slide-01.jpg, slide-02.jpg…). Na Instagramu je nahraj v tomhle pořadí jako jeden příspěvek.</p>
+    </div>
+  </section>
+
+  <section id="zalozkaStyl" hidden data-zalozka="styl">
     <div class="grid">
       <div class="card">
         <h2>Naučit se tvůj styl</h2>
@@ -199,6 +276,8 @@
 <footer>DH Post Fabrika · texty ze šablon, žádná AI, žádné klíče. Data (styl, historie) se ukládají jen v tomhle prohlížeči.</footer>
 
 <script src="sablony.js"></script>
+<script src="grafika.js"></script>
 <script src="app.js"></script>
+<script src="carousel.js"></script>
 </body>
 </html>

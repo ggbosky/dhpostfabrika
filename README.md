@@ -27,6 +27,18 @@ nic se nikam neposílá. Texty se skládají z hokejových šablon, žádná AI.
    Bez fotky vznikne grafika s titulkem.
 4. **Kopírovat text** a **Stáhnout obrázek** → nahrát na Instagram.
 
+Záložka **Carousel** (podle šablony Deníku hokeje, až 20 slidů):
+- **Titulní slide** – velký červený a bílý nápis, fotka, ikona „posuň dál“.
+- **Další slidy** – nadpis a text přes fotku. Slovo v `*hvězdičkách*` je v nadpisu
+  červené, v textu žluté. Enter v nadpisu = nový řádek.
+- Logo Deníku hokeje je na každém slidu vlevo nahoře (bílé/černé automaticky podle fotky).
+- **Stáhnout všechny slidy** → ZIP s obrázky v pořadí + `popisek.txt`. Na mobilu
+  **Uložit do telefonu** pošle slidy rovnou do galerie.
+- **Vytvořit ze slidů** napíše popisek pod carousel s hashtagy.
+- Texty slidů se pamatují i po zavření stránky (fotky ne).
+
+Logo je i na jednoduchém postu (záložka **Nový post**).
+
 Záložka **Můj styl**: vlož svoje starší posty (export z Instagramu `posts_1.json`
 nebo zkopírované texty oddělené `---`). Stránka zjistí tvoje hashtagy, jejich počet,
 jestli používáš emoji a jaké otázky dáváš na konec – a od té doby je používá.
@@ -48,7 +60,9 @@ dhpostfabrika/
 ├── web/                webová verze bez klíčů (GitHub Pages)
 │   ├── index.html
 │   ├── sablony.js      šablony textů
-│   └── app.js          tvorba postu, ořez fotky, učení stylu
+│   ├── grafika.js      logo, ořez fotky, stažení a sdílení
+│   ├── app.js          tvorba postu, učení stylu
+│   └── carousel.js     carousel podle šablony
 ├── postfabrika/        verze s AI (Python + Gemini)
 │   ├── __main__.py     spuštění přes python -m postfabrika
 │   ├── cli.py          příkazy web / analyzuj / styl / modely / generuj

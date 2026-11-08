@@ -18,8 +18,9 @@ function uloz(klic, hodnota) {
   try { localStorage.setItem(klic, JSON.stringify(hodnota)); } catch { /* soukromé okno apod. */ }
 }
 
-const VYCHOZI_NASTAVENI = { barva: "#e30613", podpis: "@denik_hokeje", ukazPodpis: true, titulekZap: true };
+const VYCHOZI_NASTAVENI = { barva: "#ab0707", logo: "auto", titulekZap: true };
 let nastaveni = { ...VYCHOZI_NASTAVENI, ...nacti("dhpf_nastaveni", {}) };
+if (!["auto", "bila", "cerna", "vypnuto"].includes(nastaveni.logo)) nastaveni.logo = "auto";
 let profil = nacti("dhpf_profil", null);
 let historie = nacti("dhpf_historie", []);
 let typ = "vysledek";
@@ -229,16 +230,7 @@ function kresli() {
     ctx.shadowBlur = 0;
   }
 
-  if (nastaveni.ukazPodpis && nastaveni.podpis.trim()) {
-    ctx.font = `500 38px ${PISMO}`;
-    ctx.fillStyle = "#fff";
-    ctx.shadowColor = "rgba(0,0,0,0.55)";
-    ctx.shadowBlur = 14;
-    ctx.textBaseline = "top";
-    ctx.fillText(nastaveni.podpis.trim().toUpperCase(), okraj, 64);
-    ctx.shadowBlur = 0;
-    ctx.textBaseline = "alphabetic";
-  }
+  window.DHG.kresliLogo(ctx, nastaveni.logo);
 }
 
 function nactiFoto(soubor) {
@@ -462,8 +454,8 @@ function vykresliHistorii() {
 
 function prepniZalozku(kam) {
   $$(".tab").forEach((b) => b.classList.toggle("on", b.dataset.tab === kam));
-  $("#zalozkaPost").hidden = kam !== "post";
-  $("#zalozkaStyl").hidden = kam !== "styl";
+  $$("[data-zalozka]").forEach((s) => { s.hidden = s.dataset.zalozka !== kam; });
+  try { localStorage.setItem("dhpf_zalozka", kam); } catch { /* nic */ }
 }
 
 function init() {
@@ -473,6 +465,7 @@ function init() {
   vykresliHistorii();
 
   $$(".tab").forEach((b) => b.addEventListener("click", () => prepniZalozku(b.dataset.tab)));
+  try { const z = localStorage.getItem("dhpf_zalozka"); if (z && $(`.tab[data-tab="${z}"]`)) prepniZalozku(z); } catch { /* nic */ }
   $("#formular").addEventListener("submit", (e) => { e.preventDefault(); vytvor(); });
   $("#varianta").addEventListener("click", vytvor);
   $("#text").addEventListener("input", prepocitej);
@@ -491,8 +484,7 @@ function init() {
     el.addEventListener("input", () => { nastaveni[klic] = el[vlastnost]; uloz("dhpf_nastaveni", nastaveni); kresli(); });
   };
   nastav("#barva", "barva");
-  nastav("#podpis", "podpis");
-  nastav("#ukazPodpis", "ukazPodpis", "checked");
+  nastav("#logo", "logo");
   nastav("#titulekZap", "titulekZap", "checked");
 
   $("#naucit").addEventListener("click", naucStyl);
