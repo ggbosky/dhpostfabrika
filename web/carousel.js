@@ -190,8 +190,11 @@ function kresliTitul(ctx, s) {
   const cerveny = s.cerveny.trim().toUpperCase();
   const bily = s.bily.trim().toUpperCase();
   const sirka = W - 120;
-  const vBily = bily ? velikostNaSirku(ctx, bily, 900, PISMO_TITUL, 170, sirka) : 0;
-  const vCerveny = cerveny ? velikostNaSirku(ctx, cerveny, 900, PISMO_TITUL, 170, sirka) : 0;
+  // Spodní řádek nesmí zasahovat do ikony „posuň dál“ vpravo dole (začíná na x ≈ 945):
+  // text je na střed, takže jeho šířka je nejvýš 2 × (925 − 540) px.
+  const sirkaDole = s.swipe ? 2 * (925 - W / 2) : sirka;
+  const vBily = bily ? velikostNaSirku(ctx, bily, 900, PISMO_TITUL, 170, sirkaDole) : 0;
+  const vCerveny = cerveny ? velikostNaSirku(ctx, cerveny, 900, PISMO_TITUL, 170, bily ? sirka : sirkaDole) : 0;
   const yBily = H - 100;
   const yCerveny = bily ? yBily - vBily * 0.72 - 75 : H - 110;
   const horni = cerveny ? yCerveny - vCerveny * 0.72 : yBily - vBily * 0.72;
