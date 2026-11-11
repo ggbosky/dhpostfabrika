@@ -52,6 +52,9 @@ text, popisek, barvu týmu i obě fotky; z **Témat** se sem jde tlačítkem **�
   zpravodajství. Doporučené zdroje: thehockeywriters.com, sport.ceskatelevize.cz,
   sportrevue.isport.blesk.cz, nhl.cz (a další). U každého tématu jsou fakta a **odkazy na zdroje**
   a potom **druhá nezávislá kontrola**: ✅ ověřeno / ❌ rozpor (co nesedí) / ⚠️ nejisté.
+  Témata se zobrazují postupně, jak přicházejí (obvykle do 15–20 s, nejdéle 30 s); kontrola
+  doběhne na pozadí a ověřená témata se seřadí nahoru. Volba **Výročí** hledá jen události
+  přesně z dnešního dne a měsíce (v jakémkoli roce) – jiná data aplikace vyřadí.
   Tlačítkem **✍️ Post** nebo **🎞️ Carousel** z tématu rovnou vznikne příspěvek, do popisku se
   přidá řádek `ℹ️ Zdroj: …`.
 - Tlačítko **🔎 Ověřit fakta** (u textu postu i u popisku carouselu): AI dohledá každé

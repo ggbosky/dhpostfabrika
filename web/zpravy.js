@@ -13,7 +13,7 @@ const ZAMERENI = {
   kuriozity: "kuriozity a perličky, které skoro nikdo nezná",
 };
 const OBDOBI = {
-  vyroci: "VÝROČÍ: události, které se staly přesně v dnešní den nebo v nejbližších 7 dnech (v libovolném roce) – ideálně kulatá výročí",
+  vyroci: "", // doplní se podle dnešního data (viz obdobiText)
   historie: "kdykoliv v historii hokeje",
   aktualne: "aktuální dění za posledních 14 dní (nové rekordy, právě dosažené milníky, unikátní statistiky)",
 };
@@ -23,9 +23,36 @@ const KDE = {
 };
 const ZDROJE_TIPY = "thehockeywriters.com, sport.ceskatelevize.cz, sportrevue.isport.blesk.cz/hokej, nhl.cz, nhl.com, hokej.cz, idnes.cz, isport.cz, hockey-reference.com, quanthockey.com, eliteprospects.com, iihf.com, Wikipedie";
 
+const MESICE = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
+const dnesniDen = () => { const d = new Date(); return `${d.getDate()}. ${MESICE[d.getMonth()]}`; };
+
+function obdobiText(klic) {
+  if (klic !== "vyroci") return OBDOBI[klic];
+  const d = new Date();
+  const EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][d.getMonth()];
+  return `VÝROČÍ PŘESNĚ DNEŠNÍHO DNE: jen události, které se staly ${d.getDate()}. ${d.getMonth() + 1}. (tj. ${dnesniDen()}) v libovolném roce.
+Každé téma MUSÍ mít datum přesně ${d.getDate()}. ${d.getMonth() + 1}. RRRR (den i měsíc musí sedět, rok libovolný). Jiné dny vůbec neuváděj –
+raději vrať méně témat. Pole "datum" piš ve tvaru ${d.getDate()}. ${d.getMonth() + 1}. RRRR.
+Hledej dotazy typu: "${dnesniDen()} hokej výročí", "${dnesniDen()} v historii hokeje", "${EN} ${d.getDate()} hockey history",
+"on this day ${EN} ${d.getDate()} NHL", "${EN} ${d.getDate()} NHL milestone Czech", "${dnesniDen()} narozeniny hokejista".`;
+}
+
+// Sedí den i měsíc s dnešním datem? ("11. 11. 1998", "11.11.1998", "11. listopadu 1998")
+function jeDnesniDen(t) {
+  const d = new Date();
+  const s = String(t.datum || "").toLowerCase();
+  let m = s.match(/(\d{1,2})\.\s*(\d{1,2})\./);
+  if (m) return +m[1] === d.getDate() && +m[2] === d.getMonth() + 1;
+  m = s.match(/(\d{1,2})\.\s*([a-zúůěščřžýáíé]+)/);
+  if (m) return +m[1] === d.getDate() && MESICE.some((nazev, i) => i === d.getMonth() && m[2].startsWith(nazev.slice(0, 4)));
+  return false;
+}
+
 let temata = [];
+let hledani = 0; // pořadí hledání – stará kontrola nesmí přepsat nová témata
 
 function zdrojeHtml(zdroje) {
+  if (zdroje === null || zdroje === undefined) return `<span class="muted">⏳ načítám zdroje…</span>`;
   if (!zdroje.length) return `<span class="bez-zdroje">⚠️ bez přímého zdroje – ověř ručně</span>`;
   return zdroje.map((z) => `<a href="${esc(z.uri)}" target="_blank" rel="noopener">${esc(z.titulek)}</a>`).join(" · ");
 }
@@ -41,16 +68,36 @@ async function najdiTemata() {
   const AI = window.DHAI;
   if (!AI.maKlic()) { zprava('Hledání potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
   const zamereni = ZAMERENI[$("#tZamereni").value];
-  const obdobi = OBDOBI[$("#tObdobi").value];
+  const jenDnes = $("#tObdobi").value === "vyroci";
+  const obdobi = obdobiText($("#tObdobi").value);
   const oblast = KDE[$("#tKde").value];
   const vlastni = $("#tVlastni").value.trim();
   const b = $("#tHledej");
+  const moje = ++hledani;
+  const klicFiltru = JSON.stringify([$("#tZamereni").value, $("#tObdobi").value, $("#tKde").value, vlastni, AI.dnes()]);
   b.disabled = true;
   b.textContent = "Hledám na webu…";
-  zprava("AI prohledává web a hledá zajímavosti se zdroji… (obvykle 15–60 s)");
+  const start = Date.now();
+  let videno = 0;
+  const pocetTemat = (n) => `${n} ${n === 1 ? "téma" : n < 5 ? "témata" : "témat"}`;
+  const odpocet = setInterval(() => {
+    const s = Math.round((Date.now() - start) / 1000);
+    zprava(videno ? `Načítám… zatím ${pocetTemat(videno)} (${s} s)` : `AI prohledává web a hledá zajímavosti se zdroji… ${s} s (obvykle do 15 s)`);
+  }, 1000);
+  zprava("AI prohledává web a hledá zajímavosti se zdroji…");
   $("#tSeznam").innerHTML = "";
   try {
-    const r = await AI.hledatNaWebu({
+    const r = await AI.hledatNaWebuProud({
+      priTextu: (text) => {
+        if (moje !== hledani) return;
+        const nalezene = AI.objektyZTextu(text).filter((t) => t && t.titulek && (!jenDnes || jeDnesniDen(t)));
+        if (nalezene.length > videno) {
+          videno = nalezene.length;
+          temata = nalezene.map((t) => ({ ...t, fakta: (t.fakta || []).filter(Boolean), zdroje: null }));
+          vykresli({});
+          zprava(`Načítám… zatím ${pocetTemat(videno)} (${Math.round((Date.now() - start) / 1000)} s)`);
+        }
+      },
       system: `Jsi rešeršista Instagramu Deník hokeje. Účet NEDĚLÁ zpravodajství (výsledky, přestupy, zranění),
 ale zajímavosti: milníky, rekordy, statistické kuriozity, výročí a silné historické příběhy – věci, u kterých
 fanoušek řekne „to jsem nevěděl“. Hledáš je na webu (Google). Dnešní datum: ${AI.dnes()}.
@@ -60,32 +107,60 @@ Zásady:
   ${ZDROJE_TIPY}.
 - Když si nejsi jistý číslem nebo datem, téma vynech.
 - Žádná běžná zpravodajská témata (výsledky kola, přestupy, zranění), pokud v nich není rekord nebo milník.`,
-      zadani: `Najdi 6 nejzajímavějších témat.
+      zadani: `Najdi ${jenDnes ? "8" : "6"} nejzajímavějších témat.
 Druh: ${zamereni}.
 Období: ${obdobi}.
 Oblast: ${oblast}.${vlastni ? `\nUpřesnění od redaktora: ${vlastni}` : ""}
 
-Odpověz POUZE blokem \`\`\`json s polem objektů:
-[{"titulek": "krátký úderný titulek", "datum": "kdy se to stalo (den. měsíc. rok, nebo rok)", "fakta": ["věta s konkrétním ověřeným faktem", "…" (3–5 faktů)],
-  "proc_zajimave": "1 věta, proč to fanoušky zaujme", "format": "post" nebo "carousel" (příběh s více fakty = carousel)}]`,
+Odpověz POUZE řádky JSON Lines – každé téma jeden řádek s jedním objektem, žádný jiný text:
+{"titulek": "krátký úderný titulek", "datum": "kdy se to stalo (den. měsíc. rok, nebo rok)", "fakta": ["krátké ověřené fakto", "…"] (2–4), "proc_zajimave": "1 věta", "format": "post" nebo "carousel"}`,
     });
-    const data = AI.jsonZTextu(r.text);
-    temata = (Array.isArray(data) ? data : data.temata || []).map((t) => {
+    if (moje !== hledani) return;
+    let data = AI.objektyZTextu(r.text).filter((t) => t && t.titulek);
+    const vsech = data.length;
+    if (jenDnes) data = data.filter(jeDnesniDen);
+    const vyrazeno = vsech - data.length;
+    temata = data.map((t) => {
       const fakta = (t.fakta || []).filter(Boolean);
       const zdroje = AI.zdrojeProText(r, [t.titulek, ...fakta, t.proc_zajimave].join(" "));
       return { ...t, fakta, zdroje };
     });
-    if (!temata.length) { zprava("Nic jsem nenašel. Zkus jiné zaměření nebo delší období.", "varovani"); return; }
+    if (!temata.length) {
+      vykresli({});
+      zprava(jenDnes ? `Na ${dnesniDen()} jsem tentokrát nenašel nic, co by šlo podložit zdrojem${vyrazeno ? ` (${vyrazeno} témat s jiným datem jsem vyřadil)` : ""}. Zkus to znovu nebo jiný druh / oblast.` : "Nic jsem nenašel. Zkus jiné zaměření nebo delší období.", "varovani");
+      return;
+    }
+    clearInterval(odpocet);
     vykresli(r);
-    zprava(`Nalezeno ${temata.length} témat. Teď je AI ještě jednou nezávisle ověřuje…`, "varovani");
-    b.textContent = "Ověřuju fakta…";
-    await overTemata(r);
+    ulozVysledek(klicFiltru, r);
+    b.disabled = false;
+    b.textContent = "🔎 Najít témata";
+    zprava(`${temata.length === 1 ? "Nalezeno" : temata.length < 5 ? "Nalezena" : "Nalezeno"} ${pocetTemat(temata.length)} za ${Math.round((Date.now() - start) / 1000)} s${jenDnes ? `, ${temata.length === 1 ? "z" : "všechna z"} ${dnesniDen()}` : ""}${vyrazeno ? ` (${vyrazeno} s jiným datem vyřazeno)` : ""}${r.preruseno ? " (Google odpovídal pomalu, ukazuji, co stihl)" : ""}. Můžeš rovnou tvořit – druhá kontrola faktů běží na pozadí a odznaky se doplní samy.`, "ok");
+    overTemata(r, moje).then(() => { if (moje === hledani) ulozVysledek(klicFiltru, r); }); // na pozadí, neblokuje
   } catch (e) {
+    clearInterval(odpocet);
     zprava(esc(e.message), "chyba");
   } finally {
+    clearInterval(odpocet);
     b.disabled = false;
     b.textContent = "🔎 Najít témata";
   }
+}
+
+// Poslední výsledky se pamatují, takže se po otevření záložky ukážou hned.
+function ulozVysledek(klicFiltru, r) {
+  try { localStorage.setItem("dhpf_temata", JSON.stringify({ klicFiltru, temata, dotazy: r.dotazy || [], cas: Date.now() })); } catch { /* nic */ }
+}
+
+function nactiPosledni() {
+  let u = null;
+  try { u = JSON.parse(localStorage.getItem("dhpf_temata")); } catch { /* nic */ }
+  if (!u?.temata?.length) return;
+  temata = u.temata;
+  temata.forEach((t) => { if (!t.kontrola) t.kontrola = { stav: "nejiste", problem: "druhá kontrola nedoběhla" }; });
+  vykresli({ dotazy: u.dotazy });
+  const kdy = new Date(u.cas).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  zprava(`Poslední nalezená témata (${kdy}). Pro nová klikni na <b>🔎 Najít témata</b>.`);
 }
 
 function vykresli(r) {
@@ -118,19 +193,22 @@ function kontrolaHtml(t) {
 }
 
 // Druhé, nezávislé hledání: ověří fakta všech témat najednou.
-async function overTemata(r) {
+async function overTemata(r, moje) {
   const AI = window.DHAI;
+  const tato = temata;
   try {
     const k = await AI.hledatNaWebu({
+      casovyLimit: 45000,
       system: `Jsi přísný fact-checker hokejové redakce. Nezávisle ověř fakta vyhledáváním na webu. Dnešní datum: ${AI.dnes()}.
 Za "overeno" označ téma jen tehdy, když jsi našel potvrzení klíčových čísel, dat, týmů i soupeřů.
-Pokud cokoliv nesedí (rok, datum, tým, soupeř, číslo, pořadí), je to "rozpor" a napiš, co je správně.`,
+Pokud cokoliv nesedí (rok, den a měsíc, tým, soupeř, číslo, pořadí), je to "rozpor" a napiš, co je správně.`,
       zadani: `Ověř tato témata:
 ${JSON.stringify(temata.map((t, id) => ({ id, titulek: t.titulek, datum: t.datum, fakta: t.fakta })), null, 1)}
 
 Odpověz POUZE blokem \`\`\`json s polem:
 [{"id": 0, "stav": "overeno" | "rozpor" | "nejiste", "problem": "u rozporu co nesedí a jak je to správně, u nejistého co se nepodařilo potvrdit, jinak prázdné"}]`,
     });
+    if (moje !== hledani) return;
     const data = AI.jsonZTextu(k.text);
     for (const v of Array.isArray(data) ? data : []) {
       const t = temata[Number(v.id)];
@@ -138,11 +216,16 @@ Odpověz POUZE blokem \`\`\`json s polem:
     }
     temata.forEach((t) => { if (!t.kontrola) t.kontrola = { stav: "nejiste", problem: "kontrola téma vynechala" }; });
   } catch (e) {
-    temata.forEach((t) => { t.kontrola = { stav: "chyba", problem: e.message }; });
+    if (moje !== hledani) return;
+    tato.forEach((t) => { t.kontrola = { stav: "chyba", problem: e.message }; });
   }
+  if (moje !== hledani) return;
+  const poradi = { overeno: 0, nejiste: 1, chyba: 1, rozpor: 2 };
+  temata.sort((x, y) => (poradi[x.kontrola?.stav] ?? 1) - (poradi[y.kontrola?.stav] ?? 1)); // ověřená nahoru
   vykresli(r);
   const ok = temata.filter((t) => t.kontrola.stav === "overeno").length;
   const spatne = temata.filter((t) => t.kontrola.stav === "rozpor").length;
+  if (temata.every((t) => t.kontrola.stav === "chyba")) return; // chybu kontroly ukazují odznaky
   zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b>, <b>🎞️ Carousel</b> nebo <b>📅 Dnes před lety</b>.`, spatne ? "varovani" : "ok");
 }
 
@@ -150,7 +233,7 @@ function zadaniZTematu(t) {
   return `${t.titulek}${t.datum ? ` (${t.datum})` : ""}
 Ověřená fakta (používej jen tato, nic nepřidávej):
 ${t.fakta.map((f) => `- ${f}`).join("\n")}
-Zdroje: ${t.zdroje.map((z) => z.titulek).join(", ") || "neuvedeny"}${t.kontrola?.stav === "rozpor" ? `
+Zdroje: ${(t.zdroje || []).map((z) => z.titulek).join(", ") || "neuvedeny"}${t.kontrola?.stav === "rozpor" ? `
 POZOR – kontrola faktů našla rozpor: ${t.kontrola.problem}. Použij opravené údaje.` : ""}`;
 }
 
@@ -200,19 +283,21 @@ Odpověz POUZE blokem \`\`\`json s polem:
 }
 
 function init() {
+  $("#tDnesVolba").textContent = `Výročí – stalo se ${dnesniDen()} (v jakémkoli roce)`;
+  nactiPosledni();
   $("#tHledej").addEventListener("click", najdiTemata);
   $("#tSeznam").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.post) {
       const t = temata[Number(b.dataset.post)];
-      window.DHPost.navrhni(zadaniZTematu(t), t.zdroje);
+      window.DHPost.navrhni(zadaniZTematu(t), t.zdroje || []);
     } else if (b.dataset.vyroci) {
       const t = temata[Number(b.dataset.vyroci)];
-      window.DHVyroci.navrhni(zadaniZTematu(t), t.zdroje);
+      window.DHVyroci.navrhni(zadaniZTematu(t), t.zdroje || []);
     } else if (b.dataset.carousel) {
       const t = temata[Number(b.dataset.carousel)];
-      window.DHCarousel.navrhni(zadaniZTematu(t), t.zdroje, Math.min(6, Math.max(3, t.fakta.length)));
+      window.DHCarousel.navrhni(zadaniZTematu(t), t.zdroje || [], Math.min(6, Math.max(3, t.fakta.length)));
     }
   });
   $("#overitPost").addEventListener("click", (e) => overFakta($("#text").value, $("#overeniPost"), e.currentTarget));
