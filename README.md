@@ -50,7 +50,9 @@ text, popisek, barvu týmu i obě fotky; z **Témat** se sem jde tlačítkem **�
 V záložkách **Nový post**, **Carousel** i **Dnes před lety** je tlačítko **💾 Uložit koncept**.
 Uloží se všechno včetně fotek (do úložiště tohoto prohlížeče, nikam se neposílá). V záložce
 **💾 Koncepty** je seznam s náhledy – **Otevřít** vrátí post přesně tam, kde jsi skončil,
-a další uložení přepíše tuhle verzi. Koncepty jsou vázané na prohlížeč a zařízení
+a další uložení přepíše tuhle verzi. Navíc se rozpracovaná práce v každé záložce **ukládá
+automaticky** (každých pár sekund) a po otevření stránky se sama vrátí – v Konceptech je
+označená „automaticky“. Koncepty jsou vázané na prohlížeč a zařízení
 (mobil a počítač mají každý své); v anonymním okně se po zavření smažou.
 
 ### 🔎 Témata a ověřování faktů (s AI klíčem)
