@@ -5,10 +5,14 @@
 
 const $ = (s, el = document) => el.querySelector(s);
 const KLIC = "dhpf_gemini_klic";
+// Pořadí podle rychlosti a spolehlivosti ve free tieru (změřeno): 2.5 Flash bez „přemýšlení“ ~5 s,
+// 3.1 Flash-Lite ~5 s, 3.6 Flash ~12 s; nejnovější 3.8 umí při přetížení „zamrznout“ i na minuty.
 const MODELY = [
-  "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
-  "gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.1-flash-lite",
+  "gemini-2.5-flash", "gemini-3.1-flash-lite", "gemini-3.6-flash",
+  "gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash",
 ];
+const LIMIT_POKUSU_MS = 20000;   // jeden model nesmí čekat déle
+const LIMIT_CELKEM_MS = 45000;   // celý návrh textu
 
 const nacti = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const uloz = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* nic */ } };
@@ -22,28 +26,39 @@ class AIChyba extends Error {}
 
 async function gemini({ system, zadani, schema, teplota = 0.9 }) {
   if (!maKlic()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
-  const posledni = nacti("dhpf_gemini_model");
-  const poradi = [...new Set([posledni, ...MODELY].filter(Boolean))];
+  const poradi = MODELY; // vždy od nejrychlejšího (přetížené / vyčerpané modely se přeskočí za pár sekund)
+  const konec = Date.now() + LIMIT_CELKEM_MS;
   let limit = false, chyba = null;
 
   for (const model of poradi) {
-    let odpoved;
+    const zbyva = konec - Date.now();
+    if (zbyva < 3000) break;
+    const preruseni = new AbortController();
+    const casovac = setTimeout(() => preruseni.abort(), Math.min(zbyva, LIMIT_POKUSU_MS));
+    let odpoved, data;
     try {
       odpoved = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
+        signal: preruseni.signal,
         headers: { "Content-Type": "application/json", "x-goog-api-key": klic() },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: zadani }] }],
-          generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema, temperature: teplota },
+          generationConfig: {
+            responseMimeType: "application/json", responseJsonSchema: schema, temperature: teplota,
+            // psaní textu podle zadaných faktů nepotřebuje dlouhé „přemýšlení“ – 2× rychlejší
+            ...(model.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          },
         }),
       });
+      data = odpoved.ok ? await odpoved.json() : null;
     } catch (e) {
-      chyba = e;
-      continue; // síť / přetížení – zkus další model
+      clearTimeout(casovac);
+      chyba = e.name === "AbortError" ? new AIChyba(`Model ${model} neodpověděl včas.`) : e;
+      continue; // síť / zamrznutí – zkus další model
     }
+    clearTimeout(casovac);
     if (odpoved.ok) {
-      const data = await odpoved.json();
       const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
       if (!text) { chyba = new AIChyba("AI nevrátila žádný text."); continue; }
       try {
@@ -60,8 +75,10 @@ async function gemini({ system, zadani, schema, teplota = 0.9 }) {
     if (odpoved.status === 403) throw new AIChyba("Google klíč odmítl (403). Zkontroluj, že je to klíč z aistudio.google.com/apikey.");
     chyba = new AIChyba(`Gemini chyba ${odpoved.status}: ${telo.slice(0, 200)}`);
   }
-  if (limit) throw new AIChyba("Dnešní bezplatný limit Gemini je vyčerpaný u všech modelů. Obnoví se v 9:00 českého času – do té doby tvoř ručně.");
-  throw chyba instanceof AIChyba ? chyba : new AIChyba("Gemini teď neodpovídá, zkus to za chvíli.");
+  if (limit && !(chyba instanceof AIChyba && /neodpověděl|přetížený/.test(chyba.message))) {
+    throw new AIChyba("Dnešní bezplatný limit Gemini je vyčerpaný u všech modelů. Obnoví se v 9:00 českého času – do té doby tvoř ručně.");
+  }
+  throw new AIChyba("Google teď odpovídá pomalu (modely jsou přetížené). Zkus to prosím znovu za chvíli.");
 }
 
 // Volání s vyhledáváním Google (grounding). Vrací text + zdroje, ze kterých model čerpal.
@@ -491,7 +508,12 @@ function zjednodusene(dotazy) {
   return [...new Set(out)];
 }
 
-async function prvniFoto(dotazy, vynechat = new Set()) {
+// Fotka nejdéle za ~12 s – jinak null (uživatel si ji pak najde ručně).
+function prvniFoto(dotazy, vynechat = new Set(), limitMs = 12000) {
+  return Promise.race([prvniFotoBezLimitu(dotazy, vynechat), pockej(limitMs).then(() => null)]);
+}
+
+async function prvniFotoBezLimitu(dotazy, vynechat) {
   for (const d of zjednodusene(dotazy)) {
     try {
       const nalezene = (await hledejFotky(d, 10)).filter((f) => !vynechat.has(f.url));

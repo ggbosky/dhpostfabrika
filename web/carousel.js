@@ -548,7 +548,7 @@ async function navrhniCarousel(bezPotvrzeni = false) {
   const b = $("#cAiNavrhni");
   b.disabled = true;
   b.textContent = "Píšu…";
-  cAiZprava("AI píše texty slidů… (obvykle 10–40 s)");
+  cAiZprava("AI píše texty slidů… (obvykle 5–15 s)");
   try {
     const r = await AI.gemini({
       system: `${SYSTEM_CAROUSEL}\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
@@ -571,17 +571,29 @@ async function navrhniCarousel(bezPotvrzeni = false) {
     const seznam = overit.length ? `<br><b>Před zveřejněním ověř:</b><ul>${overit.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>` : "";
     const pouzite = new Set();
     let nalezeno = 0;
-    for (let i = 0; i < slidy.length; i++) {
-      cAiZprava(`Texty hotové. Hledám fotky ${i + 1} / ${slidy.length}…${seznam}`, "varovani");
-      const s = slidy[i];
-      const nalez = await AI.prvniFoto([s.dotaz, s.typ === "titul" ? r.cerveny : "", r.titul_foto_dotaz], pouzite);
-      if (nalez) {
-        pouzite.add(nalez.foto.url);
-        nastavWebFoto(i, nalez.img, nalez.foto);
-        nalezeno++;
-        vykresliSeznam();
+    // Fotky souběžně (po 3), každá se ukáže hned, jak dorazí.
+    let hotovo = 0;
+    cAiZprava(`Texty hotové ✓ Můžeš je upravovat, fotky se doplňují… 0 / ${slidy.length}${seznam}`, "varovani");
+    const sada = slidy;
+    const fronta = sada.map((s, i) => i);
+    const pracovnik = async () => {
+      while (fronta.length) {
+        const i = fronta.shift();
+        const s = sada[i];
+        const nalez = await AI.prvniFoto([s.dotaz, s.typ === "titul" ? r.cerveny : "", r.titul_foto_dotaz], pouzite);
+        hotovo++;
+        if (slidy !== sada) return; // mezitím vznikl nový návrh
+        if (nalez && !pouzite.has(nalez.foto.url) && !s.img) {
+          pouzite.add(nalez.foto.url);
+          nastavWebFoto(i, nalez.img, nalez.foto);
+          nalezeno++;
+          vykresliSeznam();
+        }
+        cAiZprava(`Texty hotové ✓ Můžeš je upravovat, fotky se doplňují… ${hotovo} / ${sada.length}${seznam}`, "varovani");
       }
-    }
+    };
+    await Promise.all([pracovnik(), pracovnik(), pracovnik()]);
+    if (slidy !== sada) return;
     aktualizujKredity();
     cAiZprava(`Hotovo ✓ Fotky: ${nalezeno} / ${slidy.length} (volně použitelné, autoři jsou v popisku). Texty i fotky teď uprav podle sebe – u každého slidu je <b>🔍 Najít fotku</b> a <b>📷 Vlastní fotka</b>.${seznam}`, overit.length ? "varovani" : "ok");
   } catch (e) {

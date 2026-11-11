@@ -245,7 +245,7 @@ async function navrhni() {
   if (!AI.maKlic()) { vZprava('AI pomocník potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
   const b = $("#vAiNavrhni");
   b.disabled = true; b.textContent = "Píšu…";
-  vZprava("AI píše text… (obvykle 5–30 s)");
+  vZprava("AI píše text… (obvykle 5–15 s)");
   try {
     const r = await AI.gemini({
       system: `Jsi redaktor Instagramu Deník hokeje a píšeš single post „DNES PŘED X LETY“ – připomínku hokejového výročí.
@@ -276,10 +276,12 @@ ${AI.PRAVIDLA}
     const seznam = overit.length ? `<br><b>Před zveřejněním ověř:</b><ul>${overit.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>` : "";
     vZprava(`Text hotový, hledám fotky…${seznam}`, "varovani");
     const pouzite = new Set();
-    const hlavni = await AI.prvniFoto([stav.dotazFoto], pouzite);
-    if (hlavni) { pouzite.add(hlavni.foto.url); stav.foto = hlavni.img; stav.kreditFoto = AI.kredit(hlavni.foto); }
-    const mala = stav.dotazVlozka ? await AI.prvniFoto([stav.dotazVlozka], pouzite) : null;
-    if (mala) { stav.vlozka = mala.img; stav.kreditVlozka = AI.kredit(mala.foto); }
+    const [hlavni, mala] = await Promise.all([
+      AI.prvniFoto([stav.dotazFoto], pouzite),
+      stav.dotazVlozka ? AI.prvniFoto([stav.dotazVlozka], pouzite) : Promise.resolve(null),
+    ]);
+    if (hlavni) { stav.foto = hlavni.img; stav.kreditFoto = AI.kredit(hlavni.foto); }
+    if (mala && mala.foto.url !== hlavni?.foto.url) { stav.vlozka = mala.img; stav.kreditVlozka = AI.kredit(mala.foto); }
     aktualizujKredity(); doFormulare(); prekresli();
     vZprava(`Hotovo ✓ Fotky: ${[hlavni, mala].filter(Boolean).length} / 2. Všechno teď můžeš upravit – text, datum, barvu i fotky.${seznam}`, overit.length ? "varovani" : "ok");
   } catch (e) {

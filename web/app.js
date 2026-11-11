@@ -300,7 +300,7 @@ async function navrhniPost() {
   const b = $("#aiNavrhni");
   b.disabled = true;
   b.textContent = "Píšu…";
-  aiZprava("AI píše text… (obvykle 5–30 s)");
+  aiZprava("AI píše text… (obvykle 5–15 s)");
   try {
     const AI = window.DHAI;
     const r = await AI.gemini({
