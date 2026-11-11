@@ -45,6 +45,14 @@ z data) a žluté datum, malá kulatá fotka s barevným rámečkem a text písm
 v `*hvězdičkách*` mají barvu zvýraznění (modrá, červená, žlutá… nebo vlastní). AI umí navrhnout
 text, popisek, barvu týmu i obě fotky; z **Témat** se sem jde tlačítkem **📅 Dnes před lety**.
 
+### 💾 Koncepty – rozpracované posty
+
+V záložkách **Nový post**, **Carousel** i **Dnes před lety** je tlačítko **💾 Uložit koncept**.
+Uloží se všechno včetně fotek (do úložiště tohoto prohlížeče, nikam se neposílá). V záložce
+**💾 Koncepty** je seznam s náhledy – **Otevřít** vrátí post přesně tam, kde jsi skončil,
+a další uložení přepíše tuhle verzi. Koncepty jsou vázané na prohlížeč a zařízení
+(mobil a počítač mají každý své); v anonymním okně se po zavření smažou.
+
 ### 🔎 Témata a ověřování faktů (s AI klíčem)
 
 - Záložka **🔎 Témata**: AI prohledá web (Google) a najde 6 **zajímavostí** – milníky, rekordy,
@@ -98,6 +106,7 @@ dhpostfabrika/
 │   ├── index.html
 │   ├── sablony.js      šablony textů
 │   ├── grafika.js      logo, ořez fotky, stažení a sdílení
+│   ├── koncepty.js     ukládání rozpracovaných postů (IndexedDB, i s fotkami)
 │   ├── ai.js           volitelný AI pomocník (Gemini) + hledání volných fotek
 │   ├── zpravy.js       živé hledání témat na webu a ověřování faktů se zdroji
 │   ├── app.js          tvorba postu, učení stylu

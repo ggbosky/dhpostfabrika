@@ -104,6 +104,7 @@ function bezEmoji(s) {
 }
 
 function vytvor() {
+  window.DHKoncepty?.zapomen("post");
   const d = ulozHodnoty();
   $$("#pole [name]").forEach((el) => el.classList.remove("chyba"));
   const chybi = $$("#pole [required]").filter((el) => !el.value.trim());
@@ -291,6 +292,7 @@ function aiZprava(text, druh = "") {
 }
 
 async function navrhniPost() {
+  window.DHKoncepty?.zapomen("post");
   const zadani = $("#aiZadani").value.trim();
   if (!zadani) { aiZprava("Napiš, o čem má post být.", "chyba"); $("#aiZadani").focus(); return; }
   if (!window.DHAI.maKlic()) {
@@ -557,6 +559,40 @@ function prepniZalozku(kam) {
   $$("[data-zalozka]").forEach((s) => { s.hidden = s.dataset.zalozka !== kam; });
   try { localStorage.setItem("dhpf_zalozka", kam); } catch { /* nic */ }
 }
+
+// Koncepty: uložení a obnovení rozpracovaného postu.
+window.DHKoncepty?.registruj("post", {
+  async ziskej() {
+    ulozHodnoty();
+    kresli();
+    const text = $("#text").value;
+    return {
+      nazev: $("#titulek").value.trim() || text.split("\n")[0].trim() || "Post",
+      data: { typ, hodnoty: hodnotyFormulare, text, titulek: $("#titulek").value, pohled,
+        nastaveni: { barva: nastaveni.barva, logo: nastaveni.logo, titulekZap: nastaveni.titulekZap } },
+      obrazky: { foto },
+      platno,
+    };
+  },
+  async obnov(d, obrazky) {
+    typ = d.typ || "vysledek";
+    Object.keys(hodnotyFormulare).forEach((k) => delete hodnotyFormulare[k]);
+    Object.assign(hodnotyFormulare, d.hodnoty || {});
+    vykresliTypy();
+    vykresliFormular();
+    $("#text").value = d.text || "";
+    $("#titulek").value = d.titulek || "";
+    Object.assign(nastaveni, d.nastaveni || {});
+    $("#barva").value = nastaveni.barva;
+    $("#logo").value = nastaveni.logo;
+    $("#titulekZap").checked = nastaveni.titulekZap;
+    if (obrazky.foto) { pouzijFoto(obrazky.foto); pohled = d.pohled || pohled; $("#zoom").value = pohled.zoom; }
+    else { foto = null; $("#fotoOvl").hidden = true; $("#fotoMalo").hidden = true; }
+    $("#vysledek").hidden = false;
+    prepocitej();
+    kresli();
+  },
+});
 
 window.DHPost = {
   prepniZalozku: (kam) => prepniZalozku(kam),

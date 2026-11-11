@@ -230,6 +230,19 @@
   .barva-vzor:hover { box-shadow: 0 0 0 2px #fff; }
   input[type=radio] { width: auto; accent-color: var(--red-hot); }
   input:disabled { opacity: .55; }
+  .koncept-stav { font-size: 13px; margin: 10px 0 0; min-height: 1em; }
+  .koncept-stav.ok { color: var(--ok-text); }
+  .koncept-stav.chyba { color: var(--err-text); }
+  .koncept-stav a { color: inherit; }
+  #kSeznam { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .koncept { display: flex; gap: 14px; background: #0f0f0f; border: 1px solid var(--line); border-radius: 14px; padding: 12px; transition: border-color .15s; }
+  .koncept:hover { border-color: var(--red-hot); }
+  .koncept-nahled { flex: none; width: 96px; aspect-ratio: 4 / 5; padding: 0; border: 0; border-radius: 8px; overflow: hidden; background: #000; cursor: pointer; color: var(--muted); font-size: 11px; }
+  .koncept-nahled img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .koncept-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .koncept-info b { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .koncept-typ { font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; color: var(--yellow); }
+  #kPocet { color: var(--muted); font-weight: 600; }
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
     #vysledek, #historieKarta, #aiPostKarta, #formular { grid-column: auto; grid-row: auto; }
@@ -271,6 +284,7 @@
   <button type="button" class="tab on" data-tab="post">Nový post</button>
   <button type="button" class="tab" data-tab="carousel">Carousel</button>
   <button type="button" class="tab" data-tab="vyroci">📅 Dnes před lety</button>
+  <button type="button" class="tab" data-tab="koncepty">💾 Koncepty <span id="kPocet"></span></button>
   <button type="button" class="tab" data-tab="styl">Můj styl</button>
 </div></nav>
 
@@ -350,7 +364,9 @@
           <option value="cerna">Černé</option><option value="vypnuto">Bez loga</option></select></label>
         <label>Barva proužku / pozadí<input type="color" id="barva"></label>
       </div>
-      <div class="akce"><button type="button" class="btn" id="stahni">⬇️ Stáhnout obrázek</button></div>
+      <div class="akce"><button type="button" class="btn" id="stahni">⬇️ Stáhnout obrázek</button>
+        <button type="button" class="btn ghost" data-uloz-koncept="post">💾 Uložit koncept</button></div>
+      <p class="koncept-stav" data-koncept-stav="post"></p>
 
       <label style="margin-top:20px">Text postu (můžeš upravit)
         <textarea id="text" placeholder="Vyplň údaje vlevo a klikni na Vytvořit post."></textarea>
@@ -429,8 +445,10 @@
       <div class="akce">
         <button type="button" class="btn" id="cStahniVse">⬇️ Stáhnout všechny slidy</button>
         <button type="button" class="btn ghost" id="cStahniJeden">Stáhnout tento slide</button>
+        <button type="button" class="btn ghost" data-uloz-koncept="carousel">💾 Uložit koncept</button>
         <button type="button" class="btn ghost" id="cSdilej" hidden>📲 Uložit do telefonu</button>
       </div>
+      <p class="koncept-stav" data-koncept-stav="carousel"></p>
       <p class="muted" style="font-size:13px;margin:14px 0 0">Všechny slidy se stáhnou jako ZIP (slide-01.jpg, slide-02.jpg…). Na Instagramu je nahraj v tomhle pořadí jako jeden příspěvek.</p>
     </div>
   </section>
@@ -504,14 +522,24 @@
       <div id="vNahled" class="nahled"><canvas id="vPlatno" width="1080" height="1350" aria-label="Náhled postu Dnes před X lety"></canvas></div>
       <div class="akce">
         <button type="button" class="btn" id="vStahni">⬇️ Stáhnout obrázek</button>
+        <button type="button" class="btn ghost" data-uloz-koncept="vyroci">💾 Uložit koncept</button>
         <button type="button" class="btn ghost" id="vSdilej" hidden>📲 Uložit do telefonu</button>
       </div>
+      <p class="koncept-stav" data-koncept-stav="vyroci"></p>
       <label style="margin-top:20px">Popisek pod post
         <textarea id="vPopisek" rows="9" placeholder="Napiš popisek, nebo ho nech navrhnout AI."></textarea></label>
       <div id="vPocty" class="pocty"></div>
       <div class="akce"><button type="button" class="btn" id="vKopiruj">Kopírovat text</button>
         <button type="button" class="btn ghost" id="vOverit">🔎 Ověřit fakta</button></div>
       <div id="vOvereni"></div>
+    </div>
+  </section>
+
+  <section id="zalozkaKoncepty" hidden data-zalozka="koncepty">
+    <div class="card">
+      <h2>💾 Rozpracované posty <span class="muted">uložené jen v tomhle prohlížeči, i s fotkami</span></h2>
+      <p class="muted" style="margin-top:0">Klikni na koncept a pokračuj tam, kde jsi skončil. Když ho pak znovu uložíš, přepíše se tahle verze.</p>
+      <div id="kSeznam"></div>
     </div>
   </section>
 
@@ -571,6 +599,7 @@
 
 <script src="sablony.js"></script>
 <script src="grafika.js"></script>
+<script src="koncepty.js"></script>
 <script src="ai.js"></script>
 <script src="app.js"></script>
 <script src="carousel.js"></script>

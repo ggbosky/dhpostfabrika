@@ -524,6 +524,40 @@ async function najdiFotku(i) {
 
 const maObsah = () => slidy.some((s) => [s.cerveny, s.bily, s.nadpis, s.text].some((x) => (x || "").trim()) || s.img);
 
+window.DHKoncepty?.registruj("carousel", {
+  async ziskej() {
+    vykresliVse();
+    const titul = slidy[0] || {};
+    return {
+      nazev: [titul.cerveny, titul.bily].filter(Boolean).join(" ").trim() || (slidy[1]?.nadpis || "").replace(/\*/g, "").split("\n")[0] || "Carousel",
+      data: {
+        slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled }) =>
+          ({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled })),
+        popisek: $("#cPopisek").value,
+        logo: logoRezim,
+      },
+      obrazky: Object.fromEntries(slidy.map((s, i) => [`s${i}`, s.img]).filter(([, img]) => img)),
+      platno: slidy[0]?.platno,
+    };
+  },
+  async obnov(d, obrazky) {
+    slidy = (d.slidy || []).map((x, i) => {
+      const s = novySlide(x);
+      Object.assign(s, { kredit: x.kredit || "", url: x.url || "", nazevFota: x.nazevFota || "", pohled: x.pohled || s.pohled });
+      if (obrazky[`s${i}`]) s.img = obrazky[`s${i}`];
+      return s;
+    });
+    if (!slidy.length || slidy[0].typ !== "titul") slidy.unshift(novySlide({ typ: "titul" }));
+    vybrany = 0;
+    logoRezim = d.logo || "auto";
+    $("#cLogo").value = logoRezim;
+    $("#cPopisek").value = d.popisek || "";
+    vykresliSeznam();
+    prepocitejPopisek();
+    ulozKoncept();
+  },
+});
+
 let zdrojeNavrhu = []; // zdroje z hledání (záložka Témata)
 
 window.DHCarousel = {
@@ -542,6 +576,7 @@ window.DHCarousel = {
 };
 
 async function navrhniCarousel(bezPotvrzeni = false) {
+  window.DHKoncepty?.zapomen("carousel");
   const AI = window.DHAI;
   const zadani = $("#cAiZadani").value.trim();
   if (!zadani) { cAiZprava("Napiš téma carouselu.", "chyba"); $("#cAiZadani").focus(); return; }
@@ -656,6 +691,7 @@ function init() {
   });
   $("#cReset").addEventListener("click", () => {
     if (!confirm("Smazat všechny slidy a začít znovu?")) return;
+    window.DHKoncepty?.zapomen("carousel");
     slidy = [novySlide({ typ: "titul" }), novySlide({ typ: "obsah" })];
     vybrany = 0;
     $("#cPopisek").value = "";

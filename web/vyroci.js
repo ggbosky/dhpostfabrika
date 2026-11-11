@@ -239,6 +239,7 @@ function citelnaBarva(hex) {
 }
 
 async function navrhni() {
+  window.DHKoncepty?.zapomen("vyroci");
   const AI = window.DHAI;
   const zadani = $("#vAiZadani").value.trim();
   if (!zadani) { vZprava("Napiš, jaké výročí chceš zpracovat.", "chyba"); return; }
@@ -290,6 +291,27 @@ ${AI.PRAVIDLA}
     b.disabled = false; b.textContent = "✨ Navrhnout";
   }
 }
+
+window.DHKoncepty?.registruj("vyroci", {
+  async ziskej() {
+    kresli();
+    const { foto, vlozka, ...zbytek } = stav;
+    return {
+      nazev: `${hezkeDatum(stav.datum)} ${(stav.text || "").replace(/\*/g, "").replace(/\s+/g, " ").slice(0, 50)}`.trim() || "Dnes před lety",
+      data: { stav: zbytek, popisek: $("#vPopisek").value },
+      obrazky: { foto, vlozka },
+      platno: platno(),
+    };
+  },
+  async obnov(d, obrazky) {
+    Object.assign(stav, d.stav || {});
+    stav.foto = obrazky.foto || null;
+    stav.vlozka = obrazky.vlozka || null;
+    $("#vPopisek").value = d.popisek || "";
+    doFormulare();
+    prekresli();
+  },
+});
 
 window.DHVyroci = {
   navrhni(zadani, zdroje = []) {
