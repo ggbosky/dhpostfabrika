@@ -558,6 +558,7 @@ function prepniZalozku(kam) {
   $$(".tab").forEach((b) => b.classList.toggle("on", b.dataset.tab === kam));
   $$("[data-zalozka]").forEach((s) => { s.hidden = s.dataset.zalozka !== kam; });
   try { localStorage.setItem("dhpf_zalozka", kam); } catch { /* nic */ }
+  document.dispatchEvent(new CustomEvent("dh:zalozka", { detail: kam }));
 }
 
 // Koncepty: uložení a obnovení rozpracovaného postu.
@@ -612,7 +613,6 @@ function init() {
   vykresliHistorii();
 
   $$(".tab").forEach((b) => b.addEventListener("click", () => prepniZalozku(b.dataset.tab)));
-  try { const z = localStorage.getItem("dhpf_zalozka"); if (z && $(`.tab[data-tab="${z}"]`)) prepniZalozku(z); } catch { /* nic */ }
   $("#formular").addEventListener("submit", (e) => { e.preventDefault(); vytvor(); });
   $("#varianta").addEventListener("click", vytvor);
   $("#text").addEventListener("input", prepocitej);

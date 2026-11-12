@@ -178,6 +178,8 @@ function vykresli(r) {
       <div class="akce" style="margin-top:10px">
         <button type="button" class="btn small" data-post="${i}">✍️ Post</button>
         <button type="button" class="btn small ghost" data-carousel="${i}">🎞️ Carousel</button>
+        <button type="button" class="btn small ghost" data-reel="${i}">🎬 Reel</button>
+        <button type="button" class="btn small ghost" data-do-planu="${i}" title="Uložit do zásobníku nápadů v plánu">📆 Do plánu</button>
         ${jeDnesniDen(t) ? `<button type="button" class="btn small ghost" data-vyroci="${i}">📅 Dnes před lety</button>` : ""}
       </div>
     </article>`).join("") +
@@ -227,7 +229,7 @@ Odpověz POUZE blokem \`\`\`json s polem:
   const ok = temata.filter((t) => t.kontrola.stav === "overeno").length;
   const spatne = temata.filter((t) => t.kontrola.stav === "rozpor").length;
   if (temata.every((t) => t.kontrola.stav === "chyba")) return; // chybu kontroly ukazují odznaky
-  zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b> nebo <b>🎞️ Carousel</b>${temata.some(jeDnesniDen) ? " (u dnešních výročí i <b>📅 Dnes před lety</b>)" : ""}.`, spatne ? "varovani" : "ok");
+  zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b>, <b>🎞️ Carousel</b> nebo <b>🎬 Reel</b>, případně si téma ulož <b>📆 Do plánu</b>${temata.some(jeDnesniDen) ? " (u dnešních výročí i <b>📅 Dnes před lety</b>)" : ""}.`, spatne ? "varovani" : "ok");
 }
 
 function zadaniZTematu(t) {
@@ -296,6 +298,15 @@ function init() {
     } else if (b.dataset.vyroci) {
       const t = temata[Number(b.dataset.vyroci)];
       window.DHVyroci.navrhni(zadaniZTematu(t), t.zdroje || []);
+    } else if (b.dataset.reel) {
+      const t = temata[Number(b.dataset.reel)];
+      window.DHShell?.reel(t.titulek, zadaniZTematu(t));
+    } else if (b.dataset.doPlanu) {
+      const t = temata[Number(b.dataset.doPlanu)];
+      window.DHPlan?.pridej({ nazev: t.titulek, format: jeDnesniDen(t) ? "vyroci" : "post", zadani: zadaniZTematu(t), zdroje: t.zdroje || [] });
+      window.DHToast?.("Téma je v zásobníku nápadů 📆 – najdeš ho v Plánu.");
+      b.textContent = "✓ V plánu";
+      b.disabled = true;
     } else if (b.dataset.carousel) {
       const t = temata[Number(b.dataset.carousel)];
       window.DHCarousel.navrhni(zadaniZTematu(t), t.zdroje || [], Math.min(6, Math.max(3, t.fakta.length)));

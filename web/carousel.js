@@ -569,6 +569,7 @@ window.DHCarousel = {
     window.scrollTo({ top: 0, behavior: "smooth" });
     navrhniCarousel(true);
   },
+  platna: () => { vykresliVse(); return slidy.map((s) => s.platno); },
   textKOvereni: () => [
     ...slidy.map((s) => (s.typ === "titul" ? [s.cerveny, s.bily] : [s.nadpis, s.text]).join(" ").replace(/\*/g, "").replace(/\s+/g, " ").trim()),
     $("#cPopisek").value,

@@ -110,6 +110,22 @@ označená „automaticky“. Koncepty jsou vázané na prohlížeč a zařízen
   vždy s odkazy na zdroje.
 - AI se může splést i se zdroji – před zveřejněním si je proklikni.
 
+### 🧭 Ovládání a orientace
+
+- **Boční panel** (na mobilu spodní lišta) dělí aplikaci na *Start* (Přehled, Témata), *Tvořit*
+  (Post, Carousel, Dnes před lety, Reels), *Organizace* (Plán, Koncepty) a *Nastavení*.
+  Každá stránka má nahoře popis a kroky „co dělat“; adresa (#post, #plan…) funguje i s tlačítkem Zpět.
+- **Přehled** – rychlé zadání pro AI („Vytvořit jako“ post / carousel / výročí / reel), rozpracované
+  koncepty, plán na příštích 7 dní, výročí dnešního dne jedním klikem a stav nastavení.
+- **📆 Plán publikace** – týdenní kalendář a zásobník nápadů. Záznamy jde přetahovat mezi dny,
+  kliknutím na štítek měnit stav (nápad → rozpracováno → připraveno → publikováno) a tlačítkem
+  *Vytvořit/Otevřít* je rovnou otevřít ve správném formátu. Do plánu se dá uložit téma z *Témat*,
+  uložený koncept i rozpracovaný post (tlačítko *Do plánu* nahoře). *Zkopírovat týden* dá plán jako text.
+- **📱 Náhled v IG** – ukáže post / carousel tak, jak bude vypadat ve feedu (se swipováním slidů
+  a zkráceným popiskem „… více“) a zkontroluje délku popisku, první větu a počet hashtagů.
+- **Ctrl+K** (nebo `/`) – rychlé hledání: přejít kamkoliv, otevřít koncept nebo záznam z plánu,
+  spustit akci. **Ctrl+S** uloží rozpracovaný koncept.
+
 ### ✨ AI pomocník (volitelné)
 
 Nahoře v záložkách **Nový post** i **Carousel** je pole **Návrh od AI**: napíšeš téma

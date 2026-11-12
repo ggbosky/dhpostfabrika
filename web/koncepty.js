@@ -130,6 +130,7 @@ async function uloz(typ, jakoNovy = false) {
     const cas = new Date().toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
     stav(typ, `Uloženo ${cas} ✓${vynechano ? ` (${vynechano} fotku z webu nešlo uložit – po otevření ji najdi znovu)` : ""} → <a href="#" data-otevri-koncepty>Koncepty</a>`);
     vykresliSeznam();
+    return id;
   } catch (e) {
     stav(typ, `Uložení se nepovedlo: ${esc(e.message)}`, "chyba");
     alert(`Koncept se nepodařilo uložit: ${e.message}`);
@@ -213,7 +214,8 @@ async function vykresliSeznam() {
   odkazy.splice(0).forEach((u) => URL.revokeObjectURL(u));
   zaznamy.sort((a, b) => (b.auto ? 1 : 0) - (a.auto ? 1 : 0) || b.upraveno - a.upraveno);
   const rucni = zaznamy.filter((z) => !z.auto).length;
-  $("#kPocet").textContent = rucni ? `(${rucni})` : "";
+  $("#kPocet").textContent = rucni ? String(rucni) : "";
+  document.dispatchEvent(new CustomEvent("dh:koncepty"));
   if (!zaznamy.length) {
     el.innerHTML = `<p class="muted">Zatím žádné koncepty. V záložce Nový post, Carousel nebo Dnes před lety klikni na <b>💾 Uložit koncept</b>.</p>`;
     return;
@@ -233,7 +235,8 @@ async function vykresliSeznam() {
         <small class="muted">upraveno ${kdy}</small>
         <div class="radek" style="margin-top:8px">
           <button type="button" class="btn small" data-otevri="${esc(z.id)}">Otevřít</button>
-          ${z.auto ? "" : `<button type="button" class="btn small ghost" data-smaz="${esc(z.id)}">Smazat</button>`}
+          ${z.auto ? "" : `<button type="button" class="btn small ghost" data-naplanuj="${esc(z.id)}" data-typ="${esc(z.typ)}" data-nazev="${esc(z.nazev)}">📆 Naplánovat</button>
+          <button type="button" class="btn small ghost" data-smaz="${esc(z.id)}">Smazat</button>`}
         </div>
       </div>
     </article>`;
@@ -242,8 +245,9 @@ async function vykresliSeznam() {
 
 function init() {
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-uloz-koncept], [data-uloz-novy], [data-otevri], [data-smaz], [data-otevri-koncepty]");
+    const t = e.target.closest("[data-uloz-koncept], [data-uloz-novy], [data-otevri], [data-smaz], [data-otevri-koncepty], [data-naplanuj]");
     if (!t) return;
+    if (t.dataset.naplanuj) { window.DHPlan?.upravit({ format: t.dataset.typ, nazev: t.dataset.nazev, konceptId: t.dataset.naplanuj, stav: "rozpracovano" }); return; }
     if (t.dataset.ulozKoncept) uloz(t.dataset.ulozKoncept);
     else if (t.dataset.ulozNovy) { e.preventDefault(); uloz(t.dataset.ulozNovy, true); }
     else if (t.dataset.otevri) otevri(t.dataset.otevri).catch((err) => alert(err.message));
@@ -270,6 +274,6 @@ function init() {
   obnovAutomaticke().then(vykresliSeznam);
 }
 
-window.DHKoncepty = { registruj, zapomen, uloz, otevri, vykresliSeznam };
+window.DHKoncepty = { registruj, zapomen, uloz, otevri, vykresliSeznam, seznam: vsechny };
 document.addEventListener("DOMContentLoaded", init);
 })();
