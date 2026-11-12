@@ -580,7 +580,7 @@ async function navrhniCarousel(bezPotvrzeni = false) {
   const AI = window.DHAI;
   const zadani = $("#cAiZadani").value.trim();
   if (!zadani) { cAiZprava("Napiš téma carouselu.", "chyba"); $("#cAiZadani").focus(); return; }
-  if (!AI.maKlic()) { cAiZprava('AI pomocník potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
+  if (!AI.maKlic()) { cAiZprava('AI pomocník potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
   if (bezPotvrzeni !== true && maObsah() && !confirm("Návrh od AI přepíše současné slidy. Pokračovat?")) return;
   const pocet = Number($("#cAiPocet").value) || 4;
   const b = $("#cAiNavrhni");

@@ -296,7 +296,7 @@ async function navrhniPost() {
   const zadani = $("#aiZadani").value.trim();
   if (!zadani) { aiZprava("Napiš, o čem má post být.", "chyba"); $("#aiZadani").focus(); return; }
   if (!window.DHAI.maKlic()) {
-    aiZprava('AI pomocník potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba");
+    aiZprava('AI pomocník potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba");
     return;
   }
   const b = $("#aiNavrhni");

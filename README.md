@@ -51,7 +51,7 @@ Záložka **🎬 Reels** vyrábí vertikální MP4 (1080×1920, H.264, 30 fps) *
 a bez předplatného. Postup v 7 krocích:
 
 1. **Nový reel** – téma (nebo ✨ návrh témat od AI), délka 30/45/60/90 s, styl vyprávění, jazyky hledání.
-2. **Rešerše** – AI (Gemini + Google) hledá fakta v libovolném jazyce, píše je česky, u každého jistota
+2. **Rešerše** – AI (Claude nebo Gemini s webem) hledá fakta v libovolném jazyce, píše je česky, u každého jistota
    a zdroje; „Ověřit fakta znovu“ = druhé nezávislé ověření, sporná fakta se vyřadí.
 3. **Scénář** – 4 varianty háčku se silou (vybere nejsilnější), scény s českým voiceoverem, nápisem,
    popisem záběru a vyhledávacími dotazy v 7 jazycích (cs, en, ru, sv, fi, de, fr). Vše jde upravit,
@@ -79,7 +79,7 @@ Projekty se ukládají samy (IndexedDB prohlížeče, i s importovanými videi a
 |---|---|
 | střih, render MP4, titulky, Commons, Internet Archive, import, mikrofon | nic (zdarma) |
 | český hlas Piper | nic (zdarma), jednorázové stažení modelu |
-| rešerše, scénář, AI hledání na webu | bezplatný Gemini klíč (Můj styl → AI pomocník) |
+| rešerše, scénář, AI hledání na webu | AI klíč – Claude nebo bezplatný Gemini (Můj styl → AI pomocník) |
 | YouTube hledání | volitelný bezplatný YouTube Data API klíč (krok 1) |
 | zvuk AAC (doporučeno pro Instagram) | Chrome nebo Edge na Windows / macOS; jinde Opus |
 
@@ -118,10 +118,19 @@ volně použitelné fotky (Wikimedia Commons, záložně Openverse). Autor a lic
 se samy přidají do popisku. Pak všechno upravíš ručně jako obvykle – u každého slidu je
 **🔍 Najít fotku** (jiná fotka) a **📷 Vlastní fotka**.
 
-Potřebuje bezplatný Google Gemini klíč: záložka **Můj styl → AI pomocník**, vložit klíč
-z <https://aistudio.google.com/apikey>. Klíč zůstává jen v tvém prohlížeči. Bez klíče
-aplikace funguje dál, jen bez tlačítek ✨. Zdarma je asi 20 návrhů denně na model
-(aplikace modely střídá), limit se obnovuje v 9:00. Fakta, která má AI za nejistá,
+Potřebuje jeden AI klíč – záložka **Můj styl → AI pomocník**:
+
+- **Claude (Anthropic)** – doporučeno. Klíč `sk-ant-…` z Anthropic Console (API keys),
+  placeno z kreditu v Console (předplatné Claude.ai sem nepatří). Model si vybereš:
+  **Opus 5.5** (výchozí, nejlepší texty), **Sonnet 5.5** (rychlejší, levnější),
+  **Haiku 5.5** (nejrychlejší, nejlevnější). Hledání a ověřování používá webové
+  vyhledávání Claude se zdroji.
+- **Google Gemini** – zdarma z <https://aistudio.google.com/apikey>, asi 20 návrhů denně
+  na model (aplikace modely střídá), limit se obnovuje v 9:00.
+
+Když vyplníš oba, pracuje Claude a Gemini se použije jen jako záloha, když Claude selže
+(např. dojde kredit). Klíče zůstávají jen v tvém prohlížeči. Bez klíče aplikace funguje
+dál, jen bez tlačítek ✨. Fakta, která má AI za nejistá,
 vypíše v seznamu **Před zveřejněním ověř**.
 
 Záložka **Můj styl**: vlož svoje starší posty (export z Instagramu `posts_1.json`
@@ -147,7 +156,7 @@ dhpostfabrika/
 │   ├── sablony.js      šablony textů
 │   ├── grafika.js      logo, ořez fotky, stažení a sdílení
 │   ├── koncepty.js     ukládání rozpracovaných postů (IndexedDB, i s fotkami)
-│   ├── ai.js           volitelný AI pomocník (Gemini) + hledání volných fotek
+│   ├── ai.js           volitelný AI pomocník (Claude / Gemini) + hledání volných fotek
 │   ├── zpravy.js       živé hledání témat na webu a ověřování faktů se zdroji
 │   ├── reels.js        Reels Factory – 7 kroků (rešerše, scénář, záběry, střih, hlas, export)
 │   ├── reels-zabery.js hledání záběrů (Commons, Internet Archive, YouTube, web) a knihovna

@@ -169,10 +169,10 @@ async function overYouTube(url) {
 }
 
 // -------------------------------------------------------- web přes AI --
-// Jedno hledání pro celý scénář: AI (Gemini + Google) hledá konkrétní videa ve více jazycích.
+// Jedno hledání pro celý scénář: AI (Claude nebo Gemini s webem) hledá konkrétní videa ve více jazycích.
 async function hledejWebAI(projekt, jazyky) {
   const AI = window.DHAI;
-  if (!AI?.maKlic()) throw new Error("Hledání na webu přes AI potřebuje Gemini klíč (Můj styl → AI pomocník).");
+  if (!AI?.maKlic()) throw new Error("Hledání na webu přes AI potřebuje AI klíč (Claude nebo Gemini) (Můj styl → AI pomocník).");
   const sceny = projekt.sceny.map((s, i) => ({ scena: i + 1, zaber: s.zaber, dotazy: s.dotazy }));
   const r = await AI.hledatNaWebu({
     casovyLimit: 45000,

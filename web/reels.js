@@ -103,7 +103,7 @@ async function vykresliProjekty() {
 }
 
 async function navrhniTemata() {
-  if (!AI().maKlic()) { zprava("#rTemataZprava", 'Návrh témat potřebuje Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit</a>', "chyba"); return; }
+  if (!AI().maKlic()) { zprava("#rTemataZprava", 'Návrh témat potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit</a>', "chyba"); return; }
   zprava("#rTemataZprava", "AI hledá silná témata na reel…");
   try {
     const r = await AI().hledatNaWebu({
@@ -162,7 +162,7 @@ function zdrojeFaktu(r, x) {
 }
 
 async function vyzkum() {
-  if (!AI().maKlic()) { zprava("#rVyzkumZprava", 'Rešerše potřebuje Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit</a>', "chyba"); return; }
+  if (!AI().maKlic()) { zprava("#rVyzkumZprava", 'Rešerše potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit</a>', "chyba"); return; }
   const b = $("#rVyzkum"); b.disabled = true;
   zprava("#rVyzkumZprava", "AI prohledává web (česky i v dalších jazycích) a sbírá ověřitelná fakta…");
   try {
@@ -249,7 +249,7 @@ const TONY = {
 };
 
 async function napisScenar() {
-  if (!AI().maKlic()) { zprava("#rScenarZprava", 'Scénář potřebuje Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit</a>', "chyba"); return; }
+  if (!AI().maKlic()) { zprava("#rScenarZprava", 'Scénář potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit</a>', "chyba"); return; }
   const fakta = p.vyzkum.fakta.map((f, i) => ({ ...f, i })).filter((f) => f.pouzit !== false && f.jistota !== "rozpor");
   const nSc = SCEN[p.delka] || 10;
   const slov = Math.round(p.delka * 1.6); // hlas Piper mluví ~1,7 slova/s včetně pauz mezi scénami

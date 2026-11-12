@@ -1,4 +1,4 @@
-// Volitelný AI pomocník: Google Gemini (zdarma, vlastní klíč uložený jen v prohlížeči)
+// Volitelný AI pomocník: Claude (Anthropic, placený klíč) nebo Google Gemini (zdarma) – klíče jen v prohlížeči
 // a hledání volně použitelných fotek na Wikimedia Commons (bez klíče).
 (() => {
 "use strict";
@@ -18,14 +18,28 @@ const nacti = (k) => { try { return localStorage.getItem(k) || ""; } catch { ret
 const uloz = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* nic */ } };
 
 const klic = () => nacti(KLIC).trim();
-const maKlic = () => !!klic();
+const maGemini = () => !!klic();
+
+// Claude (Anthropic API). Když je klíč vyplněný, má přednost; Gemini zůstává jako záloha.
+const CLAUDE_KLIC = "dhpf_claude_klic";
+const CLAUDE_MODEL = "dhpf_claude_model";
+const CLAUDE_MODELY = {
+  "claude-opus-5-5": "Claude Opus 5.5",
+  "claude-sonnet-5-5": "Claude Sonnet 5.5",
+  "claude-haiku-5-5": "Claude Haiku 5.5",
+};
+const claudeKlic = () => nacti(CLAUDE_KLIC).trim();
+const maClaude = () => !!claudeKlic();
+const claudeModel = () => (CLAUDE_MODELY[nacti(CLAUDE_MODEL)] ? nacti(CLAUDE_MODEL) : "claude-opus-5-5");
+
+const maKlic = () => maClaude() || maGemini();
 
 class AIChyba extends Error {}
 
 // ------------------------------------------------------------------ Gemini --
 
-async function gemini({ system, zadani, schema, teplota = 0.9 }) {
-  if (!maKlic()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
+async function geminiPrimo({ system, zadani, schema, teplota = 0.9 }) {
+  if (!maGemini()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
   const poradi = MODELY; // vždy od nejrychlejšího (přetížené / vyčerpané modely se přeskočí za pár sekund)
   const konec = Date.now() + LIMIT_CELKEM_MS;
   let limit = false, chyba = null;
@@ -85,8 +99,8 @@ async function gemini({ system, zadani, schema, teplota = 0.9 }) {
 // Pozn.: hledání nejde kombinovat s JSON režimem, proto se JSON čte z textu.
 // casovyLimit: celkový čas na odpověď (ms). Gemini 2.5 Flash bez „přemýšlení“ odpoví i s hledáním
 // obvykle do 10 s; při přetížení se zkusí znovu / jiný model, ale nikdy déle než limit.
-async function hledatNaWebu({ system, zadani, teplota = 0.3, casovyLimit = 30000 }) {
-  if (!maKlic()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
+async function hledatNaWebuGemini({ system, zadani, teplota = 0.3, casovyLimit = 30000 }) {
+  if (!maGemini()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
   const konec = Date.now() + casovyLimit;
   const poradi = ["gemini-2.5-flash", "gemini-2.5-flash", ...MODELY.filter((m) => m !== "gemini-2.5-flash")];
   let limit = false, chyba = null, bezHledani = null, rozpocet = 512;
@@ -153,8 +167,8 @@ async function hledatNaWebu({ system, zadani, teplota = 0.3, casovyLimit = 30000
 
 // Hledání s průběžnou odpovědí (streaming): priTextu(text) se volá s každým kouskem textu,
 // zdroje přijdou v posledním kousku. Po vypršení limitu vrátí to, co stihlo dorazit.
-async function hledatNaWebuProud({ system, zadani, priTextu = () => {}, teplota = 0.3, casovyLimit = 30000 }) {
-  if (!maKlic()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
+async function hledatNaWebuProudGemini({ system, zadani, priTextu = () => {}, teplota = 0.3, casovyLimit = 30000 }) {
+  if (!maGemini()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
   const konec = Date.now() + casovyLimit;
   const poradi = ["gemini-2.5-flash", "gemini-2.5-flash", ...MODELY.filter((m) => m !== "gemini-2.5-flash")];
   let limit = false, chyba = null;
@@ -229,6 +243,203 @@ async function hledatNaWebuProud({ system, zadani, priTextu = () => {}, teplota 
   if (Date.now() >= konec - 4000) throw new AIChyba("Google teď odpovídá pomalu (je přetížený). Zkus to prosím znovu za chvíli.");
   throw chyba instanceof AIChyba ? chyba : new AIChyba("Gemini teď neodpovídá, zkus to za chvíli.");
 }
+
+
+// ------------------------------------------------------------------ Claude --
+// Oficiální Anthropic SDK přímo v prohlížeči (klíč zůstává v tomhle prohlížeči a jde jen na api.anthropic.com).
+
+let sdkSlib = null;
+async function claudeKlient() {
+  if (!sdkSlib) {
+    sdkSlib = import("https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.8.0/+esm").catch(() => {
+      sdkSlib = null;
+      throw new AIChyba("Nepodařilo se načíst knihovnu pro Claude – zkontroluj připojení a zkus to znovu.");
+    });
+  }
+  const m = await sdkSlib;
+  const Anthropic = m.default || m.Anthropic;
+  return new Anthropic({ apiKey: claudeKlic(), dangerouslyAllowBrowser: true, maxRetries: 1 });
+}
+
+function claudeChyba(e) {
+  if (e instanceof AIChyba) return e;
+  const s = e?.status;
+  const text = String(e?.error?.error?.message || e?.message || "");
+  if (e?.name === "AbortError" || e?.name === "APIUserAbortError") return new AIChyba("Claude neodpověděl včas, zkus to znovu.");
+  if (s === 401) return new AIChyba("Neplatný Claude klíč. Zkontroluj ho v záložce Můj styl → AI pomocník.");
+  if (/credit balance/i.test(text)) return new AIChyba("Na Anthropic účtu došel kredit. Dobij ho v Anthropic Console → Billing.");
+  if (s === 403) return new AIChyba("Anthropic klíč odmítl (403) – klíč nemá oprávnění.");
+  if (s === 429) return new AIChyba("Claude: moc požadavků najednou, zkus to za minutu.");
+  if (s === 529 || s >= 500) return new AIChyba("Claude je teď přetížený, zkus to za chvíli.");
+  if (s === 400) return new AIChyba(`Claude odmítl požadavek: ${text.slice(0, 200)}`);
+  if (!s) return new AIChyba("Claude je teď nedostupný (síť). Zkus to znovu.");
+  return new AIChyba(`Claude chyba ${s}: ${text.slice(0, 200)}`);
+}
+
+// Strukturovaný výstup Claude chce u každého objektu additionalProperties: false
+// a nepodporuje číselné/délkové limity → schéma z Gemini se upraví.
+const NEPODPOROVANE = new Set(["minimum", "maximum", "minLength", "maxLength", "maxItems", "pattern", "propertyOrdering", "nullable"]);
+function prisneSchema(s) {
+  if (Array.isArray(s)) return s.map(prisneSchema);
+  if (!s || typeof s !== "object") return s;
+  const o = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (NEPODPOROVANE.has(k) || (k === "minItems" && v > 1)) continue;
+    o[k] = k === "properties"
+      ? Object.fromEntries(Object.entries(v).map(([n, p]) => [n, prisneSchema(p)]))
+      : prisneSchema(v);
+  }
+  if (o.type === "object") {
+    o.additionalProperties = false;
+    if (o.properties) o.required = Object.keys(o.properties);
+  }
+  return o;
+}
+
+// Jedno volání se streamováním. Text chodí průběžně do priTextu; po vypršení limitu
+// se vrátí, co stihlo dorazit. pause_turn (dlouhé hledání) se automaticky dokončí.
+async function claudeVolani({ system, zadani, nastaveni = {}, casovyLimit, priTextu }) {
+  const klient = await claudeKlient();
+  const preruseni = new AbortController();
+  const casovac = setTimeout(() => preruseni.abort(), casovyLimit);
+  const zpravy = [{ role: "user", content: zadani }];
+  const bloky = [];
+  let text = "", posledni = null;
+  try {
+    for (let kolo = 0; kolo < 4; kolo++) {
+      const proud = klient.messages.stream({
+        model: claudeModel(),
+        max_tokens: 16000,
+        system,
+        messages: zpravy,
+        ...nastaveni,
+      }, { signal: preruseni.signal });
+      proud.on("text", (kus) => { text += kus; try { priTextu?.(text); } catch { /* UI */ } });
+      proud.on("contentBlock", (b) => bloky.push(b));
+      posledni = await proud.finalMessage();
+      if (posledni.stop_reason !== "pause_turn") break;
+      zpravy.push({ role: "assistant", content: posledni.content });
+    }
+  } catch (e) {
+    clearTimeout(casovac);
+    if (preruseni.signal.aborted) {
+      if (text) return { text, bloky, preruseno: true };
+      throw new AIChyba("Claude neodpověděl včas, zkus to znovu.");
+    }
+    throw claudeChyba(e);
+  }
+  clearTimeout(casovac);
+  if (posledni?.stop_reason === "refusal") throw new AIChyba("Claude tenhle požadavek odmítl zpracovat. Zkus ho přeformulovat.");
+  if (!text.trim()) throw new AIChyba("Claude nevrátil žádný text, zkus to znovu.");
+  return { text, bloky, preruseno: false };
+}
+
+async function claudeJson({ system, zadani, schema }) {
+  const r = await claudeVolani({
+    system,
+    zadani,
+    casovyLimit: 120000,
+    nastaveni: { output_config: { effort: "low", format: { type: "json_schema", schema: prisneSchema(schema) } } },
+  });
+  if (r.preruseno) throw new AIChyba("Claude neodpověděl včas, zkus to znovu.");
+  try { return JSON.parse(r.text); } catch { return jsonZTextu(r.text); }
+}
+
+const POKYN_ZDROJE = `
+
+Fakta hledej nástrojem web_search. Do každého JSON objektu, který obsahuje fakta, přidej pole "zdroje_url":
+seznam přesných URL z výsledků hledání, které ta fakta dokládají (jen URL, které ti hledání opravdu vrátilo).
+Odpověz jen požadovaným výstupem, bez úvodu a bez komentáře.`;
+
+const klicUrl = (u) => String(u || "").trim().replace(/#.*$/, "").replace(/\/+$/, "").replace(/^http:/, "https:");
+const domena = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return "zdroj"; } };
+
+function textObjektu(x) {
+  if (Array.isArray(x)) return x.map(textObjektu).join(" ");
+  if (x && typeof x === "object") return Object.entries(x).filter(([k]) => k !== "zdroje_url").map(([, v]) => textObjektu(v)).join(" ");
+  return typeof x === "string" || typeof x === "number" ? String(x) : "";
+}
+
+// Odpověď Claude → stejný tvar jako u Gemini: { text, zdroje, podpory, dotazy }.
+function claudeVysledek({ text, bloky, preruseno }) {
+  const nalezene = new Map(); // klíč URL → URL z výsledků hledání
+  const dotazy = [];
+  for (const b of bloky) {
+    if (b.type === "server_tool_use" && b.input?.query) dotazy.push(b.input.query);
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      b.content.forEach((r) => { if (r?.url) nalezene.set(klicUrl(r.url), r.url); });
+    }
+  }
+  const zdroje = [], index = new Map();
+  const pridej = (url) => {
+    const k = klicUrl(url);
+    if (!/^https:\/\//.test(k)) return -1;
+    if (nalezene.size && !nalezene.has(k)) return -1; // jen URL, které hledání opravdu vrátilo
+    if (!index.has(k)) {
+      const uri = nalezene.get(k) || url;
+      index.set(k, zdroje.length);
+      zdroje.push({ titulek: domena(uri), uri });
+    }
+    return index.get(k);
+  };
+  const podpory = [];
+  for (const b of bloky) {
+    if (b.type !== "text" || !b.citations?.length) continue;
+    const indexy = b.citations.map((c) => pridej(c.url)).filter((i) => i >= 0);
+    if (indexy.length) podpory.push({ text: b.text, indexy });
+  }
+  const projdi = (x) => {
+    if (Array.isArray(x)) { x.forEach(projdi); return; }
+    if (!x || typeof x !== "object") return;
+    if (Array.isArray(x.zdroje_url)) {
+      const indexy = x.zdroje_url.map(pridej).filter((i) => i >= 0);
+      if (indexy.length) podpory.push({ text: textObjektu(x), indexy });
+    }
+    Object.entries(x).forEach(([k, v]) => { if (k !== "zdroje_url") projdi(v); });
+  };
+  objektyZTextu(text).forEach(projdi);
+  const blok = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/i) || text.match(/^\s*(\[[\s\S]*\])\s*$/);
+  if (blok) { try { projdi(JSON.parse(blok[1])); } catch { /* objekty už prošly výše */ } }
+  return { text, zdroje, podpory, dotazy, preruseno };
+}
+
+async function claudeWeb({ system, zadani, priTextu, casovyLimit, hledani = 4 }) {
+  const r = await claudeVolani({
+    system: system + POKYN_ZDROJE,
+    zadani,
+    priTextu,
+    casovyLimit,
+    nastaveni: {
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: hledani }],
+      output_config: { effort: "low" },
+    },
+  });
+  return claudeVysledek(r);
+}
+
+// --------------------------------------------- výběr poskytovatele + záloha --
+
+async function sZalohou(claudeFn, geminiFn) {
+  if (maClaude()) {
+    try { return await claudeFn(); } catch (e) {
+      if (!maGemini()) throw e;
+      console.warn("Claude selhal, zkouším Gemini:", e?.message);
+      try { return await geminiFn(); } catch (e2) {
+        throw new AIChyba(`${e.message} (Záloha Gemini taky selhala: ${e2.message})`);
+      }
+    }
+  }
+  if (!maGemini()) throw new AIChyba("Chybí AI klíč – vlož Claude nebo Gemini klíč v záložce Můj styl → AI pomocník.");
+  return geminiFn();
+}
+
+const gemini = (o) => sZalohou(() => claudeJson(o), () => geminiPrimo(o));
+const hledatNaWebu = (o) => sZalohou(
+  () => claudeWeb({ ...o, casovyLimit: Math.max(o.casovyLimit || 30000, 90000) }),
+  () => hledatNaWebuGemini(o));
+const hledatNaWebuProud = (o) => sZalohou(
+  () => claudeWeb({ ...o, casovyLimit: Math.max(o.casovyLimit || 30000, 40000), hledani: 3 }),
+  () => hledatNaWebuProudGemini(o));
 
 // Všechny celé JSON objekty nejvyšší úrovně z (i nedokončeného) textu.
 function objektyZTextu(text) {
@@ -538,8 +749,19 @@ async function prvniFotoBezLimitu(dotazy, vynechat) {
 function vykresliStav() {
   const pill = $("#pAI");
   if (pill) {
-    pill.textContent = maKlic() ? "AI: zapnuto" : "AI: vypnuto";
+    pill.textContent = maClaude() ? `AI: ${CLAUDE_MODELY[claudeModel()]}` : maGemini() ? "AI: Gemini" : "AI: vypnuto";
     pill.className = "pill " + (maKlic() ? "ok" : "");
+  }
+  const cVstup = $("#aiClaudeKlic");
+  if (cVstup && !cVstup.value) cVstup.placeholder = maClaude() ? "•••••••• (klíč je uložený)" : "sk-ant-…";
+  const volba = $("#aiClaudeModel");
+  if (volba) volba.value = claudeModel();
+  const stav = $("#aiPoskytovatel");
+  if (stav) {
+    stav.className = "zprava " + (maKlic() ? "ok" : "");
+    stav.textContent = maClaude()
+      ? `Teď pracuje ${CLAUDE_MODELY[claudeModel()]}${maGemini() ? " (Gemini je záloha, kdyby Claude selhal)" : ""}.`
+      : maGemini() ? "Teď pracuje Google Gemini (zdarma, s denním limitem)." : "AI je vypnutá – vlož aspoň jeden klíč.";
   }
   document.querySelectorAll("[data-ai-bez-klice]").forEach((el) => { el.hidden = maKlic(); });
   const vstup = $("#aiKlic");
@@ -562,7 +784,7 @@ function init() {
     vykresliStav();
     zprava("Ověřuju klíč…");
     try {
-      await gemini({ system: "Odpověz JSON.", zadani: "Vrať {\"ok\": true}.", schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, teplota: 0 });
+      await geminiPrimo({ system: "Odpověz JSON.", zadani: "Vrať {\"ok\": true}.", schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }, teplota: 0 });
       zprava("Klíč funguje ✓ AI pomocník je zapnutý.");
     } catch (e) {
       zprava(e.message, true);
@@ -575,6 +797,36 @@ function init() {
     vykresliStav();
     zprava("Klíč je smazaný z tohoto prohlížeče.");
   });
+  const zpravaC = (t, chyba) => {
+    const el = $("#aiClaudeZprava");
+    el.textContent = t;
+    el.className = "zprava " + (chyba ? "chyba" : "ok");
+    el.hidden = !t;
+  };
+  $("#aiClaudeModel")?.addEventListener("change", (e) => {
+    uloz(CLAUDE_MODEL, e.target.value);
+    vykresliStav();
+  });
+  $("#aiClaudeUlozit")?.addEventListener("click", async () => {
+    const v = $("#aiClaudeKlic").value.trim();
+    if (!v && !maClaude()) { zpravaC("Vlož klíč (začíná sk-ant-).", true); return; }
+    if (v && !/^sk-ant-/.test(v)) { zpravaC("Tohle nevypadá jako Anthropic klíč – ten začíná „sk-ant-“.", true); return; }
+    if (v) uloz(CLAUDE_KLIC, v);
+    $("#aiClaudeKlic").value = "";
+    vykresliStav();
+    zpravaC("Ověřuju klíč…");
+    try {
+      await claudeJson({ system: "Odpověz JSON.", zadani: "Vrať {\"ok\": true}.", schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] } });
+      zpravaC(`Klíč funguje ✓ Teď pracuje ${CLAUDE_MODELY[claudeModel()]}.`);
+    } catch (e) {
+      zpravaC(e.message, true);
+    }
+  });
+  $("#aiClaudeSmazat")?.addEventListener("click", () => {
+    uloz(CLAUDE_KLIC, "");
+    vykresliStav();
+    zpravaC("Claude klíč je smazaný z tohoto prohlížeče.");
+  });
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-jdi-na-ai]")) {
       e.preventDefault();
@@ -584,6 +836,6 @@ function init() {
   });
 }
 
-window.DHAI = { hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
+window.DHAI = { maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
 init();
 })();

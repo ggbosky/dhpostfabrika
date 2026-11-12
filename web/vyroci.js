@@ -257,7 +257,7 @@ async function navrhni() {
   const AI = window.DHAI;
   const zadani = $("#vAiZadani").value.trim();
   if (!zadani) { vZprava("Napiš, jaké výročí chceš zpracovat.", "chyba"); return; }
-  if (!AI.maKlic()) { vZprava('AI pomocník potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
+  if (!AI.maKlic()) { vZprava('AI pomocník potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
   const b = $("#vAiNavrhni");
   b.disabled = true; b.textContent = "Píšu…";
   vZprava("AI píše text… (obvykle 5–15 s)");

@@ -374,7 +374,7 @@
       </div>
       <div class="akce">
         <button type="button" class="btn" id="tHledej">🔎 Najít témata</button>
-        <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+        <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje AI klíč (Claude nebo Gemini) – <a href="#" data-jdi-na-ai>nastavit</a></span>
       </div>
       <div class="zprava" id="tZprava" hidden></div>
       <p class="muted" style="font-size:13px;margin:12px 0 0">AI vybírá jen to, co našla ve zdrojích. Zdroje si před zveřejněním proklikni – AI se může splést i s nimi.</p>
@@ -388,7 +388,7 @@
         <textarea id="aiZadani" rows="3" placeholder="O čem má post být + fakta, např.: Kometa porazila Spartu 4:3 po prodloužení, rozhodl Zbořil v 63. minutě, Furch chytil 34 střel."></textarea>
         <div class="akce" style="margin-top:12px">
           <button type="button" class="btn" id="aiNavrhni">✨ Navrhnout post</button>
-          <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+          <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje AI klíč (Claude nebo Gemini) – <a href="#" data-jdi-na-ai>nastavit</a></span>
         </div>
         <div class="zprava" id="aiZprava" hidden></div>
       </div>
@@ -463,7 +463,7 @@
               <option value="3">1 + 3</option><option value="4" selected>1 + 4</option><option value="5">1 + 5</option>
               <option value="6">1 + 6</option><option value="8">1 + 8</option>
             </select></label>
-          <span class="muted" style="font-size:13px" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+          <span class="muted" style="font-size:13px" data-ai-bez-klice>Potřebuje AI klíč (Claude nebo Gemini) – <a href="#" data-jdi-na-ai>nastavit</a></span>
         </div>
         <div class="zprava" id="cAiZprava" hidden></div>
       </div>
@@ -524,7 +524,7 @@
         <textarea id="vAiZadani" rows="3" placeholder="Jaké výročí? Např.: 10. 8. 1995 – Quebec Nordiques se stěhují do Denveru a vzniká Colorado Avalanche."></textarea>
         <div class="akce" style="margin-top:12px">
           <button type="button" class="btn" id="vAiNavrhni">✨ Navrhnout</button>
-          <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje bezplatný Gemini klíč – <a href="#" data-jdi-na-ai>nastavit</a></span>
+          <span class="muted" style="font-size:13px;align-self:center" data-ai-bez-klice>Potřebuje AI klíč (Claude nebo Gemini) – <a href="#" data-jdi-na-ai>nastavit</a></span>
         </div>
         <div class="zprava" id="vAiZprava" hidden></div>
       </div>
@@ -640,7 +640,7 @@
             <ul class="muted r-seznam">
               <li><b>Wikimedia Commons</b> – videa s volnou licencí, aplikace je umí rovnou použít. Zdarma, bez klíče.</li>
               <li><b>Internet Archive</b> – náhled a odkaz; soubor stáhneš ručně (archiv nedovolí načtení z cizí stránky) a importuješ. Zdarma.</li>
-              <li><b>Web přes AI</b> (YouTube, NHL.com, iVysílání ČT, IIHF…) – hledá v jazycích, které zvolíš; jen ke sledování a jako zdroj. Potřebuje Gemini klíč (zdarma).</li>
+              <li><b>Web přes AI</b> (YouTube, NHL.com, iVysílání ČT, IIHF…) – hledá v jazycích, které zvolíš; jen ke sledování a jako zdroj. Potřebuje AI klíč (Claude nebo Gemini).</li>
               <li><b>YouTube Data API</b> – volitelné, přesnější hledání s délkou videa, licencí a časovými značkami. Bezplatný klíč z Google Cloud (10 000 jednotek/den ≈ 100 hledání). Videa z YouTube aplikace nestahuje.</li>
               <li><b>Vlastní soubory</b> – záběry, ke kterým máš práva (licence ČT, klub, NHL…), přetáhni do kroku Záběry.</li>
             </ul>
@@ -802,8 +802,31 @@
         </div>
         <div class="card" id="aiKarta" style="margin-top:20px">
           <h2>✨ AI pomocník (volitelné)</h2>
-          <p class="muted" style="margin-top:0">Aby AI uměla navrhnout text postu nebo celý carousel, vlož svůj bezplatný Google Gemini klíč.
-            Bez klíče aplikace funguje dál, jen bez tlačítek ✨.</p>
+          <p class="muted" style="margin-top:0">AI navrhuje texty, carousely, scénáře reels, hledá témata a ověřuje fakta.
+            Stačí jeden klíč – když vyplníš oba, pracuje Claude a Gemini je záloha. Bez klíče aplikace funguje dál, jen bez tlačítek ✨.</p>
+          <p class="zprava ok" id="aiPoskytovatel" style="margin:0 0 14px"></p>
+
+          <h3 style="margin:0 0 6px">Claude (Anthropic) – doporučeno</h3>
+          <ol class="muted" style="margin:0 0 12px">
+            <li>V Anthropic Console otevři <b>API keys</b> → <b>Create key</b> a klíč zkopíruj (začíná <code>sk-ant-</code>).</li>
+            <li>Vlož ho sem a klikni <b>Uložit a ověřit</b>. Zůstane jen v tomhle prohlížeči a posílá se jen na api.anthropic.com.</li>
+          </ol>
+          <label>Claude API klíč<input id="aiClaudeKlic" type="password" autocomplete="off" placeholder="sk-ant-…"></label>
+          <label>Model
+            <select id="aiClaudeModel">
+              <option value="claude-opus-5-5">Claude Opus 5.5 – nejlepší texty (výchozí)</option>
+              <option value="claude-sonnet-5-5">Claude Sonnet 5.5 – rychlejší, levnější</option>
+              <option value="claude-haiku-5-5">Claude Haiku 5.5 – nejrychlejší, nejlevnější</option>
+            </select>
+          </label>
+          <div class="akce">
+            <button type="button" class="btn" id="aiClaudeUlozit">Uložit a ověřit</button>
+            <button type="button" class="btn ghost" id="aiClaudeSmazat">Smazat klíč</button>
+          </div>
+          <div class="zprava" id="aiClaudeZprava" hidden></div>
+          <p class="muted" style="font-size:13px;margin:10px 0 18px">Platí se z kreditu v Anthropic Console (předplatné Claude.ai sem nepatří). Jeden návrh postu stojí řádově korunu, hledání témat s webem pár korun.</p>
+
+          <h3 style="margin:0 0 6px">Google Gemini – zdarma (záloha)</h3>
           <ol class="muted" style="margin:0 0 12px">
             <li>Otevři <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> a přihlas se Google účtem.</li>
             <li>Klikni <b>Create API key</b> a klíč zkopíruj.</li>
@@ -826,18 +849,18 @@
   <span>Post Fabrika · redakční nástroj Deníku hokeje. Styl, historie i AI klíč zůstávají jen v tomhle prohlížeči.</span>
 </div></footer>
 
-<script src="sablony.js?v=20261112f"></script>
-<script src="grafika.js?v=20261112f"></script>
-<script src="koncepty.js?v=20261112f"></script>
-<script src="ai.js?v=20261112f"></script>
-<script src="app.js?v=20261112f"></script>
-<script src="carousel.js?v=20261112f"></script>
-<script src="vyroci.js?v=20261112f"></script>
-<script src="zpravy.js?v=20261112f"></script>
-<script src="reels-ulozeni.js?v=20261112f"></script>
-<script src="reels-hlas.js?v=20261112f"></script>
-<script src="reels-render.js?v=20261112f"></script>
-<script src="reels-zabery.js?v=20261112f"></script>
-<script src="reels.js?v=20261112f"></script>
+<script src="sablony.js?v=20261112g"></script>
+<script src="grafika.js?v=20261112g"></script>
+<script src="koncepty.js?v=20261112g"></script>
+<script src="ai.js?v=20261112g"></script>
+<script src="app.js?v=20261112g"></script>
+<script src="carousel.js?v=20261112g"></script>
+<script src="vyroci.js?v=20261112g"></script>
+<script src="zpravy.js?v=20261112g"></script>
+<script src="reels-ulozeni.js?v=20261112g"></script>
+<script src="reels-hlas.js?v=20261112g"></script>
+<script src="reels-render.js?v=20261112g"></script>
+<script src="reels-zabery.js?v=20261112g"></script>
+<script src="reels.js?v=20261112g"></script>
 </body>
 </html>

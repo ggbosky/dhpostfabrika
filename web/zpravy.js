@@ -67,7 +67,7 @@ function zprava(html, druh = "") {
 
 async function najdiTemata() {
   const AI = window.DHAI;
-  if (!AI.maKlic()) { zprava('Hledání potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
+  if (!AI.maKlic()) { zprava('Hledání potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
   const zamereni = ZAMERENI[$("#tZamereni").value];
   const jenDnes = $("#tObdobi").value === "vyroci";
   const obdobi = obdobiText($("#tObdobi").value);
@@ -244,7 +244,7 @@ async function overFakta(text, cil, tlacitko) {
   const AI = window.DHAI;
   const vypis = (html, druh = "") => { cil.innerHTML = html ? `<div class="zprava ${druh}">${html}</div>` : ""; };
   if (!text.trim()) { vypis("Není co ověřovat – nejdřív vytvoř text.", "chyba"); return; }
-  if (!AI.maKlic()) { vypis('Ověřování potřebuje bezplatný Gemini klíč. <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
+  if (!AI.maKlic()) { vypis('Ověřování potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
   const puvodni = tlacitko.textContent;
   tlacitko.disabled = true;
   tlacitko.textContent = "Ověřuju…";
