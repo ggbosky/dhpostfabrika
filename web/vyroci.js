@@ -44,7 +44,7 @@ function nadpisZData(text) {
   const dnes = new Date();
   let let_ = dnes.getFullYear() - d.r;
   if (d.m && (dnes.getMonth() + 1 < d.m || (dnes.getMonth() + 1 === d.m && dnes.getDate() < d.d))) let_ -= 1;
-  if (let_ <= 0) return "DNES";
+  if (let_ <= 0) return "DNES PŘED X LETY"; // letošní datum: nech šablonový text, ať je vidět, že chybí rok události
   if (let_ === 1) return "DNES PŘED ROKEM";
   return `DNES PŘED ${let_} LETY`;
 }
