@@ -115,15 +115,27 @@ function kresli() {
   ctx.shadowBlur = 12;
   ctx.letterSpacing = "-1.3px";
   ctx.font = `italic 800 32px ${MONT}`;
-  const sN = ctx.measureText(nadpis).width;
-  const pravy = 1055;
-  ctx.fillStyle = SEDA;
-  ctx.fillText(nadpis, pravy - sN, 46);
+  // Ochranné pásmo vpravo: nadpis i datum vždy končí nejdál 30 px od okraje (počítá se se skutečným
+  // přesahem kurzívy). Kratší řádek se centruje pod delší, takže nic nevyjede ven.
+  const pravyOkraj = W - 30;
+  const sirkaTextu = (t) => { const m = ctx.measureText(t); return Math.max(m.width, m.actualBoundingBoxRight || 0); };
+  let velikost = 32;
+  ctx.font = `italic 800 ${velikost}px ${MONT}`;
+  while (velikost > 20 && Math.max(sirkaTextu(nadpis), datum ? sirkaTextu(datum) : 0) > 620) {
+    velikost -= 2;
+    ctx.font = `italic 800 ${velikost}px ${MONT}`;
+  }
+  const sN = nadpis ? sirkaTextu(nadpis) : 0;
+  const sD = datum ? sirkaTextu(datum) : 0;
+  const blok = Math.max(sN, sD);
+  const stred = pravyOkraj - blok / 2;
+  if (nadpis) {
+    ctx.fillStyle = SEDA;
+    ctx.fillText(nadpis, stred - sN / 2, 46);
+  }
   if (datum) {
-    ctx.font = `italic 800 32px ${MONT}`;
-    const sD = ctx.measureText(datum).width;
     ctx.fillStyle = ZLUTA;
-    ctx.fillText(datum, pravy - sN / 2 - sD / 2, 96);
+    ctx.fillText(datum, stred - sD / 2, 46 + Math.round(velikost * 1.56));
   }
   ctx.restore();
   ctx.letterSpacing = "0px";
