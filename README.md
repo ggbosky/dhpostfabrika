@@ -45,6 +45,44 @@ z data) a žluté datum, malá kulatá fotka s barevným rámečkem a text písm
 v `*hvězdičkách*` mají barvu zvýraznění (modrá, červená, žlutá… nebo vlastní). AI umí navrhnout
 text, popisek, barvu týmu i obě fotky; z **Témat** se sem jde tlačítkem **📅 Dnes před lety**.
 
+### 🎬 Reels Factory – historické dokumenty z autentických záběrů
+
+Záložka **🎬 Reels** vyrábí vertikální MP4 (1080×1920, H.264, 30 fps) **přímo v prohlížeči** – bez serveru
+a bez předplatného. Postup v 7 krocích:
+
+1. **Nový reel** – téma (nebo ✨ návrh témat od AI), délka 30/45/60/90 s, styl vyprávění, jazyky hledání.
+2. **Rešerše** – AI (Gemini + Google) hledá fakta v libovolném jazyce, píše je česky, u každého jistota
+   a zdroje; „Ověřit fakta znovu“ = druhé nezávislé ověření, sporná fakta se vyřadí.
+3. **Scénář** – 4 varianty háčku se silou (vybere nejsilnější), scény s českým voiceoverem, nápisem,
+   popisem záběru a vyhledávacími dotazy v 7 jazycích (cs, en, ru, sv, fi, de, fr). Vše jde upravit,
+   jednotlivé scény přepsat AI.
+4. **Záběry** – hledání ve zdrojích a štítky 👁 lze sledovat / ⬇ lze načíst / ✅ licence k použití:
+   - **Wikimedia Commons** – videa s volnou licencí, rovnou použitelná (zdarma, bez klíče),
+   - **Internet Archive** – náhled a odkaz, soubor stáhnout ručně a importovat (zdarma),
+   - **YouTube Data API** – volitelný bezplatný klíč; délka, licence, časové značky; jen sledování/odkaz,
+   - **web přes AI** (YouTube, NHL.com, iVysílání ČT, IIHF…) – odkazy ke sledování, YouTube ověřené,
+   - **vlastní import** autorizovaných souborů (s potvrzením práv a poznámkou o původu).
+   Nic se nestahuje tam, kde to zdroj nedovoluje.
+5. **Střih** – výběr a pořadí záběrů, začátek úseku, vodorovný výřez, režim „vyplnit“ nebo „celý záběr
+   s rozmazaným pozadím“, přiblížení, původní zvuk (atmosféra), barevné úpravy, logo, outro.
+6. **Hlas a titulky** – český hlas **Piper „Jirka“** (open-source, běží v prohlížeči, model ~60 MB se
+   stáhne jednou) nebo vlastní nahrávka z mikrofonu, tempo; titulky časované přesně podle hlasu každé
+   scény (proto není potřeba Whisper), ruční úprava textu a časů; vlastní hudba s hlasitostí.
+7. **Export a historie** – kontrola kvality (≥ 85 % pohyblivého videa, minimum záběrů, žádné opakování,
+   práva ke všem záběrům, český hlas a titulky, zdroje faktů, délka, formát). Při chybě se **render
+   zablokuje** a vypíše proč. Pak render MP4, historie, hromadný ZIP, scénář (.txt), titulky (.srt),
+   popisek s kredity záběrů a dokument se zdroji a licencemi.
+
+Projekty se ukládají samy (IndexedDB prohlížeče, i s importovanými videi a hlasem).
+
+| Funkce | Co potřebuje |
+|---|---|
+| střih, render MP4, titulky, Commons, Internet Archive, import, mikrofon | nic (zdarma) |
+| český hlas Piper | nic (zdarma), jednorázové stažení modelu |
+| rešerše, scénář, AI hledání na webu | bezplatný Gemini klíč (Můj styl → AI pomocník) |
+| YouTube hledání | volitelný bezplatný YouTube Data API klíč (krok 1) |
+| zvuk AAC (doporučeno pro Instagram) | Chrome nebo Edge na Windows / macOS; jinde Opus |
+
 ### 💾 Koncepty – rozpracované posty
 
 V záložkách **Nový post**, **Carousel** i **Dnes před lety** je tlačítko **💾 Uložit koncept**.
@@ -111,6 +149,11 @@ dhpostfabrika/
 │   ├── koncepty.js     ukládání rozpracovaných postů (IndexedDB, i s fotkami)
 │   ├── ai.js           volitelný AI pomocník (Gemini) + hledání volných fotek
 │   ├── zpravy.js       živé hledání témat na webu a ověřování faktů se zdroji
+│   ├── reels.js        Reels Factory – 7 kroků (rešerše, scénář, záběry, střih, hlas, export)
+│   ├── reels-zabery.js hledání záběrů (Commons, Internet Archive, YouTube, web) a knihovna
+│   ├── reels-render.js střihový engine, náhled, render MP4 (WebCodecs), kontrola kvality
+│   ├── reels-hlas.js   český hlas Piper TTS, mikrofon, mix zvuku
+│   ├── reels-ulozeni.js projekty a média v IndexedDB
 │   ├── app.js          tvorba postu, učení stylu
 │   └── carousel.js     carousel podle šablony
 ├── postfabrika/        verze s AI (Python + Gemini)

@@ -89,12 +89,12 @@ async function hledatNaWebu({ system, zadani, teplota = 0.3, casovyLimit = 30000
   if (!maKlic()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
   const konec = Date.now() + casovyLimit;
   const poradi = ["gemini-2.5-flash", "gemini-2.5-flash", ...MODELY.filter((m) => m !== "gemini-2.5-flash")];
-  let limit = false, chyba = null;
+  let limit = false, chyba = null, bezHledani = null, rozpocet = 512;
   for (const model of poradi) {
     const zbyva = konec - Date.now();
     if (zbyva < 3000) break;
     const preruseni = new AbortController();
-    const casovac = setTimeout(() => preruseni.abort(), Math.min(zbyva, 25000));
+    const casovac = setTimeout(() => preruseni.abort(), Math.min(zbyva, 30000));
     let odpoved;
     try {
       odpoved = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -108,7 +108,8 @@ async function hledatNaWebu({ system, zadani, teplota = 0.3, casovyLimit = 30000
           generationConfig: {
             temperature: teplota,
             // bez dlouhého „přemýšlení“ – výrazně rychlejší odpověď
-            ...(model.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            // Bez „přemýšlení“ model často vůbec nehledá a odpoví z paměti (bez zdrojů) – proto aspoň krátké.
+            ...(model.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: rozpocet } } : {}),
           },
         }),
       });
@@ -125,13 +126,16 @@ async function hledatNaWebu({ system, zadani, teplota = 0.3, casovyLimit = 30000
       const gm = kandidat.groundingMetadata || {};
       const zdroje = (gm.groundingChunks || []).map((c) => ({ titulek: c.web?.title || c.web?.domain || "zdroj", uri: c.web?.uri || "" }));
       if (!text) { chyba = new AIChyba("AI nevrátila žádný text."); continue; }
-      uloz("dhpf_gemini_model_web", model);
-      return {
+      const vysledek = {
         text,
         zdroje,
         podpory: (gm.groundingSupports || []).map((s) => ({ text: s.segment?.text || "", indexy: s.groundingChunkIndices || [] })),
         dotazy: gm.webSearchQueries || [],
       };
+      // Model odpověděl bez hledání na webu → jeden pokus s delším přemýšlením (pokud zbývá čas).
+      if (!zdroje.length && !bezHledani && konec - Date.now() > 12000) { bezHledani = vysledek; rozpocet = 1024; continue; }
+      uloz("dhpf_gemini_model_web", model);
+      return zdroje.length || !bezHledani ? vysledek : bezHledani;
     }
     const telo = await odpoved.text();
     if (odpoved.status === 404) continue;
@@ -141,6 +145,7 @@ async function hledatNaWebu({ system, zadani, teplota = 0.3, casovyLimit = 30000
     if (odpoved.status === 403) throw new AIChyba("Google klíč odmítl (403).");
     chyba = new AIChyba(`Gemini chyba ${odpoved.status}: ${telo.slice(0, 160)}`);
   }
+  if (bezHledani) return bezHledani;
   if (Date.now() >= konec - 3000) throw new AIChyba("Google teď odpovídá pomalu (je přetížený). Zkus to prosím znovu za chvíli.");
   if (limit) throw new AIChyba("Dnešní bezplatný limit Gemini je vyčerpaný. Obnoví se v 9:00 českého času.");
   throw chyba instanceof AIChyba ? chyba : new AIChyba("Gemini teď neodpovídá, zkus to za chvíli.");
@@ -272,7 +277,10 @@ function zdrojeProText(vysledek, textPolozky) {
     const slova = normalizuj(p.text.replace(/"[a-z_]+"\s*:/gi, " ")).split(" ").filter((w) => w.length >= 3);
     if (slova.length < 3) continue;
     const shoda = slova.filter((w) => slovaCile.has(w)).length / slova.length;
-    if (shoda >= 0.7) p.indexy.forEach((i) => indexy.add(i));
+    // úsek odpovědi může pokrývat víc položek najednou → stačí, když položka leží celá v úseku
+    const slovaUseku = new Set(slova);
+    const pokryti = slovaCile.size ? [...slovaCile].filter((w) => slovaUseku.has(w)).length / slovaCile.size : 0;
+    if (shoda >= 0.7 || pokryti >= 0.75) p.indexy.forEach((i) => indexy.add(i));
   }
   const videne = new Set();
   return [...indexy].map((i) => vysledek.zdroje[i]).filter((z) => z && !videne.has(z.titulek) && videne.add(z.titulek));

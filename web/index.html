@@ -244,6 +244,63 @@
   .koncept-typ em.auto { font-style: normal; color: #8fe3a0; }
   .koncept-typ { font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; color: var(--yellow); }
   #kPocet { color: var(--muted); font-weight: 600; }
+  /* --------------------------------------------------------- Reels Factory */
+  .r-hlavicka { margin-bottom: 14px; }
+  .r-kroky { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 18px; scrollbar-width: thin; }
+  .r-krok { flex: none; border: 1px solid var(--line-2); background: #101010; color: #ccc; border-radius: 999px; padding: 8px 14px; font: 700 13px var(--uzke); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+  .r-krok:hover:not(:disabled) { border-color: var(--red-hot); color: #fff; }
+  .r-krok.on { background: linear-gradient(180deg, var(--red-hot), var(--red)); color: #fff; border-color: transparent; }
+  .r-krok:disabled { opacity: .4; cursor: default; }
+  .r-mrizka { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 22px; align-items: start; }
+  .r-obsah > div > .card + .card, .r-obsah > div > .card + div, .r-obsah > div > div + .card { margin-top: 18px; }
+  .r-nahled-panel { position: sticky; top: 64px; }
+  .r-telefon { border-radius: 18px; overflow: hidden; background: #000; box-shadow: 0 0 0 6px #050505, 0 0 0 7px #2a2a2a, 0 24px 60px rgba(0,0,0,.6); }
+  .r-telefon canvas { display: block; width: 100%; height: auto; }
+  .r-h3 { font: 800 14px var(--uzke); letter-spacing: .08em; text-transform: uppercase; margin: 18px 0 8px; color: var(--muted); }
+  .r-navrhy { display: grid; gap: 8px; margin-top: 12px; }
+  .r-navrh { text-align: left; background: #101010; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--text); cursor: pointer; display: grid; gap: 3px; }
+  .r-navrh:hover { border-color: var(--red-hot); }
+  .r-navrh small { color: var(--muted); }
+  .r-projekt { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .r-projekt.on b { color: var(--yellow); }
+  .r-seznam { padding-left: 18px; margin: 0 0 12px; font-size: 14px; }
+  .r-seznam li { margin-bottom: 6px; }
+  .r-fakta { display: grid; gap: 8px; margin-top: 14px; }
+  .r-fakt { background: #0f0f0f; border: 1px solid var(--line); border-left: 3px solid #555; border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; }
+  .r-fakt.potvrzeno, .r-fakt.overeno { border-left-color: #3fd16a; }
+  .r-fakt.nejiste { border-left-color: var(--yellow); }
+  .r-fakt.rozpor { border-left-color: var(--red-hot); opacity: .7; }
+  .r-fakt small a { color: #ff6b70; }
+  .r-hook { padding: 6px 0; }
+  .r-scena, .r-hlas-scena, .r-scena-zabery { background: #0f0f0f; border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; display: grid; gap: 8px; }
+  .r-scena .dva, .r-strih-pole .dva { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .r-dotazy { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+  .r-scena-zabery { margin-top: 14px; background: var(--card); }
+  .r-vysledky { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .r-vysledek, .r-klip { display: grid; grid-template-columns: 112px 1fr; gap: 10px; background: #0d0d0d; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  .r-nahledovka { position: relative; aspect-ratio: 16 / 10; background: #000; border-radius: 6px; overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: 11px; align-self: start; }
+  .r-nahledovka img { width: 100%; height: 100%; object-fit: cover; }
+  .r-nahledovka em { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,.75); color: #fff; font: 700 11px var(--uzke); font-style: normal; padding: 1px 5px; border-radius: 4px; }
+  .r-vinfo { display: grid; gap: 4px; min-width: 0; font-size: 13px; }
+  .r-vinfo b { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .r-stitky { display: flex; flex-wrap: wrap; gap: 4px; }
+  .r-stitky i { font-style: normal; font: 700 11px var(--uzke); letter-spacing: .03em; padding: 2px 6px; border-radius: 999px; background: #1b1b1b; }
+  .r-stitky i.ok { color: var(--ok-text); } .r-stitky i.warn { color: var(--warn-text); } .r-stitky i.err { color: var(--err-text); }
+  .r-knihovna { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 12px; }
+  .r-drop { display: block; border: 2px dashed var(--line-2); border-radius: 12px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; text-transform: none; letter-spacing: 0; font: 600 14px Inter, sans-serif; }
+  .r-drop.drop, .r-drop:hover { border-color: var(--red-hot); color: #fff; }
+  .r-prirazeno { color: var(--ok-text); font-size: 13px; font-weight: 600; }
+  .r-strih-scena { display: grid; grid-template-columns: 150px 1fr; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 12px; }
+  .r-strih-pole { display: grid; gap: 10px; min-width: 0; }
+  .r-hlas-text { margin: 0; color: #ddd; font-size: 14px; }
+  .r-titulky { display: grid; gap: 6px; margin: 8px 0; }
+  .r-titulek { display: grid; grid-template-columns: 1fr 80px 80px; gap: 6px; }
+  .r-qc.chyba { color: var(--err-text); } .r-qc.varovani { color: var(--warn-text); }
+  .r-vystup video { width: 100%; max-width: 360px; border-radius: 12px; margin-top: 14px; background: #000; }
+  .r-historie { display: grid; gap: 8px; margin-top: 10px; }
+  .r-render { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; }
+  .r-dialog { width: min(900px, calc(100vw - 32px)); border: 1px solid var(--line-2); border-radius: 16px; background: var(--card); color: var(--text); padding: 18px; }
+  .r-dialog::backdrop { background: rgba(0,0,0,.8); }
   @media (max-width: 900px) {
     .grid { grid-template-columns: 1fr; }
     #vysledek, #historieKarta, #aiPostKarta, #formular { grid-column: auto; grid-row: auto; }
@@ -252,6 +309,11 @@
     #cVysledek { order: -1; }
     .slide-pole .dva { grid-template-columns: 1fr; }
     .filtry, .filtry.tri { grid-template-columns: 1fr; }
+    .r-mrizka { grid-template-columns: 1fr; }
+    .r-nahled-panel { position: static; order: -1; }
+    .r-nahled-panel .r-telefon { max-width: 300px; margin: 0 auto; }
+    .r-scena .dva, .r-strih-pole .dva { grid-template-columns: 1fr; }
+    .r-strih-scena { grid-template-columns: 1fr; }
     #tSeznam { grid-template-columns: 1fr; }
     .hero-in, .nav-in, main, .footer-in { padding-left: 16px; padding-right: 16px; }
     .pills { margin-left: 0; width: 100%; }
@@ -285,6 +347,7 @@
   <button type="button" class="tab on" data-tab="post">Nový post</button>
   <button type="button" class="tab" data-tab="carousel">Carousel</button>
   <button type="button" class="tab" data-tab="vyroci">📅 Dnes před lety</button>
+  <button type="button" class="tab" data-tab="reels">🎬 Reels</button>
   <button type="button" class="tab" data-tab="koncepty">💾 Koncepty <span id="kPocet"></span></button>
   <button type="button" class="tab" data-tab="styl">Můj styl</button>
 </div></nav>
@@ -536,6 +599,171 @@
     </div>
   </section>
 
+  <section id="zalozkaReels" hidden data-zalozka="reels">
+    <div class="r-hlavicka">
+      <div><h2 style="margin:0">🎬 Reels Factory <span class="muted">historické dokumenty z autentických záběrů</span></h2>
+        <small class="muted"><b id="rNazevProjektu">Žádný otevřený projekt</b> · <span id="rUlozeno"></span> · <span id="rFormat"></span></small></div>
+    </div>
+    <nav class="r-kroky">
+      <button type="button" class="r-krok on" data-krok="zalozit">1 · Nový reel</button>
+      <button type="button" class="r-krok" data-krok="vyzkum" disabled>2 · Rešerše</button>
+      <button type="button" class="r-krok" data-krok="scenar" disabled>3 · Scénář</button>
+      <button type="button" class="r-krok" data-krok="zabery" disabled>4 · Záběry</button>
+      <button type="button" class="r-krok" data-krok="strih" disabled>5 · Střih</button>
+      <button type="button" class="r-krok" data-krok="hlas" disabled>6 · Hlas a titulky</button>
+      <button type="button" class="r-krok" data-krok="export" disabled>7 · Export a historie</button>
+    </nav>
+    <div class="r-mrizka">
+      <div class="r-obsah">
+
+        <div data-rkrok="zalozit">
+          <div class="card ai-karta">
+            <h2>Nový reel</h2>
+            <label>Téma<textarea id="rTema" rows="2" placeholder="např. Příběh Ruské pětky v Detroitu · 5 neuvěřitelných rekordů Wayna Gretzkyho · Nagano 1998"></textarea></label>
+            <div class="filtry tri" style="margin-top:12px">
+              <label>Délka<select id="rDelka"><option value="30">30 s</option><option value="45">45 s</option><option value="60" selected>60 s</option><option value="90">90 s</option></select></label>
+              <label>Styl vyprávění<select id="rTon"><option value="dokument">Dokument</option><option value="napeti">Napínavý příběh</option><option value="vycet">Výčet (top 5…)</option><option value="kontroverze">Kontroverzní moment</option></select></label>
+              <label>Hledat záběry v jazycích<span class="radek" id="rJazyky">
+                <label class="check"><input type="checkbox" value="cs" checked>cs</label><label class="check"><input type="checkbox" value="en" checked>en</label>
+                <label class="check"><input type="checkbox" value="ru" checked>ru</label><label class="check"><input type="checkbox" value="sv">sv</label>
+                <label class="check"><input type="checkbox" value="fi">fi</label><label class="check"><input type="checkbox" value="de">de</label>
+                <label class="check"><input type="checkbox" value="fr">fr</label></span></label>
+            </div>
+            <div class="akce"><button type="button" class="btn" id="rZalozit">Založit projekt</button>
+              <button type="button" class="btn ghost" id="rNavrhniTemata">✨ Navrhni témata (AI)</button></div>
+            <div class="zprava" id="rTemataZprava" hidden></div>
+            <div id="rTemataNavrhy" class="r-navrhy"></div>
+          </div>
+          <div class="card"><h2>Rozpracované projekty</h2><div class="r-projekty" id="rProjekty"></div></div>
+          <div class="card">
+            <h2>Zdroje záběrů a klíče</h2>
+            <ul class="muted r-seznam">
+              <li><b>Wikimedia Commons</b> – videa s volnou licencí, aplikace je umí rovnou použít. Zdarma, bez klíče.</li>
+              <li><b>Internet Archive</b> – náhled a odkaz; soubor stáhneš ručně (archiv nedovolí načtení z cizí stránky) a importuješ. Zdarma.</li>
+              <li><b>Web přes AI</b> (YouTube, NHL.com, iVysílání ČT, IIHF…) – hledá v jazycích, které zvolíš; jen ke sledování a jako zdroj. Potřebuje Gemini klíč (zdarma).</li>
+              <li><b>YouTube Data API</b> – volitelné, přesnější hledání s délkou videa, licencí a časovými značkami. Bezplatný klíč z Google Cloud (10 000 jednotek/den ≈ 100 hledání). Videa z YouTube aplikace nestahuje.</li>
+              <li><b>Vlastní soubory</b> – záběry, ke kterým máš práva (licence ČT, klub, NHL…), přetáhni do kroku Záběry.</li>
+            </ul>
+            <label>YouTube Data API klíč (nepovinné)<span class="radek"><input id="rYtKlic" type="password" autocomplete="off" placeholder="AIza…" style="flex:1"><button type="button" class="btn small" id="rYtUlozit">Uložit</button></span></label>
+            <div class="zprava" id="rYtZprava" hidden></div>
+            <details class="muted" style="margin-top:8px"><summary>Jak získat YouTube klíč zdarma</summary>
+              <ol><li>console.cloud.google.com → nový projekt.</li><li>APIs &amp; Services → Library → <b>YouTube Data API v3</b> → Enable.</li><li>Credentials → Create credentials → API key. Doporučeno omezit na web ggbosky.github.io.</li></ol></details>
+          </div>
+        </div>
+
+        <div data-rkrok="vyzkum" hidden>
+          <div class="card">
+            <h2>Rešerše tématu <span class="muted">AI hledá na webu ve více jazycích, píše česky, ke každému faktu zdroj</span></h2>
+            <div class="akce" style="margin-top:0"><button type="button" class="btn" id="rVyzkum">🔎 Prozkoumat téma</button>
+              <button type="button" class="btn ghost" id="rOveritFakta" disabled>✔ Ověřit fakta znovu</button></div>
+            <div class="zprava" id="rVyzkumZprava" hidden></div>
+            <div id="rFakta" class="r-fakta"></div>
+            <div id="rZdrojeVyzkumu" class="muted" style="font-size:13px;margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div data-rkrok="scenar" hidden>
+          <div class="card">
+            <h2>Scénář <span class="muted" id="rScenarStat"></span></h2>
+            <div class="akce" style="margin-top:0"><button type="button" class="btn" id="rNapsat">✍️ Napsat scénář</button>
+              <button type="button" class="btn ghost" id="rPridatScenu">＋ Přidat scénu</button></div>
+            <div class="zprava" id="rScenarZprava" hidden></div>
+            <h3 class="r-h3">Háček (první 1–3 s)</h3><div id="rHooky"></div>
+            <h3 class="r-h3">Scény</h3><div id="rSceny"></div>
+            <label style="margin-top:14px">Popisek pod reel, výzva a hashtagy<textarea id="rPopisekReel" rows="6"></textarea></label>
+          </div>
+        </div>
+
+        <div data-rkrok="zabery" hidden>
+          <div class="card">
+            <h2>Záběry <span class="muted" id="rYtStav"></span></h2>
+            <div class="akce" style="margin-top:0">
+              <button type="button" class="btn" id="rHledatVse">🔎 Hledat záběry pro všechny scény</button>
+              <button type="button" class="btn ghost" id="rHledatWeb">🌐 Hledat na webu (AI)</button>
+              <button type="button" class="btn ghost" id="rPriradit">⚡ Automaticky přiřadit</button></div>
+            <div class="zprava" id="rZaberyZprava" hidden></div>
+            <p class="muted" style="font-size:13px">Štítky: 👁 lze sledovat · ⬇ lze načíst do střihu · ✅ licence k použití. Veřejně dostupné video ještě neznamená, že ho smíš použít – aplikace nic nestahuje tam, kde to zdroj nedovoluje.</p>
+          </div>
+          <div class="card">
+            <h2>Knihovna záběrů</h2>
+            <label class="r-drop" id="rDrop">📥 Přetáhni sem autorizovaná videa (MP4/WebM) nebo fotky, nebo klikni<input type="file" id="rImport" accept="video/*,image/*" multiple></label>
+            <div id="rKnihovna" class="r-knihovna"></div>
+          </div>
+          <div id="rScenyZabery"></div>
+        </div>
+
+        <div data-rkrok="strih" hidden>
+          <div class="card">
+            <h2>Střih <span class="muted" id="rStrihStat"></span></h2>
+            <div class="filtry tri">
+              <label>Barvy<select id="rBarvy"><option value="prirozene">Přirozené</option><option value="archiv">Archivní</option><option value="dramaticke">Dramatické</option><option value="zadne">Bez úprav</option></select></label>
+              <label class="check"><input type="checkbox" id="rProlnuti"> Krátký střih přes černou</label>
+              <label class="check"><input type="checkbox" id="rLogoZap"> Logo Deníku hokeje</label>
+              <label class="check"><input type="checkbox" id="rTitulkyZap"> Titulky</label>
+              <label class="check"><input type="checkbox" id="rZvyrazneni"> Zvýraznit klíčová slova</label>
+              <label class="check"><input type="checkbox" id="rOutro"> Outro s logem</label>
+            </div>
+          </div>
+          <div id="rStrih"></div>
+        </div>
+
+        <div data-rkrok="hlas" hidden>
+          <div class="card">
+            <h2>Český hlas a titulky</h2>
+            <div class="filtry tri">
+              <label>Hlas<select id="rHlasId"></select></label>
+              <label>Tempo <b id="rRychlostHodnota">100 %</b><input type="range" id="rRychlost" min="0.9" max="1.15" step="0.01" value="1"></label>
+              <label style="align-self:end"><button type="button" class="btn" id="rGenHlas">🤖 Vygenerovat hlas pro všechny scény</button></label>
+            </div>
+            <p class="muted" style="font-size:13px">Hlas Piper „Jirka“ běží zdarma přímo v prohlížeči (model ~60 MB se stáhne poprvé). Pro nejpřirozenější výsledek můžeš každou scénu namluvit sám (🎙️). Titulky se časují přesně podle hlasu každé scény – jdou ručně upravit.</p>
+            <div class="zprava" id="rHlasZprava" hidden></div>
+          </div>
+          <div class="card">
+            <h2>Hudba</h2>
+            <div class="filtry tri">
+              <label class="btn ghost small" style="align-self:end">🎵 Nahrát hudbu<input type="file" id="rHudba" accept="audio/*"></label>
+              <label>Hlasitost<input type="range" id="rHudbaHlasitost" min="0" max="0.5" step="0.01" value="0.12"></label>
+              <label>Licence hudby<input id="rHudbaLicence" placeholder="např. YouTube Audio Library – bez nutnosti uvést autora"></label>
+            </div>
+            <p class="muted" style="margin:6px 0 0"><span id="rHudbaInfo">bez hudby</span> · Použij jen hudbu, kterou smíš použít (YouTube Audio Library, vlastní licence).</p>
+          </div>
+          <div id="rHlasSceny"></div>
+        </div>
+
+        <div data-rkrok="export" hidden>
+          <div class="card">
+            <h2>Kontrola kvality a export</h2>
+            <div class="akce" style="margin-top:0"><button type="button" class="btn ghost" id="rKontrolaBtn">✔ Zkontrolovat</button>
+              <button type="button" class="btn" id="rRender" disabled>🎬 Vyrenderovat MP4</button>
+              <button type="button" class="btn ghost" id="rZrusit" hidden>Zrušit</button></div>
+            <progress id="rPrubeh" max="1" value="0" hidden style="width:100%;margin-top:12px"></progress>
+            <div class="zprava" id="rRenderZprava" hidden></div>
+            <div id="rKontrola"></div>
+            <div id="rVystup" class="r-vystup"></div>
+            <div class="akce">
+              <button type="button" class="btn small ghost" id="rExScenar">📄 Scénář (.txt)</button>
+              <button type="button" class="btn small ghost" id="rExSrt">💬 Titulky (.srt)</button>
+              <button type="button" class="btn small ghost" id="rExPopisek">📋 Popisek + kredity</button>
+              <button type="button" class="btn small ghost" id="rExZdroje">🔗 Zdroje a licence (.txt)</button>
+            </div>
+          </div>
+          <div class="card"><div class="radek" style="justify-content:space-between"><h2 style="margin:0">Historie reels</h2><button type="button" class="btn small ghost" id="rZip">📦 Hromadný export (ZIP)</button></div>
+            <div id="rHistorie" class="r-historie"></div></div>
+          <div class="card"><h2>Projekty</h2><div class="r-projekty"></div></div>
+        </div>
+      </div>
+
+      <aside class="card r-nahled-panel">
+        <h2>Náhled 9:16 <span class="muted" id="rQcSouhrn"></span></h2>
+        <div class="r-telefon"><canvas id="rPlatno" width="1080" height="1920" aria-label="Náhled reelu"></canvas></div>
+        <div class="radek" style="margin-top:10px"><button type="button" class="btn small" id="rPrehrat">▶ Přehrát</button><span class="muted" id="rCas">0:00 / 0:00</span></div>
+        <input type="range" id="rPosuv" min="0" max="1" step="0.01" value="0" style="width:100%">
+        <div class="zprava" id="rNahledZprava" hidden></div>
+      </aside>
+    </div>
+    <dialog id="rDialog" class="r-dialog"><form method="dialog" class="dlg-hlava"><span id="rDialogInfo"></span><button class="ikona" value="x">✕</button></form><div id="rDialogObsah"></div></dialog>
+  </section>
+
   <section id="zalozkaKoncepty" hidden data-zalozka="koncepty">
     <div class="card">
       <h2>💾 Rozpracované posty <span class="muted">uložené jen v tomhle prohlížeči, i s fotkami</span></h2>
@@ -598,13 +826,18 @@
   <span>Post Fabrika · redakční nástroj Deníku hokeje. Styl, historie i AI klíč zůstávají jen v tomhle prohlížeči.</span>
 </div></footer>
 
-<script src="sablony.js?v=20261112c"></script>
-<script src="grafika.js?v=20261112c"></script>
-<script src="koncepty.js?v=20261112c"></script>
-<script src="ai.js?v=20261112c"></script>
-<script src="app.js?v=20261112c"></script>
-<script src="carousel.js?v=20261112c"></script>
-<script src="vyroci.js?v=20261112c"></script>
-<script src="zpravy.js?v=20261112c"></script>
+<script src="sablony.js?v=20261112e"></script>
+<script src="grafika.js?v=20261112e"></script>
+<script src="koncepty.js?v=20261112e"></script>
+<script src="ai.js?v=20261112e"></script>
+<script src="app.js?v=20261112e"></script>
+<script src="carousel.js?v=20261112e"></script>
+<script src="vyroci.js?v=20261112e"></script>
+<script src="zpravy.js?v=20261112e"></script>
+<script src="reels-ulozeni.js?v=20261112e"></script>
+<script src="reels-hlas.js?v=20261112e"></script>
+<script src="reels-render.js?v=20261112e"></script>
+<script src="reels-zabery.js?v=20261112e"></script>
+<script src="reels.js?v=20261112e"></script>
 </body>
 </html>
