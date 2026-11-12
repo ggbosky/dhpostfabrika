@@ -68,11 +68,11 @@ function kresli() {
   }
 
   // Text dole: Anton, zvýraznění barvou.
-  const sirka = W - 2 * 32 - 120;
+  const sirka = W - 2 * 32 - 20; // skoro celá šířka (s mezerami mezi písmeny je text širší)
   let v = 70, radky = [];
   for (; v >= 48; v -= 2) {
     ctx.font = `400 ${v}px ${ANTON}`;
-    ctx.letterSpacing = `${(-0.04 * v).toFixed(1)}px`; // tracking −40 jako v PSD
+    ctx.letterSpacing = `${(0.02 * v).toFixed(1)}px`; // malé mezery mezi písmeny, ať text není nalepený
     radky = G.zalomBohaty(ctx, stav.text || "", sirka);
     if (radky.length <= 4) break;
   }
@@ -104,7 +104,7 @@ function kresli() {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `400 ${v}px ${ANTON}`;
-  ctx.letterSpacing = `${(-0.04 * v).toFixed(1)}px`;
+  ctx.letterSpacing = `${(0.02 * v).toFixed(1)}px`;
   radky.forEach((r, i) => G.kresliBohatyRadek(ctx, r, 32, prvni + i * rozestup, stav.barva));
 
   // Pravý horní roh: DNES PŘED X LETY + datum.
@@ -113,7 +113,7 @@ function kresli() {
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 12;
-  ctx.letterSpacing = "-1.3px";
+  ctx.letterSpacing = "0.5px";
   ctx.font = `italic 800 32px ${MONT}`;
   // Ochranné pásmo vpravo: nadpis i datum vždy končí nejdál 30 px od okraje (počítá se se skutečným
   // přesahem kurzívy). Kratší řádek se centruje pod delší, takže nic nevyjede ven.
@@ -222,7 +222,7 @@ async function najdiFoto(kam) {
 const SCHEMA = {
   type: "object",
   properties: {
-    datum: { type: "string", description: "datum události ve tvaru D.M.RRRR" },
+    datum: { type: "string", description: "den, kdy se událost PŮVODNĚ stala (rok v minulosti), ve tvaru D.M.RRRR" },
     text: { type: "string", description: "text do obrázku" },
     barva: { type: "string", description: "hex hlavní barvy týmu z příběhu, dobře čitelná na černé (např. #005DB8)" },
     popisek: { type: "string", description: "text pod příspěvek bez hashtagů" },
@@ -262,7 +262,8 @@ async function navrhni() {
   try {
     const r = await AI.gemini({
       system: `Jsi redaktor Instagramu Deník hokeje a píšeš single post „DNES PŘED X LETY“ – připomínku hokejového výročí.
-Text do obrázku ("text"): 1–2 úderné věty, celkem 60–120 znaků, ideálně 3 řádky oddělené \\n (každý řádek do ~32 znaků).
+Datum ("datum") je den, kdy se událost PŮVODNĚ stala – v minulém roce, nikdy letošní datum (z něj se počítá „před X lety“).
+Text do obrázku ("text"): 1–2 úderné věty, celkem 60–120 znaků, ideálně 3 řádky oddělené \\n (každý řádek do ~32 znaků), BEZ emoji.
 Pointa příběhu, ne suchý výčet. 3–5 klíčových slov obal hvězdičkami *takhle* – zobrazí se barvou týmu.
 Popisek: první řádek hook s 📅 (např. „📅 Dnes před 31 lety…“), pak 2–3 krátké odstavce s fakty a kontextem,
 na konci otázka pro fanoušky. Hashtagy 6–10.
@@ -275,7 +276,7 @@ ${AI.PRAVIDLA}
     });
     stav.datum = r.datum || stav.datum;
     stav.nadpisAuto = true;
-    stav.text = r.text || "";
+    stav.text = (r.text || "").replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\u200D\p{Extended_Pictographic})*\s?/gu, "").trim();
     stav.barva = citelnaBarva(r.barva) || stav.barva;
     stav.dotazFoto = r.foto_dotaz || "";
     stav.dotazVlozka = r.vlozka_dotaz || "";
