@@ -14,7 +14,8 @@ const ZAMERENI = {
 };
 const OBDOBI = {
   vyroci: "", // doplní se podle dnešního data (viz obdobiText)
-  historie: "kdykoliv v historii hokeje",
+  historie: `KDYKOLIV v historii hokeje. Data událostí ber z LIBOVOLNÝCH dnů a měsíců – NEVÁŽ je na dnešní datum
+(žádná „výročí dnešního dne“). Udělej pestrý mix desetiletí (od 50. let po současnost) a různých měsíců.`,
   aktualne: "aktuální dění za posledních 14 dní (nové rekordy, právě dosažené milníky, unikátní statistiky)",
 };
 const KDE = {
@@ -99,8 +100,8 @@ async function najdiTemata() {
         }
       },
       system: `Jsi rešeršista Instagramu Deník hokeje. Účet NEDĚLÁ zpravodajství (výsledky, přestupy, zranění),
-ale zajímavosti: milníky, rekordy, statistické kuriozity, výročí a silné historické příběhy – věci, u kterých
-fanoušek řekne „to jsem nevěděl“. Hledáš je na webu (Google). Dnešní datum: ${AI.dnes()}.
+ale zajímavosti: milníky, rekordy, statistické kuriozity${jenDnes ? ", výročí" : ""} a silné historické příběhy – věci, u kterých
+fanoušek řekne „to jsem nevěděl“. Hledáš je na webu (Google).${jenDnes || $("#tObdobi").value === "aktualne" ? ` Dnešní datum: ${AI.dnes()}.` : ""}
 Zásady:
 - Uváděj JEN fakta, která jsi našel ve zdrojích: přesná čísla, data, jména, soupeře. Nic nedomýšlej.
 - Každé téma musí být podložené alespoň jedním důvěryhodným zdrojem. Doporučené zdroje (ale můžeš hledat kdekoliv):
@@ -177,7 +178,7 @@ function vykresli(r) {
       <div class="akce" style="margin-top:10px">
         <button type="button" class="btn small" data-post="${i}">✍️ Post</button>
         <button type="button" class="btn small ghost" data-carousel="${i}">🎞️ Carousel</button>
-        <button type="button" class="btn small ghost" data-vyroci="${i}">📅 Dnes před lety</button>
+        ${jeDnesniDen(t) ? `<button type="button" class="btn small ghost" data-vyroci="${i}">📅 Dnes před lety</button>` : ""}
       </div>
     </article>`).join("") +
     (r.dotazy?.length ? `<p class="muted" style="font-size:12px">Hledáno: ${r.dotazy.map(esc).join(" · ")}</p>` : "");
@@ -226,7 +227,7 @@ Odpověz POUZE blokem \`\`\`json s polem:
   const ok = temata.filter((t) => t.kontrola.stav === "overeno").length;
   const spatne = temata.filter((t) => t.kontrola.stav === "rozpor").length;
   if (temata.every((t) => t.kontrola.stav === "chyba")) return; // chybu kontroly ukazují odznaky
-  zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b>, <b>🎞️ Carousel</b> nebo <b>📅 Dnes před lety</b>.`, spatne ? "varovani" : "ok");
+  zprava(`Nalezeno ${temata.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b> nebo <b>🎞️ Carousel</b>${temata.some(jeDnesniDen) ? " (u dnešních výročí i <b>📅 Dnes před lety</b>)" : ""}.`, spatne ? "varovani" : "ok");
 }
 
 function zadaniZTematu(t) {

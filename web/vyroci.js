@@ -45,8 +45,10 @@ function nadpisZData(text) {
   let let_ = dnes.getFullYear() - d.r;
   if (d.m && (dnes.getMonth() + 1 < d.m || (dnes.getMonth() + 1 === d.m && dnes.getDate() < d.d))) let_ -= 1;
   if (let_ <= 0) return "DNES PŘED X LETY"; // letošní datum: nech šablonový text, ať je vidět, že chybí rok události
-  if (let_ === 1) return "DNES PŘED ROKEM";
-  return `DNES PŘED ${let_} LETY`;
+  // „DNES“ jen když výročí připadá opravdu na dnešek; jinak jen „PŘED X LETY“.
+  const dnesJe = d.d === dnes.getDate() && d.m === dnes.getMonth() + 1;
+  const pred = let_ === 1 ? "PŘED ROKEM" : `PŘED ${let_} LETY`;
+  return dnesJe ? `DNES ${pred}` : pred;
 }
 
 const hezkeDatum = (text) => {
@@ -265,7 +267,7 @@ async function navrhni() {
 Datum ("datum") je den, kdy se událost PŮVODNĚ stala – v minulém roce, nikdy letošní datum (z něj se počítá „před X lety“).
 Text do obrázku ("text"): 1–2 úderné věty, celkem 60–120 znaků, ideálně 3 řádky oddělené \\n (každý řádek do ~32 znaků), BEZ emoji.
 Pointa příběhu, ne suchý výčet. 3–5 klíčových slov obal hvězdičkami *takhle* – zobrazí se barvou týmu.
-Popisek: první řádek hook s 📅 (např. „📅 Dnes před 31 lety…“), pak 2–3 krátké odstavce s fakty a kontextem,
+Popisek: první řádek hook s 📅 („📅 Dnes před 31 lety…“ jen pokud událost připadá na dnešní den, jinak „📅 Před 31 lety…“), pak 2–3 krátké odstavce s fakty a kontextem,
 na konci otázka pro fanoušky. Hashtagy 6–10.
 ${AI.stylDoPromptu()}
 
