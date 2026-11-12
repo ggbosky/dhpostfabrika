@@ -264,7 +264,10 @@ Pravidla:
 - Používej JEN fakta ze seznamu (čísla, data, skóre, citace přesně). Co ze seznamu nevyplývá, nepiš. Pochybnosti dej do "nejiste".
 - Přesně ${nSc} scén. Voiceover má CELKEM ${slov} slov (±10 %, ≈ ${p.delka} s) – to je tvrdý limit, delší text se do reelu nevejde.
   Jedna scéna = jeden záběr = nejvýš ${Math.ceil(slov / nSc) + 3} slov (jedna krátká věta, výjimečně dvě).
-- Scéna 1 = háček (hook): silný, do 12 slov, zazní v prvních 1–3 s. Dej 4 varianty háčku se silou 1–10 a vyber nejlepší.
+- Scéna 1 = háček (hook): do 10 slov, zazní v prvních 1–3 s a musí zastavit scrollování. Dej 4 varianty háčku,
+  každou podle jiného vzorce (šokující číslo · kontrast/paradox · konkrétní okamžik · nedokončená zápletka), se silou 1–10, a vyber nejlepší.
+  Zakázané začátky: „Věděli jste, že“, „Dnes si povíme“, „Pojďme“, „Tohle je příběh“.
+- Krátké věty, žádná vata, žádné opakování. Každá scéna posune příběh dál.
 - Pak logický příběh s gradací, poslední scéna = zapamatovatelná pointa (případně krátká výzva k Deníku hokeje v "cta").
 - V každé scéně 1–2 klíčová slova obal *hvězdičkami* (zvýrazní se v titulcích).
 - "titulek" = krátký nápis na obrazovku (max 5 slov) jen u klíčových scén, jinak prázdný řetězec.
@@ -272,7 +275,7 @@ Pravidla:
 - "dotazy" = vyhledávací dotazy na ten konkrétní záběr ve více jazycích (cs, en, ru, sv, fi, de, fr): jména, tým, rok, akce,
   slova jako highlights / goal / footage / 1980s game / interview v daném jazyce. Ne jen jméno hráče.
 - "fakta" = čísla faktů ze seznamu, ze kterých scéna vychází.
-- Popisek pod reel česky (2–4 krátké odstavce + otázka), hashtagy 8–12 (česky/hokejové).
+- Popisek pod reel česky: hook (1 řádek, max 10 slov) + 1 krátký odstavec + krátká otázka, celkem max 300 znaků. Hashtagy 3–5.
 Tón: ${TONY[p.ton] || TONY.dokument}.`,
       zadani: `TÉMA: ${p.tema}\n\nOVĚŘENÁ FAKTA (číslo: fakt):\n${fakta.map((f) => `${f.i}: ${f.text}${f.rok ? ` (${f.rok})` : ""}${f.jistota === "nejiste" ? " [nejisté]" : ""}`).join("\n") || "(žádná rešerše – piš opatrně jen obecně známá fakta a vše sporné dej do nejiste)"}\n\nNapiš scénář.`,
       schema: SCHEMA_SCENAR,

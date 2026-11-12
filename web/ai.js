@@ -502,13 +502,13 @@ function stylDoPromptu() {
   let p = null;
   try { p = JSON.parse(localStorage.getItem("dhpf_profil")); } catch { /* nic */ }
   if (!p) {
-    return "Styl účtu (výchozí odhad): úderný zpravodajsko-fanouškovský tón, hook s 1 emoji, " +
-      "2–4 krátké odstavce, střídmě emoji (🏒 🚨 🔥 🇨🇿 👇), na konci otázka na fanoušky, " +
-      "hashtagy #denikhokeje #hokej + soutěž a týmy (celkem 6–10).";
+    return "Styl účtu (výchozí odhad): úderný fanouškovský tón, hook s 1 emoji, " +
+      "2–3 krátké odstavce, střídmě emoji (🏒 🚨 🔥 🇨🇿 👇), na konci otázka na fanoušky, " +
+      "hashtagy #denikhokeje #hokej + 1–3 k tématu (celkem 3–5).";
   }
   return [
     `Styl naučený z ${p.pocet} reálných postů účtu:`,
-    `- průměrná délka ${p.prumerZnaku} znaků`,
+    `- průměrná délka ${p.prumerZnaku} znaků (jen horní mez – piš kratší a údernější)`,
     `- hashtagy v každém postu: ${p.stale.join(" ") || "žádné"}; obvykle ${p.pocetTagu} hashtagů; časté: ${p.hashtagy.slice(0, 15).join(" ")}`,
     `- emoji: ${p.emojiNaPost} na post${p.emoji.length ? ` (${p.emoji.join(" ")})` : ""}`,
     p.cta.length ? `- typické výzvy na konci: ${p.cta.slice(0, 6).map((c) => `„${c}“`).join(", ")}` : "",
@@ -519,6 +519,35 @@ function dnes() {
   const d = new Date();
   return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()}`;
 }
+
+
+// Pravidla copywritingu pro všechny texty: krátce, úderně, s hookem.
+const COPY = `JAK PSÁT PRO @denik_hokeje – krátce, úderně, s hookem. Kratší je vždycky lepší než delší.
+
+HOOK (první řádek) rozhoduje, jestli člověk přestane scrollovat:
+- Max 10 slov / 70 znaků – ve feedu musí být vidět celý. Žádný úvod, rovnou to nejsilnější z celého příběhu.
+- Postav ho na jednom z těchto vzorců:
+  • šokující číslo: „44 zápasů. Ani jedna prohra.“
+  • kontrast / paradox: „V Naganu chytal jako bůh. Doma ho nechtěli.“
+  • konkrétní okamžik: „63. minuta. Zbořil sám před brankou.“
+  • odvážné tvrzení: „Nejlepší sezóna, jakou kdy Čech v NHL odehrál.“
+  • nedokončená zápletka: „Nastoupil se zlomenou rukou. A pak…“
+- Konkrétní jméno, číslo nebo detail místo obecných slov. Nejvýš 1 emoji.
+- ZAKÁZÁNO: „Věděli jste, že…“, „Dnes si připomeneme…“, „Pojďme se podívat“, „Neuvěřitelný příběh“,
+  „legenda“ bez konkrétního důvodu, vykřičníky za každou větou, clickbait, který text nesplní.
+
+TĚLO:
+- Nejvýš 3 krátké odstavce po 1–2 větách. Věta do 15 slov. Jedna věta = jedna informace.
+- Nejsilnější detail hned za hookem. Žádná vata, žádné opakování hooku, nevysvětluj samozřejmosti.
+- Tón: fanoušek, který ví víc – sebevědomě, živě, spisovně, bez patosu a bez zbytečných superlativů.
+- Poslední věta těla = pointa (překvapení, emoce nebo souvislost s dneškem).
+
+VÝZVA: jedna krátká otázka, na kterou jde odpovědět jedním slovem nebo názorem
+(„Lepší gólman: Hašek, nebo Vokoun? 👇“). Nikdy „Co na to říkáte?“.
+
+HASHTAGY: 3–5 (stálé hashtagy účtu + 1–3 k tématu). Žádné obecné #sport #instagood.
+DÉLKA celého textu bez hashtagů: ideálně 250–450 znaků. Délku z naučeného stylu ber jen jako horní mez.
+EMOJI: celkem 1–3, nikdy na začátku každého řádku.`;
 
 const PRAVIDLA = `Pravidla:
 - Piš česky, přirozeně, bez AI frází („v dnešním příspěvku“, „pojďme se podívat“).
@@ -768,7 +797,134 @@ function vykresliStav() {
   if (vstup && !vstup.value && maKlic()) vstup.placeholder = "•••••••• (klíč je uložený)";
 }
 
+// ------------------------------------------------ nástroje na texty postů --
+// Pod popisky postu / carouselu / výročí: jiný hook, zkrátit, úderněji (+ vrátit zpět).
+
+const CILE_TEXTU = { post: "#text", carousel: "#cPopisek", vyroci: "#vPopisek" };
+const CHRANENE = /^\s*(#|📸|ℹ️)/u;
+
+function rozdelText(text) {
+  const obsah = [], chranene = [];
+  for (const o of text.split(/\n{2,}/)) (CHRANENE.test(o) ? chranene : obsah).push(o.trim());
+  return { obsah: obsah.filter(Boolean), chranene: chranene.filter(Boolean) };
+}
+const slozText = (obsah, chranene) => [...obsah, ...chranene].filter(Boolean).join("\n\n");
+
+function nastavText(ta, text) {
+  ta.value = text;
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function boxNastroju(ta) {
+  return ta.parentElement.querySelector(`.text-nastroje[data-pro="${ta.id}"]`);
+}
+
+function nabidniHooky(cil, hooky) {
+  const ta = typeof cil === "string" ? $(cil) : cil;
+  const box = ta && boxNastroju(ta);
+  if (!box) return;
+  const seznam = [...new Set((hooky || []).map((h) => String(h || "").trim()).filter(Boolean))];
+  const el = box.querySelector(".tn-hooky");
+  el.innerHTML = seznam.length > 1
+    ? `<span class="muted">Hook:</span>${seznam.map((h) => `<button type="button" class="tn-hook" data-tn-hook="${h.replace(/"/g, "&quot;")}">${h.replace(/</g, "&lt;")}</button>`).join("")}`
+    : "";
+  zvyrazniHook(ta);
+}
+
+function zvyrazniHook(ta) {
+  const box = boxNastroju(ta);
+  if (!box) return;
+  const prvni = (rozdelText(ta.value).obsah[0] || "").trim();
+  box.querySelectorAll(".tn-hook").forEach((b) => b.classList.toggle("on", b.dataset.tnHook.trim() === prvni));
+}
+
+async function upravText(ta, akce, tlacitko) {
+  const box = boxNastroju(ta);
+  const stav = box.querySelector(".tn-stav");
+  const { obsah, chranene } = rozdelText(ta.value);
+  if (!obsah.length) { stav.textContent = "Nejdřív je potřeba nějaký text."; return; }
+  if (!maKlic()) { stav.innerHTML = 'Potřebuje AI klíč – <a href="#" data-jdi-na-ai>nastavit</a>.'; return; }
+  const tlacitka = box.querySelectorAll("button");
+  tlacitka.forEach((b) => { b.disabled = true; });
+  const puvodniPopis = tlacitko.textContent;
+  tlacitko.textContent = "Píšu…";
+  stav.textContent = "";
+  const system = `Jsi nejlepší copywriter Instagramu @denik_hokeje (český hokej).\n\n${COPY}\n\n${stylDoPromptu()}\n\n` +
+    "Fakta, čísla, jména a data NIKDY neměň ani nepřidávej nová. Neměň význam. Hashtagy ani zdroje nepiš (přidají se samy).";
+  try {
+    if (akce === "hook") {
+      const r = await gemini({
+        system,
+        zadani: `TEXT POSTU:\n${obsah.join("\n\n")}\n\nNapiš 5 nových hooků (první řádek) – každý podle jiného vzorce, max 10 slov, nejvýš 1 emoji. Seřaď od nejsilnějšího.`,
+        schema: { type: "object", properties: { hooky: { type: "array", items: { type: "string" } } }, required: ["hooky"] },
+      });
+      const hooky = (r.hooky || []).filter(Boolean);
+      if (!hooky.length) throw new AIChyba("AI žádný hook nevymyslela, zkus to znovu.");
+      box.dataset.zpet = ta.value;
+      nastavText(ta, slozText([hooky[0], ...obsah.slice(1)], chranene));
+      nabidniHooky(ta, [obsah[0], ...hooky]);
+      stav.innerHTML = "Nový hook je nahoře ✓ Další varianty máš tady pod tím.";
+    } else {
+      const ukol = akce === "kratsi"
+        ? "Zkrať tenhle text zhruba na polovinu. Zachovej hook (můžeš ho zlepšit), nejsilnější fakta, pointu a výzvu na konci. Vyhoď všechno, co nic nepřidává."
+        : "Přepiš tenhle text tak, aby byl úderný a čtivý podle pravidel výše: silnější hook, kratší věty, žádná vata, pointa, výzva na konci. Nesmí být delší než originál.";
+      const r = await gemini({
+        system,
+        zadani: `TEXT POSTU:\n${obsah.join("\n\n")}\n\n${ukol}\nOdstavce odděl prázdným řádkem. První odstavec = hook (jeden řádek).`,
+        schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+      });
+      const novy = String(r.text || "").replace(/\n\s*#[\p{L}\p{N}_]+(\s+#[\p{L}\p{N}_]+)*\s*$/u, "").trim();
+      if (!novy) throw new AIChyba("AI nevrátila text, zkus to znovu.");
+      box.dataset.zpet = ta.value;
+      nastavText(ta, slozText(rozdelText(novy).obsah, chranene));
+      stav.textContent = `Hotovo ✓ ${obsah.join("\n\n").length} → ${rozdelText(novy).obsah.join("\n\n").length} znaků.`;
+      zvyrazniHook(ta);
+    }
+    box.querySelector("[data-tn=zpet]").hidden = false;
+  } catch (e) {
+    stav.textContent = e.message;
+  } finally {
+    tlacitka.forEach((b) => { b.disabled = false; });
+    tlacitko.textContent = puvodniPopis;
+  }
+}
+
+function initNastroje() {
+  for (const sel of Object.values(CILE_TEXTU)) {
+    const ta = $(sel);
+    if (!ta || boxNastroju(ta)) continue;
+    const box = document.createElement("div");
+    box.className = "text-nastroje";
+    box.dataset.pro = ta.id;
+    box.innerHTML = `<div class="tn-radek">
+        <button type="button" class="tn-btn" data-tn="hook" title="AI napíše nové varianty prvního řádku">🔁 Jiný hook</button>
+        <button type="button" class="tn-btn" data-tn="kratsi" title="Zkrátí text zhruba na polovinu">✂️ Zkrátit</button>
+        <button type="button" class="tn-btn" data-tn="udernejsi" title="Přepíše text úderněji, fakta nechá">🔥 Úderněji</button>
+        <button type="button" class="tn-btn" data-tn="zpet" hidden>↶ Vrátit</button>
+        <span class="tn-stav muted"></span>
+      </div>
+      <div class="tn-hooky"></div>`;
+    ta.insertAdjacentElement("afterend", box);
+    ta.addEventListener("input", () => zvyrazniHook(ta));
+    box.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.dataset.tnHook !== undefined) {
+        const { obsah, chranene } = rozdelText(ta.value);
+        box.dataset.zpet = ta.value;
+        nastavText(ta, slozText([b.dataset.tnHook, ...obsah.slice(1)], chranene));
+        box.querySelector("[data-tn=zpet]").hidden = false;
+      } else if (b.dataset.tn === "zpet") {
+        if (box.dataset.zpet !== undefined) nastavText(ta, box.dataset.zpet);
+        b.hidden = true;
+        box.querySelector(".tn-stav").textContent = "Vráceno.";
+      } else if (b.dataset.tn) upravText(ta, b.dataset.tn, b);
+    });
+  }
+}
+
 function init() {
+  initNastroje();
   vykresliStav();
   const zprava = (t, chyba) => {
     const el = $("#aiKlicZprava");
@@ -836,6 +992,6 @@ function init() {
   });
 }
 
-window.DHAI = { maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
+window.DHAI = { COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
 init();
 })();

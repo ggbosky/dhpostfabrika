@@ -453,11 +453,12 @@ const SCHEMA_CAROUSEL = {
         required: ["nadpis", "text", "foto_dotaz"],
       },
     },
-    popisek: { type: "string", description: "text pod příspěvek bez hashtagů: hook, 2–3 krátké odstavce, výzva pro fanoušky" },
-    hashtagy: { type: "array", items: { type: "string" } },
+    popisek: { type: "string", description: "text pod příspěvek bez hashtagů: hook (1 řádek), 1–2 krátké odstavce, krátká otázka. Max 400 znaků" },
+    dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty prvního řádku popisku, každá podle jiného vzorce" },
+    hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
     k_overeni: { type: "array", items: { type: "string" } },
   },
-  required: ["cerveny", "bily", "titul_foto_dotaz", "slidy", "popisek", "hashtagy", "k_overeni"],
+  required: ["cerveny", "bily", "titul_foto_dotaz", "slidy", "popisek", "dalsi_hooky", "hashtagy", "k_overeni"],
 };
 
 const SYSTEM_CAROUSEL = `Jsi redaktor Instagram účtu Deník hokeje (@denik_hokeje). Píšeš texty na příběhové carousely
@@ -468,17 +469,20 @@ Formát:
 - Každý další slide:
   - "nadpis": přesně 2 krátké věty (2–4 slova), každá na vlastním řádku (oddělené \\n), každá končí tečkou.
     1–3 klíčová slova obal hvězdičkami *takhle* – zobrazí se červeně.
-  - "text": 1–3 krátké věty, celkem max 190 znaků, věty odděluj \\n. Jména, čísla, data a důležitá
-    slova obal hvězdičkami *takhle* – zobrazí se žlutě (zhruba každé 3.–4. slovo).
+  - "text": 1–2 krátké věty, celkem max 130 znaků, věty odděluj \\n. Jedna věta = jedna informace.
+    Jména, čísla, data a důležitá slova obal hvězdičkami *takhle* – zobrazí se žlutě (zhruba každé 3.–4. slovo).
   - "foto_dotaz": dotaz na fotku pro tenhle slide.
-- Slidy tvoří příběh: úvod → průběh → vyvrcholení → pointa/odkaz. Poslední slide má emoci.
+- Titulní slide musí vzbudit zvědavost – člověk MUSÍ chtít swipnout (jméno/místo + rok nebo číslo).
+- Slidy tvoří příběh: háček → průběh → vyvrcholení → pointa. Každý slide končí tak, aby chtěl člověk vidět další.
+  Poslední slide má emoci nebo překvapivou pointu, žádné shrnutí.
+- Na slidech žádná vata: žádné „V tomto příspěvku“, „Pojďme na to“, žádné opakování titulku.
 
 Ukázka (carousel o tragédii Lokomotivu Jaroslavl):
   titul: cerveny "Jaroslavl", bily "2011."
   slide: nadpis "Černé *září*.\\nOsudný *let* do *Minsku*."
-         text "*1. září 2011* mířil *Lokomotiv* na první zápas *sezóny*.\\nNa palubě seděl špičkový *evropský* tým.\\nVčetně tří *českých* mistrů světa."
+         text "*7. září 2011* letěl *Lokomotiv* na první zápas *sezóny*.\\nNa palubě celý tým."
   slide: nadpis "Věčná *památka*.\\n*Legendy* žijí dál."
-         text "*Neštěstí* vzalo život *44* lidem včetně *trojice českých* šampionů.\\nČísla *Rachůnka*, *Vašíčka*, *Marka* byla v *reprezentaci* navždy vyřazena. *Nezapomeneme*."
+         text "*44* obětí. Mezi nimi *tři čeští* mistři světa.\\nČísla *Rachůnka*, *Vašíčka* a *Marka* už nikdo neobleče."
 `;
 
 function cAiZprava(html, druh = "") {
@@ -590,7 +594,7 @@ async function navrhniCarousel(bezPotvrzeni = false) {
   cAiZprava("AI píše texty slidů… (obvykle 5–15 s)");
   try {
     const r = await AI.gemini({
-      system: `${SYSTEM_CAROUSEL}\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
+      system: `${SYSTEM_CAROUSEL}\nPOPISEK POD CAROUSEL:\n${AI.COPY}\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
       zadani: `TÉMA A PODKLADY OD REDAKTORA:\n${zadani}\n\nVytvoř titulní slide a přesně ${pocet} dalších slidů.`,
       schema: SCHEMA_CAROUSEL,
     });
@@ -603,6 +607,7 @@ async function navrhniCarousel(bezPotvrzeni = false) {
     const zdrojeRadek = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
     $("#cPopisek").value = [r.popisek || "", zdrojeRadek, tagy.join(" ")].map((x) => x.trim()).filter(Boolean).join("\n\n");
     prepocitejPopisek();
+    AI.nabidniHooky("#cPopisek", [(r.popisek || "").split(/\n/)[0], ...(r.dalsi_hooky || [])]);
     vykresliSeznam();
     ulozKoncept();
 

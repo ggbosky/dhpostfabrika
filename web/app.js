@@ -271,15 +271,16 @@ function nastavRadek(prefix, novy) {
 const SCHEMA_POST = {
   type: "object",
   properties: {
-    hook: { type: "string", description: "první řádek, který zastaví scrollování, s 1 emoji" },
-    telo: { type: "string", description: "2–4 krátké odstavce oddělené prázdným řádkem" },
-    cta: { type: "string", description: "otázka nebo výzva pro fanoušky na konec" },
-    hashtagy: { type: "array", items: { type: "string" } },
-    titulek: { type: "string", description: "titulek do obrázku, max 7 slov, bez emoji" },
+    hook: { type: "string", description: "nejsilnější hook: první řádek, max 10 slov, max 1 emoji" },
+    dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty hooku, každá podle jiného vzorce" },
+    telo: { type: "string", description: "max 3 krátké odstavce (1–2 věty) oddělené prázdným řádkem, celkem max 320 znaků" },
+    cta: { type: "string", description: "jedna krátká otázka pro fanoušky" },
+    hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
+    titulek: { type: "string", description: "titulek do obrázku: 2–5 úderných slov, bez emoji, neopakuje hook doslova" },
     foto_dotazy: { type: "array", items: { type: "string" }, description: "2–3 dotazy pro Wikimedia Commons" },
     k_overeni: { type: "array", items: { type: "string" } },
   },
-  required: ["hook", "telo", "cta", "hashtagy", "titulek", "foto_dotazy", "k_overeni"],
+  required: ["hook", "dalsi_hooky", "telo", "cta", "hashtagy", "titulek", "foto_dotazy", "k_overeni"],
 };
 let fotoDotazy = [];
 let zdrojeNavrhu = []; // zdroje z hledání (záložka Témata)
@@ -306,7 +307,7 @@ async function navrhniPost() {
   try {
     const AI = window.DHAI;
     const r = await AI.gemini({
-      system: `Jsi copywriter Instagram účtu @denik_hokeje (český hokej). Píšeš příspěvky k nerozeznání od reálných postů účtu.\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
+      system: `Jsi nejlepší copywriter Instagram účtu @denik_hokeje (český hokej). Tvoje posty jsou krátké, úderné a lidi je sdílí.\n\n${AI.COPY}\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
       zadani: `ZADÁNÍ OD REDAKTORA:\n${zadani}\n\nNapiš nový příspěvek.`,
       schema: SCHEMA_POST,
     });
@@ -314,6 +315,7 @@ async function navrhniPost() {
     const zdrojeRadek = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
     $("#text").value = [r.hook, r.telo, r.cta, zdrojeRadek, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
     $("#titulek").value = r.titulek || "";
+    AI.nabidniHooky("#text", [r.hook, ...(r.dalsi_hooky || [])]);
     fotoDotazy = r.foto_dotazy || [];
     prepocitej();
     kresli();

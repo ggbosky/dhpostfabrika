@@ -227,13 +227,14 @@ const SCHEMA = {
     datum: { type: "string", description: "den, kdy se událost PŮVODNĚ stala (rok v minulosti), ve tvaru D.M.RRRR" },
     text: { type: "string", description: "text do obrázku" },
     barva: { type: "string", description: "hex hlavní barvy týmu z příběhu, dobře čitelná na černé (např. #005DB8)" },
-    popisek: { type: "string", description: "text pod příspěvek bez hashtagů" },
-    hashtagy: { type: "array", items: { type: "string" } },
+    popisek: { type: "string", description: "text pod příspěvek bez hashtagů, max 400 znaků" },
+    dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty prvního řádku popisku" },
+    hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
     foto_dotaz: { type: "string", description: "hlavní fotka: 2–4 slova, hlavně jméno hráče/týmu" },
     vlozka_dotaz: { type: "string", description: "malá kulatá fotka: jiný hráč/osobnost nebo logo týmu, 2–4 slova" },
     k_overeni: { type: "array", items: { type: "string" } },
   },
-  required: ["datum", "text", "barva", "popisek", "hashtagy", "foto_dotaz", "vlozka_dotaz", "k_overeni"],
+  required: ["datum", "text", "barva", "popisek", "dalsi_hooky", "hashtagy", "foto_dotaz", "vlozka_dotaz", "k_overeni"],
 };
 
 function vZprava(html, druh = "") {
@@ -265,10 +266,12 @@ async function navrhni() {
     const r = await AI.gemini({
       system: `Jsi redaktor Instagramu Deník hokeje a píšeš single post „DNES PŘED X LETY“ – připomínku hokejového výročí.
 Datum ("datum") je den, kdy se událost PŮVODNĚ stala – v minulém roce, nikdy letošní datum (z něj se počítá „před X lety“).
-Text do obrázku ("text"): 1–2 úderné věty, celkem 60–120 znaků, ideálně 3 řádky oddělené \\n (každý řádek do ~32 znaků), BEZ emoji.
-Pointa příběhu, ne suchý výčet. 3–5 klíčových slov obal hvězdičkami *takhle* – zobrazí se barvou týmu.
-Popisek: první řádek hook s 📅 („📅 Dnes před 31 lety…“ jen pokud událost připadá na dnešní den, jinak „📅 Před 31 lety…“), pak 2–3 krátké odstavce s fakty a kontextem,
-na konci otázka pro fanoušky. Hashtagy 6–10.
+Text do obrázku ("text"): 1–2 úderné věty, celkem 50–100 znaků, ideálně 3 řádky oddělené \\n (každý řádek do ~32 znaků), BEZ emoji.
+Nejsilnější moment příběhu (číslo, okamžik, kontrast), ne suchý výčet. 3–5 klíčových slov obal hvězdičkami *takhle* – zobrazí se barvou týmu.
+Popisek: první řádek = hook s 📅 a tím nejsilnějším z příběhu, max 12 slov
+(„📅 Dnes před 31 lety…“ jen pokud událost připadá na dnešní den, jinak „📅 Před 31 lety…“), pak 1–2 krátké odstavce, na konci krátká otázka.
+
+${AI.COPY}
 ${AI.stylDoPromptu()}
 
 ${AI.PRAVIDLA}
@@ -285,6 +288,7 @@ ${AI.PRAVIDLA}
     const tagy = AI.cisteHashtagy(r.hashtagy);
     const zdroj = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
     $("#vPopisek").value = [r.popisek, zdroj, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
+    AI.nabidniHooky("#vPopisek", [(r.popisek || "").split(/\n/)[0], ...(r.dalsi_hooky || [])]);
     stav.foto = null; stav.vlozka = null; stav.kreditFoto = ""; stav.kreditVlozka = "";
     doFormulare(); prekresli();
 
