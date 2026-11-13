@@ -104,7 +104,9 @@ async function api(host, cesta, params = {}) {
 const KLIC_PRODLOUZENO = "dhpf_ig_token_prodlouzen";
 async function prodlouzToken() {
   const t = token();
-  if (!/^IG/.test(t)) return;
+  let host = "";
+  try { host = localStorage.getItem(KLIC_HOST) || ""; } catch { /* nic */ }
+  if (!/^IG/.test(t) && host !== "instagram") return;
   let posledne = 0;
   try { posledne = +localStorage.getItem(KLIC_PRODLOUZENO) || 0; } catch { /* nic */ }
   if (Date.now() - posledne < 864e5) return;
@@ -116,26 +118,56 @@ async function prodlouzToken() {
   } catch { /* zkusí se příště */ }
 }
 
+// Token může být z „Instagram login“ (IG…), z nového jednotného přihlášení (jiný tvar) nebo z Facebooku (EAA…).
+// Zkusí se všechny cesty a ta, která funguje, se zapamatuje.
+const KLIC_HOST = "dhpf_ig_host";
+const POLE_PROFILU = "username,name,profile_picture_url,followers_count,media_count";
+async function zjistiUcet() {
+  const pokusy = {
+    instagram: async () => {
+      const p = await api("graph.instagram.com", "me", { fields: `user_id,${POLE_PROFILU}` });
+      return { host: "graph.instagram.com", id: p.user_id || p.id, profil: p };
+    },
+    "facebook-ig": async () => {
+      const p = await api("graph.facebook.com", "me", { fields: `id,${POLE_PROFILU}` });
+      if (!p.username) throw new Error("není Instagram účet");
+      return { host: "graph.facebook.com", id: p.id, profil: p };
+    },
+    "facebook-stranka": async () => {
+      const a = await api("graph.facebook.com", "me/accounts", { fields: `name,instagram_business_account{id,${POLE_PROFILU}}` });
+      const ucet = (a.data || []).map((x) => x.instagram_business_account).find(Boolean);
+      if (!ucet) throw new Error("k Facebook stránce není propojený Instagram");
+      return { host: "graph.facebook.com", id: ucet.id, profil: ucet };
+    },
+  };
+  let ulozeny = "";
+  try { ulozeny = localStorage.getItem(KLIC_HOST) || ""; } catch { /* nic */ }
+  const poradi = [ulozeny, ...(/^EAA/.test(token()) ? ["facebook-stranka", "facebook-ig", "instagram"] : ["instagram", "facebook-ig", "facebook-stranka"])]
+    .filter((k, i, a) => k && pokusy[k] && a.indexOf(k) === i);
+  const chyby = [];
+  for (const k of poradi) {
+    try {
+      const r = await pokusy[k]();
+      try { localStorage.setItem(KLIC_HOST, k); } catch { /* nic */ }
+      return r;
+    } catch (e) {
+      if (/limit/.test(e.message)) throw e;
+      chyby.push(e.message);
+    }
+  }
+  try { localStorage.removeItem(KLIC_HOST); } catch { /* nic */ }
+  const neplatny = chyby.every((c) => /neplatný|vypršel/.test(c));
+  throw new Error(neplatny
+    ? `Token nefunguje (začíná „${token().slice(0, 4)}…“). Vygeneruj nový u účtu v kroku „Generate access tokens“ a vlož ho celý.`
+    : `K tokenu se nepodařilo najít Instagram účet (${[...new Set(chyby)].join(" · ").slice(0, 220)}).`);
+}
+
 // lehce = jen profil a příspěvky (lajky, komentáře); dosah/uložení/sdílení se převezmou z minula
 // a dotáhnou se jen u nových příspěvků. Šetří limity API při častém obnovování.
 async function nactiZApi(pokrok = () => {}, { lehce = false, predchozi = null } = {}) {
   if (!token()) throw new Error("Chybí token – vlož ho v Připojení.");
-  const ig = /^IG/.test(token());
-  const host = ig ? "graph.instagram.com" : "graph.facebook.com";
   pokrok("Načítám profil…");
-  let profil, id;
-  const pole = "username,name,profile_picture_url,followers_count,media_count";
-  if (ig) {
-    const p = await api(host, "me", { fields: `user_id,${pole}` });
-    id = p.user_id || p.id;
-    profil = p;
-  } else {
-    const a = await api(host, "me/accounts", { fields: `name,instagram_business_account{id,${pole}}` });
-    const ucet = (a.data || []).map((x) => x.instagram_business_account).find(Boolean);
-    if (!ucet) throw new Error("K tokenu není připojený žádný Instagram Business účet (Facebook stránka musí být propojená s Instagramem).");
-    id = ucet.id;
-    profil = ucet;
-  }
+  const { host, id, profil } = await zjistiUcet();
   pokrok("Načítám příspěvky…");
   const media = [];
   let dalsi = null;
@@ -684,7 +716,7 @@ function zprava(t, druh = "ok") {
 
 async function pripojit() {
   const v = $("#stToken")?.value.trim();
-  if (v) { try { localStorage.setItem(KLIC_TOKEN, v); } catch { /* nic */ } }
+  if (v) { try { localStorage.setItem(KLIC_TOKEN, v.replace(/\s+/g, "")); localStorage.removeItem(KLIC_HOST); localStorage.removeItem(KLIC_PRODLOUZENO); } catch { /* nic */ } }
   if (!token()) { zprava("Vlož token.", "chyba"); return; }
   await obnovit();
 }
