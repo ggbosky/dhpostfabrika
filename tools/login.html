@@ -17,6 +17,7 @@
       linear-gradient(180deg, rgba(9, 9, 9, .6), #090909 70%), url("brand/praha.webp") center 40% / cover no-repeat, #090909; }
   .box { width: min(400px, 100%); background: rgba(19, 19, 19, .92); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 22px; padding: 30px 26px 24px; box-shadow: 0 30px 80px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .05); text-align: center; }
   .box.tres { animation: tres .4s; }
+  .odemykam form, .odemykam small { display: none; }
   @keyframes tres { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
   img { width: 76px; height: 76px; border-radius: 50%; box-shadow: 0 0 0 3px #000, 0 0 0 5px var(--red), 0 12px 34px rgba(224, 30, 38, .45); }
   h1 { margin: 16px 0 4px; font: 900 26px/1 "Arial Black", Impact, sans-serif; text-transform: uppercase; letter-spacing: -.01em; }
@@ -39,8 +40,8 @@
   <img src="brand/dh-avatar.webp" alt="Deník hokeje" width="76" height="76">
   <h1>Post <span>Fabrika</span></h1>
   <p id="popis">Redakční nástroj Deníku hokeje. Pro vstup zadej heslo.</p>
-  <form id="form" autocomplete="on">
-    <input type="text" name="username" value="denik_hokeje" autocomplete="username" hidden>
+  <form id="form" autocomplete="on" action="javascript:void 0" onsubmit="return false">
+    <input type="text" value="denik_hokeje" autocomplete="username" hidden>
     <label>Heslo<input type="password" id="heslo" autocomplete="current-password" required autofocus></label>
     <label class="check"><input type="checkbox" id="pamatovat" checked> Zapamatovat na tomhle zařízení</label>
     <button type="submit" id="tl">Vstoupit</button>
@@ -56,6 +57,9 @@
   const $ = (id) => document.getElementById(id);
   const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   const doB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  // úklid adresy po dřívějším odeslání formuláře (?username=…)
+  if (location.search) history.replaceState(null, "", location.pathname + location.hash);
+  const nacteno = () => (document.readyState === "complete" ? Promise.resolve() : new Promise((ok) => addEventListener("load", ok, { once: true })));
 
   if (!Z || Z.zamceno) {
     $("popis").textContent = "Aplikace je zamčená. Správce ještě nenastavil heslo (secret APP_HESLO v GitHubu).";
@@ -71,6 +75,8 @@
 
   async function otevri(klic) {
     const html = new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(Z.iv) }, klic, b64(Z.data)));
+    // document.open() nahradí stránku jen po jejím úplném načtení – jinak by se aplikace přidala pod přihlášení
+    await nacteno();
     window.__dhZamceno = true;
     document.open();
     document.write(html);
@@ -82,11 +88,17 @@
     let ulozeny = null;
     try { ulozeny = JSON.parse(localStorage.getItem(KLIC) || "null"); } catch { /* nic */ }
     if (ulozeny?.sul === Z.sul && ulozeny.klic) {
+      $("box").classList.add("odemykam");
+      $("popis").textContent = "Odemykám…";
       try {
         const klic = await crypto.subtle.importKey("raw", b64(ulozeny.klic), "AES-GCM", true, ["decrypt"]);
         await otevri(klic);
         return;
-      } catch { try { localStorage.removeItem(KLIC); } catch { /* nic */ } }
+      } catch {
+        try { localStorage.removeItem(KLIC); } catch { /* nic */ }
+        $("box").classList.remove("odemykam");
+        $("popis").textContent = "Heslo se změnilo – zadej ho prosím znovu.";
+      }
     }
   })();
 
