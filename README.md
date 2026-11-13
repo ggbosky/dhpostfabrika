@@ -129,6 +129,9 @@ Na webu leží jen přihlašovací stránka – bez hesla aplikaci nikdo nespust
 - **Připojení přes oficiální Instagram API** (token z developers.facebook.com → aplikace → Instagram →
   API setup with Instagram login → Generate token; potřeba profesionální účet), nebo **import CSV**
   z Meta Business Suite → Přehledy → Obsah → Exportovat. Žádné neoficiální stahování – nehrozí ban účtu.
+- **Živě:** s tokenem se čísla samy obnovují (lajky a komentáře každých 5 minut, dosah/uložení/sdílení
+  každou hodinu, při otevření Statistik či Přehledu) a token (IG…) si aplikace jednou denně sama
+  prodlužuje – developers.facebook.com tak stačí otevřít jen jednou.
 - Dosah, míra interakce, uložení a sdílení; graf dosahu po příspěvcích (barva = formát, tabulkový pohled),
   **nejlepší čas na post** (heatmapa den × čas → doporučení i v Plánu a Přehledu), výkon podle formátu,
   délky popisku a hashtagů, **top příspěvky** s tlačítkem ♻️ „zopakovat jako carousel / reel“

@@ -100,7 +100,25 @@ async function api(host, cesta, params = {}) {
   return j;
 }
 
-async function nactiZApi(pokrok = () => {}) {
+// Instagram token (IG…) platí 60 dní; jde prodloužit bez app secretu → připojení vydrží napořád.
+const KLIC_PRODLOUZENO = "dhpf_ig_token_prodlouzen";
+async function prodlouzToken() {
+  const t = token();
+  if (!/^IG/.test(t)) return;
+  let posledne = 0;
+  try { posledne = +localStorage.getItem(KLIC_PRODLOUZENO) || 0; } catch { /* nic */ }
+  if (Date.now() - posledne < 864e5) return;
+  try {
+    const r = await fetch(`https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(t)}`);
+    const j = await r.json();
+    if (j.access_token) localStorage.setItem(KLIC_TOKEN, j.access_token);
+    localStorage.setItem(KLIC_PRODLOUZENO, String(Date.now()));
+  } catch { /* zkusí se příště */ }
+}
+
+// lehce = jen profil a příspěvky (lajky, komentáře); dosah/uložení/sdílení se převezmou z minula
+// a dotáhnou se jen u nových příspěvků. Šetří limity API při častém obnovování.
+async function nactiZApi(pokrok = () => {}, { lehce = false, predchozi = null } = {}) {
   if (!token()) throw new Error("Chybí token – vlož ho v Připojení.");
   const ig = /^IG/.test(token());
   const host = ig ? "graph.instagram.com" : "graph.facebook.com";
@@ -137,10 +155,22 @@ async function nactiZApi(pokrok = () => {}) {
     likes: m.like_count, komentare: m.comments_count,
   }));
 
+  const stare = new Map((predchozi?.posty || []).map((p) => [p.id, p]));
+  if (lehce) {
+    for (const p of posty) {
+      const s = stare.get(p.id);
+      if (!s) continue;
+      Object.assign(p, { dosah: s.dosah, ulozeni: s.ulozeni, sdileni: s.sdileni, zobrazeni: s.zobrazeni });
+      // total_interactions z minula + změna lajků a komentářů od té doby
+      if (s.interakce != null) p.interakce = s.interakce + ((p.likes ?? 0) - (s.likes ?? 0)) + ((p.komentare ?? 0) - (s.komentare ?? 0));
+    }
+  }
+
   // Insights – souběžně po 4, s ústupem na menší sadu metrik.
   const SADY = ["reach,saved,shares,total_interactions,views", "reach,saved,shares,total_interactions", "reach"];
   let hotovo = 0;
-  const fronta = posty.slice(0, MAX_INSIGHTS).map((p) => p);
+  const fronta = (lehce ? posty.slice(0, MAX_INSIGHTS).filter((p) => !stare.has(p.id)).slice(0, 10) : posty.slice(0, MAX_INSIGHTS)).map((p) => p);
+  const celkemInsights = fronta.length;
   const pracovnik = async () => {
     while (fronta.length) {
       const p = fronta.shift();
@@ -159,12 +189,12 @@ async function nactiZApi(pokrok = () => {}) {
         } catch (e) { if (/oprávnění|neplatný|limit/.test(e.message)) throw e; }
       }
       hotovo++;
-      pokrok(`Načítám statistiky příspěvků… ${hotovo} / ${Math.min(posty.length, MAX_INSIGHTS)}`);
+      pokrok(`Načítám statistiky příspěvků… ${hotovo} / ${celkemInsights}`);
     }
   };
   await Promise.all([pracovnik(), pracovnik(), pracovnik(), pracovnik()]);
   return {
-    zdroj: "api", cas: Date.now(),
+    zdroj: "api", cas: Date.now(), plne: lehce ? (predchozi?.plne || Date.now()) : Date.now(),
     profil: { jmeno: profil.username || profil.name || "", foto: profil.profile_picture_url || "", sledujici: profil.followers_count ?? null, prispevku: profil.media_count ?? null },
     posty: posty.map(normalizuj),
   };
@@ -464,7 +494,8 @@ function vykresli() {
         ${Object.entries(OBDOBI).map(([k, n]) => `<button type="button" class="chip ${+k === obdobi ? "on" : ""}" data-st-obdobi="${k}">${n}</button>`).join("")}
       </div>
       <div class="radek" style="gap:6px">
-        ${data.zdroj === "api" ? `<button type="button" class="btn small" data-st="obnovit">↻ Obnovit</button>` : ""}
+        ${data.zdroj === "api" ? `<span class="st-zive" id="stZive" title="Data se samy obnovují každých 5 minut, dokud máš aplikaci otevřenou">${zivePopis()}</span>
+          <button type="button" class="btn small" data-st="obnovit">↻ Obnovit</button>` : ""}
         <button type="button" class="btn small ghost" data-st="pripojeni">⚙ Připojení</button>
       </div>
     </div>
@@ -561,12 +592,12 @@ function uvodHtml() {
   return `<div class="st-uvod">
     <div class="card ai-karta">
       <h2>📡 Připojit Instagram (živá data)</h2>
-      <p>Oficiální Instagram API – dosah, uložení, sdílení a interakce každého příspěvku. Potřebuješ <b>profesionální účet</b> (Tvůrce nebo Firma) a jednorázově vygenerovaný token.</p>
+      <p>Oficiální Instagram API – dosah, uložení, sdílení a interakce každého příspěvku, <b>živě</b>: čísla se samy obnovují každých 5 minut a token si aplikace sama prodlužuje. Nastavuje se <b>jen jednou</b> (asi 5 minut), potřebuješ profesionální účet (Tvůrce nebo Firma).</p>
       <ol class="muted st-navod">
         <li>Otevři <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">developers.facebook.com/apps</a> → <b>Vytvořit aplikaci</b> (typ Business / „Jiné“).</li>
         <li>Přidej produkt <b>Instagram</b> → <b>API setup with Instagram login</b>.</li>
         <li>V části <b>Generate access tokens</b> přidej účet @denik_hokeje a klikni <b>Generate token</b> (oprávnění instagram_business_basic + instagram_business_manage_insights).</li>
-        <li>Token (začíná <code>IG…</code>, platí ~60 dní) vlož sem.</li>
+        <li>Token (začíná <code>IG…</code>) vlož sem. Platí 60 dní, ale aplikace ho sama prodlužuje, takže tohle děláš jen jednou.</li>
       </ol>
       <label>Instagram access token<input id="stToken" type="password" autocomplete="off" placeholder="IGAA… nebo EAA…"></label>
       <div class="akce"><button type="button" class="btn" data-st="pripojit">Připojit a načíst</button></div>
@@ -658,11 +689,45 @@ async function pripojit() {
   await obnovit();
 }
 
+// ------------------------------------------------------------- živé obnovování --
+
+const LEHCE_PO = 5 * 60e3;   // lajky, komentáře, nové posty
+const PLNE_PO = 60 * 60e3;   // dosah, uložení, sdílení u všech postů
+let bezi = false, posledniChyba = "";
+
+function zivePopis() {
+  if (!data || data.zdroj !== "api") return "";
+  if (bezi) return `<i class="nacita"></i> Aktualizuju…`;
+  if (posledniChyba) return `<i class="chyba"></i> ${esc(posledniChyba)}`;
+  const min = Math.round((Date.now() - data.cas) / 60e3);
+  return `<i></i> Živě · ${min < 1 ? "právě teď" : `před ${min} min`}`;
+}
+const ukazZive = () => { const el = $("#stZive"); if (el) el.innerHTML = zivePopis(); };
+
+async function tichaObnova(vynutitPlnou = false) {
+  if (bezi || !data || data.zdroj !== "api" || !token()) return;
+  const vek = Date.now() - data.cas;
+  const plna = vynutitPlnou || Date.now() - (data.plne || 0) > PLNE_PO;
+  if (!plna && vek < LEHCE_PO) return;
+  bezi = true; ukazZive();
+  try {
+    await prodlouzToken();
+    const d = await nactiZApi(() => {}, { lehce: !plna, predchozi: data });
+    posledniChyba = "";
+    ulozData(d);
+    if (!$("#zalozkaStatistiky")?.hidden && !document.querySelector(".st-tip:not([hidden])")) vykresli();
+  } catch (e) {
+    posledniChyba = /neplatný|vypršel/.test(e.message) ? "Token vypršel – připoj znovu" : "Obnova se nepovedla";
+  } finally { bezi = false; ukazZive(); }
+}
+
 async function obnovit() {
   const b = $('[data-st="obnovit"]') || $('[data-st="pripojit"]');
   if (b) b.disabled = true;
   try {
+    await prodlouzToken();
     const d = await nactiZApi((t) => { if ($("#stZprava")) zprava(t, ""); else if (b) b.textContent = t.length > 34 ? `${t.slice(0, 32)}…` : t; });
+    posledniChyba = "";
     ulozData(d);
     aiVysledek = null;
     vykresli();
@@ -723,8 +788,15 @@ function init() {
   });
   let casovac;
   window.addEventListener("resize", () => { clearTimeout(casovac); casovac = setTimeout(() => { if (!$("#zalozkaStatistiky")?.hidden && !tabulka && data) grafDosahu(vObdobi()); }, 150); });
-  document.addEventListener("dh:zalozka", (e) => { if (e.detail === "statistiky") vykresli(); });
+  document.addEventListener("dh:zalozka", (e) => {
+    if (e.detail === "statistiky") vykresli();
+    if (e.detail === "statistiky" || e.detail === "prehled") tichaObnova();
+  });
+  // Živě: dokud je aplikace otevřená, každou minutu zkontroluje, jestli není čas obnovit.
+  setInterval(() => { if (document.visibilityState === "visible") { tichaObnova(); ukazZive(); } }, 60e3);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") tichaObnova(); });
   vykresli();
+  setTimeout(() => tichaObnova(), 1500);
 }
 
 // Pro Přehled a Plán: nejlepší čas a souhrn posledních 30 dní.
