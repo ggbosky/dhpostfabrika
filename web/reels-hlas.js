@@ -229,6 +229,121 @@ function naWav(buffer) {
   return new Blob([data], { type: "audio/wav" });
 }
 
+// --------------------------------------------- import hotového voiceoveru --
+// Celé audio (např. z ElevenLabs) se rozseká na scény podle pauz mezi větami.
+
+// Pauzy v řeči: úseky ticha delší než ~150 ms (energie v 10ms oknech).
+function najdiPauzy(buf) {
+  const sr = buf.sampleRate, okno = Math.max(1, Math.round(sr * 0.01));
+  const kanaly = [...Array(buf.numberOfChannels)].map((_, c) => buf.getChannelData(c));
+  const n = Math.floor(buf.length / okno);
+  const db = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let s = 0;
+    for (const ch of kanaly) for (let j = i * okno; j < (i + 1) * okno; j++) s += ch[j] * ch[j];
+    db[i] = 10 * Math.log10(s / (okno * kanaly.length) + 1e-12);
+  }
+  const serazene = Array.from(db).sort((a, b) => a - b);
+  const hlasite = serazene[Math.floor(serazene.length * 0.9)] ?? -20;
+  const prah = Math.max(-60, Math.min(-30, hlasite - 26));
+  const pauzy = [];
+  let od = -1;
+  for (let i = 0; i <= n; i++) {
+    const ticho = i < n && db[i] < prah;
+    if (ticho && od < 0) od = i;
+    if (!ticho && od >= 0) {
+      const pred = pauzy[pauzy.length - 1];
+      if (pred && od * 0.01 - pred.do < 0.12) pred.do = i * 0.01; // krátký zvuk mezi dvěma tichy = jedna pauza
+      else pauzy.push({ od: od * 0.01, do: i * 0.01 });
+      od = -1;
+    }
+  }
+  // pauza mezi větami trvá aspoň ~150 ms; kratší ticha bývají uvnitř slov (p, t, k…)
+  const vysledek = pauzy.filter((q) => q.do - q.od >= 0.15)
+    .map((q) => ({ ...q, stred: (q.od + q.do) / 2, delka: q.do - q.od }));
+  return { pauzy: vysledek, prah, db, krok: 0.01 };
+}
+
+// Váha textu ≈ jak dlouho se bude číst (číslice se čtou dlouho).
+const vahaTextu = (t) => {
+  const x = textProHlas(String(t || "").replace(/\[[^\]]{1,40}\]/g, " "));
+  const vety = (x.match(/[.!?…]+(\s|$)/g) || []).length, carky = (x.match(/[,;:–—]/g) || []).length;
+  // znaky + čísla (čtou se dlouho) + pauzy za větami a čárkami
+  return Math.max(4, x.replace(/\s/g, "").length + (x.match(/\d/g) || []).length * 3 + vety * 7 + carky * 3);
+};
+
+// Rozdělí buffer na tolik kusů, kolik je textů. Hranice = pauzy co nejblíž očekávaným místům.
+function rozdelNaSceny(buf, texty) {
+  const celkem = buf.duration;
+  if (texty.length <= 1) return [{ od: 0, do: celkem }];
+  const { pauzy } = najdiPauzy(buf);
+  const vnitrni = pauzy.filter((p) => p.od > 0.15 && p.do < celkem - 0.15);
+  const potreba = texty.length - 1;
+  if (vnitrni.length < potreba) {
+    throw new Error(`V audiu jsem našel jen ${vnitrni.length} pauz, ale scén je ${texty.length}. Vygeneruj audio znovu tak, aby mezi scénami byl prázdný řádek (nebo nahraj audio ke každé scéně zvlášť tlačítkem 📥).`);
+  }
+  // začátek a konec řeči (bez ticha na krajích)
+  const zacatek = pauzy.length && pauzy[0].od <= 0.05 ? pauzy[0].do : 0;
+  const posl = pauzy[pauzy.length - 1];
+  const konec = posl && posl.do >= celkem - 0.05 ? posl.od : celkem;
+  const reci = Math.max(0.1, konec - zacatek);
+  const vahy = texty.map(vahaTextu), suma = vahy.reduce((a, b) => a + b, 0);
+  let kum = 0;
+  const ocekavane = vahy.slice(0, -1).map((v) => { kum += v; return zacatek + (reci * kum) / suma; });
+  // DP: vyber rostoucí posloupnost pauz. Kritéria: (1) mezi hranicemi má být zhruba tolik pauz, kolik má scéna vět,
+  // (2) hranice blízko odhadovanému času, (3) delší pauza je pravděpodobnější hranice.
+  const vety = texty.map((t) => Math.max(1, (textProHlas(t).match(/[.!?…]+(?=\s|$)/g) || []).length));
+  const sumVet = vety.reduce((a, b) => a + b, 0);
+  const zaVetu = reci / sumVet;
+  const P = vnitrni.length, K = potreba, INF = 1e9;
+  const casCena = (k, j) => (1.5 * Math.abs(vnitrni[j].stred - ocekavane[k])) / zaVetu - 1.2 * Math.min(vnitrni[j].delka, 0.6);
+  const dp = [...Array(K)].map(() => new Float64Array(P).fill(INF));
+  const odkud = [...Array(K)].map(() => new Int32Array(P).fill(-1));
+  for (let j = 0; j < P; j++) dp[0][j] = 0.3 * Math.abs(j + 1 - vety[0]) + casCena(0, j);
+  for (let k = 1; k < K; k++) {
+    for (let j = k; j < P; j++) {
+      let nej = INF, nejJ = -1;
+      for (let jp = k - 1; jp < j; jp++) {
+        if (dp[k - 1][jp] >= INF) continue;
+        const c = dp[k - 1][jp] + 0.3 * Math.abs(j - jp - vety[k]);
+        if (c < nej) { nej = c; nejJ = jp; }
+      }
+      if (nejJ >= 0) { dp[k][j] = nej + casCena(k, j); odkud[k][j] = nejJ; }
+    }
+  }
+  let j = -1, nej = INF;
+  for (let x = 0; x < P; x++) {
+    if (dp[K - 1][x] >= INF) continue;
+    const c = dp[K - 1][x] + 0.3 * Math.abs(P - 1 - x - (vety[K] - 1)); // pauzy uvnitř poslední scény
+    if (c < nej) { nej = c; j = x; }
+  }
+  const vybrane = [];
+  for (let k = K - 1; k >= 0; k--) { vybrane.unshift(vnitrni[j]); j = odkud[k][j]; }
+  const hranice = [0, ...vybrane.map((p) => p.stred), celkem];
+  // každý kus: bez dlouhého ticha na krajích, ale s malou rezervou
+  return hranice.slice(0, -1).map((od, i) => {
+    const doCas = hranice[i + 1];
+    const pPred = i === 0 ? null : vybrane[i - 1];
+    const pPo = i === hranice.length - 2 ? null : vybrane[i];
+    const s = pPred ? Math.max(od, pPred.do - 0.06) : Math.max(0, zacatek - 0.06);
+    const e = pPo ? Math.min(doCas, pPo.od + 0.12) : Math.min(celkem, konec + 0.15);
+    return { od: s, do: Math.max(s + 0.1, e) };
+  });
+}
+
+function vyrizni(buf, od, doCas) {
+  const sr = buf.sampleRate;
+  const a = Math.max(0, Math.floor(od * sr)), b = Math.min(buf.length, Math.ceil(doCas * sr));
+  const out = new AudioBuffer({ length: Math.max(1, b - a), numberOfChannels: buf.numberOfChannels, sampleRate: sr });
+  for (let c = 0; c < buf.numberOfChannels; c++) out.copyToChannel(buf.getChannelData(c).subarray(a, b), c);
+  return out;
+}
+
+// Text scénáře připravený k vložení do ElevenLabs (scény oddělené prázdným řádkem).
+function textProElevenLabs(sceny) {
+  return sceny.map((s) => textProHlas(s.text)).filter(Boolean).join("\n\n");
+}
+
 // ------------------------------------------------- nastavení v „Můj styl“ --
 
 function initNastaveni() {
@@ -309,5 +424,5 @@ function initNastaveni() {
 }
 initNastaveni();
 
-window.DHReelsHlas = { EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
+window.DHReelsHlas = { najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
 })();

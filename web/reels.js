@@ -543,8 +543,9 @@ function vykresliHlas() {
     const zastaraly = s.hlas && s.hlas.textHash !== R.hashTextu(s.text);
     return `<div class="r-hlas-scena" data-i="${i}">
       <div class="slide-hlava"><b>Scéna ${i + 1}</b><span class="radek">
-        ${s.hlas ? `<span class="${zastaraly ? "bez-zdroje" : "r-prirazeno"}">${zastaraly ? "⚠️ text se změnil" : `✔ ${s.hlas.zdroj === "mikrofon" ? "🎙️" : s.hlas.zdroj === "elevenlabs" ? "🎧" : "🤖"} ${s.hlas.delka.toFixed(1)} s`}</span><button type="button" class="btn small ghost" data-r-hakce="prehrat">▶</button>` : '<span class="bez-zdroje">bez hlasu</span>'}
+        ${s.hlas ? `<span class="${zastaraly ? "bez-zdroje" : "r-prirazeno"}">${zastaraly ? "⚠️ text se změnil" : `✔ ${s.hlas.zdroj === "mikrofon" ? "🎙️" : s.hlas.zdroj === "elevenlabs" || s.hlas.zdroj === "import" ? "🎧" : "🤖"} ${s.hlas.delka.toFixed(1)} s`}</span><button type="button" class="btn small ghost" data-r-hakce="prehrat">▶</button>` : '<span class="bez-zdroje">bez hlasu</span>'}
         <button type="button" class="btn small ghost" data-r-hakce="tts">🤖 Hlas</button>
+        <button type="button" class="btn small ghost" data-r-hakce="soubor" title="Nahrát audio soubor jen pro tuhle scénu">📥 Soubor</button>
         <button type="button" class="btn small ghost" data-r-hakce="mic">🎙️ Nahrát sám</button></span></div>
       <p class="r-hlas-text">${esc(s.text.replace(/\*/g, ""))}</p>
       <details ${s.titulkyRucne ? "open" : ""}><summary class="muted">Titulky (${(s.titulky || []).length})${s.titulkyRucne ? " · upravené ručně" : ""}</summary>
@@ -581,6 +582,60 @@ async function hlasVse() {
     zprava("#rHlasZprava", `Hlas je hotový ve všech scénách. Délka reelu ${R.casovaOsa(p).celkem.toFixed(1)} s.`, "ok");
   } catch (e) { zprava("#rHlasZprava", esc(e.message), "chyba"); }
   finally { b.disabled = false; }
+}
+
+// --------------------------------------------- hotové audio (ElevenLabs bez API) --
+
+async function kopirujProEleven() {
+  if (!p?.sceny.length) { zprava("#rHlasZprava", "Nejdřív napiš scénář.", "chyba"); return; }
+  const text = A.textProElevenLabs(p.sceny);
+  try {
+    await navigator.clipboard.writeText(text);
+    zprava("#rHlasZprava", `Text zkopírován ✓ (${text.length} znaků, ${p.sceny.length} scén). V ElevenLabs ho vlož do <b>Text to Speech</b>, vyber hlas <b>Kuba</b>, klikni <b>Generate</b>, stáhni MP3 a nahraj ho sem tlačítkem <b>📥 Nahrát celé audio</b>.`, "ok");
+  } catch {
+    $("#rElevenText").value = text;
+    $("#rElevenText").hidden = false;
+    $("#rElevenText").select();
+    zprava("#rHlasZprava", "Kopírování zablokoval prohlížeč – text je označený níž, zkopíruj ho ručně (Ctrl+C).", "varovani");
+  }
+}
+
+async function ulozHlasSceny(i, buf, zdroj, nazev) {
+  const blob = A.naWav(buf);
+  const souborId = await U.ulozSoubor(blob, { nazev });
+  A.zapomen(souborId);
+  const dek = await A.dekoduj(souborId, async () => blob);
+  const s = p.sceny[i];
+  s.hlas = { souborId, delka: dek.duration, zdroj, hlasId: zdroj, textHash: R.hashTextu(s.text) };
+  if (!s.titulkyRucne) s.titulky = R.autoTitulky(s.text, dek.duration / p.hlas.rychlost);
+}
+
+async function importCelehoAudia(soubor) {
+  if (!soubor || !p) return;
+  if (!p.sceny.length) { zprava("#rHlasZprava", "Nejdřív napiš scénář – audio se rozdělí podle jeho scén.", "chyba"); return; }
+  zprava("#rHlasZprava", "Načítám audio a hledám pauzy mezi scénami…");
+  try {
+    const buf = await A.dekoduj(`import-${Date.now()}`, async () => soubor);
+    const useky = A.rozdelNaSceny(buf, p.sceny.map((s) => s.text));
+    for (let i = 0; i < useky.length; i++) {
+      await ulozHlasSceny(i, A.vyrizni(buf, useky[i].od, useky[i].do), "import", `voiceover-${i + 1}.wav`);
+    }
+    vykresliHlas(); vykresliStrih(); ulozPozdeji(); obnovNahled();
+    zprava("#rHlasZprava", `Audio (${buf.duration.toFixed(1)} s) je rozdělené do ${useky.length} scén ✓ Proklikej ▶ u scén – kdyby střih seděl špatně, nahraj audio ke konkrétní scéně tlačítkem 📥 Soubor.`, "ok");
+  } catch (e) { zprava("#rHlasZprava", esc(e.message), "chyba"); }
+}
+
+let souborProScenu = null;
+async function importSceny(soubor) {
+  const i = souborProScenu;
+  souborProScenu = null;
+  if (!soubor || i === null || !p?.sceny[i]) return;
+  try {
+    const buf = await A.dekoduj(`import-${Date.now()}`, async () => soubor);
+    await ulozHlasSceny(i, buf, "import", `scena-${i + 1}.wav`);
+    vykresliHlas(); vykresliStrih(); ulozPozdeji(); obnovNahled();
+    zprava("#rHlasZprava", `Audio scény ${i + 1} nahrané (${buf.duration.toFixed(1)} s).`, "ok");
+  } catch (e) { zprava("#rHlasZprava", `Audio se nepodařilo načíst: ${esc(e.message)}`, "chyba"); }
 }
 
 let nahravani = null;
@@ -781,6 +836,7 @@ function init() {
       if (d.rHakce === "prehrat" && s.hlas) { const buf = await A.dekoduj(s.hlas.souborId, () => U.souborBlob(s.hlas.souborId)); A.prehraj(buf); return; }
       if (d.rHakce === "tts") { try { t.disabled = true; await hlasScenu(i); vykresliHlas(); vykresliStrih(); ulozPozdeji(); obnovNahled(); zprava("#rHlasZprava", `Hlas scény ${i + 1} hotový.`, "ok"); } catch (er) { zprava("#rHlasZprava", esc(er.message), "chyba"); } finally { t.disabled = false; } return; }
       if (d.rHakce === "mic") return mikrofon(i, t);
+      if (d.rHakce === "soubor") { souborProScenu = i; $("#rSouborSceny").value = ""; $("#rSouborSceny").click(); return; }
       if (d.rHakce === "titulky") { s.titulkyRucne = false; s.titulky = R.autoTitulky(s.text, s.hlas ? s.hlas.delka / p.hlas.rychlost : null); vykresliHlas(); ulozPozdeji(); obnovNahled(); return; }
     }
     if (d.rHledat !== undefined) { t.disabled = true; try { await hledatScenu(+d.rHledat); } catch (er) { zprava("#rZaberyZprava", esc(er.message), "chyba"); } t.disabled = false; return; }
@@ -865,6 +921,9 @@ function init() {
     ulozPozdeji();
   });
   $("#rGenHlas").addEventListener("click", hlasVse);
+  $("#rKopirujEleven").addEventListener("click", kopirujProEleven);
+  $("#rCeleAudio").addEventListener("change", (e) => { importCelehoAudia(e.target.files[0]); e.target.value = ""; });
+  $("#rSouborSceny").addEventListener("change", (e) => importSceny(e.target.files[0]));
   $("#rHudba").addEventListener("change", async (e) => {
     const f = e.target.files[0]; if (!f || !p) return;
     const souborId = await U.ulozSoubor(f, { nazev: f.name });

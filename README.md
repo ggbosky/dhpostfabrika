@@ -79,7 +79,8 @@ Projekty se ukládají samy (IndexedDB prohlížeče, i s importovanými videi a
 |---|---|
 | střih, render MP4, titulky, Commons, Internet Archive, import, mikrofon | nic (zdarma) |
 | český hlas Piper | nic (zdarma), jednorázové stažení modelu |
-| vlastní hlas ElevenLabs (např. „Kuba“) | ElevenLabs API klíč (Můj styl → Hlas pro reels), platí se znaky z plánu |
+| hlas z ElevenLabs (např. „Kuba“) bez API | nic – v kroku Hlas zkopíruj text, vygeneruj MP3 na webu ElevenLabs a nahraj ho zpět; aplikace ho sama rozdělí na scény podle pauz |
+| hlas z ElevenLabs přes API (volitelné) | ElevenLabs API klíč (Můj styl), platí se znaky z plánu |
 | rešerše, scénář, AI hledání na webu | AI klíč – Claude nebo bezplatný Gemini (Můj styl → AI pomocník) |
 | YouTube hledání | volitelný bezplatný YouTube Data API klíč (krok 1) |
 | zvuk AAC (doporučeno pro Instagram) | Chrome nebo Edge na Windows / macOS; jinde Opus |

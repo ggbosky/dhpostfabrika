@@ -478,6 +478,8 @@
   .r-hlas-text { margin: 0; color: #ddd; font-size: 14px; }
   .r-titulky { display: grid; gap: 6px; margin: 8px 0; }
   .r-titulek { display: grid; grid-template-columns: 1fr 80px 80px; gap: 6px; }
+  .r-eleven { margin-top: 14px; padding: 14px; border-radius: 12px; border: 1px solid rgba(178, 107, 255, .4); background: rgba(178, 107, 255, .07); }
+  .r-eleven ol { margin: 8px 0 0; font-size: 13.5px; }
   .r-qc.chyba { color: var(--err-text); } .r-qc.varovani { color: var(--warn-text); }
   .r-vystup video { width: 100%; max-width: 360px; border-radius: 12px; margin-top: 14px; background: #000; }
   .r-historie { display: grid; gap: 8px; margin-top: 10px; }
@@ -995,6 +997,20 @@
               <label style="align-self:end"><button type="button" class="btn" id="rGenHlas">🤖 Vygenerovat hlas pro všechny scény</button></label>
             </div>
             <p class="muted" style="font-size:13px"><span id="rHlasInfo"></span> Každou scénu můžeš i namluvit sám (🎙️). Titulky se časují přesně podle hlasu každé scény – jdou ručně upravit.</p>
+            <div class="r-eleven">
+              <b>🎧 Hlas Kuba z ElevenLabs – bez API klíče</b>
+              <ol class="muted">
+                <li>Klikni <b>📋 Zkopírovat text pro ElevenLabs</b>.</li>
+                <li>V ElevenLabs → Text to Speech vlož text, vyber hlas <b>Kuba</b> (model v4, stabilita 50 %, podobnost 75 %) a klikni <b>Generate</b>.</li>
+                <li>Stáhni MP3 a nahraj ho sem – aplikace ho sama rozdělí na scény podle pauz a načasuje titulky.</li>
+              </ol>
+              <div class="akce" style="margin-top:8px">
+                <button type="button" class="btn small" id="rKopirujEleven">📋 Zkopírovat text pro ElevenLabs</button>
+                <label class="btn small ghost">📥 Nahrát celé audio<input type="file" id="rCeleAudio" accept="audio/*,.mp3,.wav,.m4a"></label>
+              </div>
+              <textarea id="rElevenText" rows="6" hidden readonly style="margin-top:10px"></textarea>
+              <input type="file" id="rSouborSceny" accept="audio/*,.mp3,.wav,.m4a" hidden>
+            </div>
             <div class="zprava" id="rHlasZprava" hidden></div>
           </div>
           <div class="card">
@@ -1079,8 +1095,9 @@
           <h2>Aktuální styl</h2>
           <div id="profil"></div>
         </div>
-        <div class="card" id="hlasKarta" style="margin-top:20px">
-          <h2>🎙️ Hlas pro reels (ElevenLabs)</h2>
+        <details class="card" id="hlasKarta" style="margin-top:20px">
+          <summary><h2 style="display:inline-flex;margin:0">🎙️ Volitelně: ElevenLabs přes API klíč</h2></summary>
+          <p class="muted">Nemusíš – hlas z ElevenLabs jde použít i bez klíče: v Reels → krok Hlas zkopíruj text, vygeneruj ho na webu ElevenLabs a nahraj MP3 zpátky. Klíč jen ušetří to přenášení.</p>
           <p class="muted" style="margin-top:0">Reels pak namlouvá tvůj hlas z ElevenLabs (např. „Kuba – Czech Social Media“) místo zdarma hlasu Jirka.
             Hlas musí být v ElevenLabs v sekci <b>My Voices</b> (u knihovních hlasů klikni na <b>Add to my voices</b>).</p>
           <ol class="muted" style="margin:0 0 12px">
@@ -1105,7 +1122,7 @@
           </div>
           <div class="zprava" id="elZprava" hidden></div>
           <p class="muted" style="font-size:13px;margin:12px 0 0">Výchozí nastavení odpovídá tvé ukázce (model v4, stabilita 50 %, podobnost 75 %). Každé namluvení stojí znaky z tvého ElevenLabs plánu – 45s reel je zhruba 600–900 znaků. Klíč zůstává jen v tomhle prohlížeči.</p>
-        </div>
+        </details>
 
         <div class="card" id="aiKarta" style="margin-top:20px">
           <h2>✨ AI pomocník (volitelné)</h2>
@@ -1215,21 +1232,21 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261113a"></script>
-<script src="grafika.js?v=20261113a"></script>
-<script src="koncepty.js?v=20261113a"></script>
-<script src="ai.js?v=20261113a"></script>
-<script src="app.js?v=20261113a"></script>
-<script src="carousel.js?v=20261113a"></script>
-<script src="vyroci.js?v=20261113a"></script>
-<script src="zpravy.js?v=20261113a"></script>
-<script src="reels-ulozeni.js?v=20261113a"></script>
-<script src="reels-hlas.js?v=20261113a"></script>
-<script src="reels-render.js?v=20261113a"></script>
-<script src="reels-zabery.js?v=20261113a"></script>
-<script src="reels.js?v=20261113a"></script>
-<script src="plan.js?v=20261113a"></script>
-<script src="prehled.js?v=20261113a"></script>
-<script src="shell.js?v=20261113a"></script>
+<script src="sablony.js?v=20261113b"></script>
+<script src="grafika.js?v=20261113b"></script>
+<script src="koncepty.js?v=20261113b"></script>
+<script src="ai.js?v=20261113b"></script>
+<script src="app.js?v=20261113b"></script>
+<script src="carousel.js?v=20261113b"></script>
+<script src="vyroci.js?v=20261113b"></script>
+<script src="zpravy.js?v=20261113b"></script>
+<script src="reels-ulozeni.js?v=20261113b"></script>
+<script src="reels-hlas.js?v=20261113b"></script>
+<script src="reels-render.js?v=20261113b"></script>
+<script src="reels-zabery.js?v=20261113b"></script>
+<script src="reels.js?v=20261113b"></script>
+<script src="plan.js?v=20261113b"></script>
+<script src="prehled.js?v=20261113b"></script>
+<script src="shell.js?v=20261113b"></script>
 </body>
 </html>
