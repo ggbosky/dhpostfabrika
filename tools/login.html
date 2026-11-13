@@ -43,7 +43,7 @@
   <form id="form" autocomplete="on" action="javascript:void 0" onsubmit="return false">
     <input type="text" value="denik_hokeje" autocomplete="username" hidden>
     <label>Heslo<input type="password" id="heslo" autocomplete="current-password" required autofocus></label>
-    <label class="check"><input type="checkbox" id="pamatovat" checked> Zapamatovat na tomhle zařízení</label>
+    <label class="check"><input type="checkbox" id="pamatovat"> Zapamatovat na tomhle zařízení (30 dní)</label>
     <button type="submit" id="tl">Vstoupit</button>
     <p class="chyba" id="chyba" role="alert"></p>
   </form>
@@ -53,7 +53,9 @@
 (() => {
   "use strict";
   const Z = /*__ZAMEK__*/null;
-  const KLIC = "dhpf_zamek";
+  const KLIC = "dhpf_zamek_v2";
+  const PAMATOVAT_MS = 30 * 864e5;
+  try { localStorage.removeItem("dhpf_zamek"); } catch { /* staré trvalé zapamatování */ }
   const $ = (id) => document.getElementById(id);
   const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
   const doB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
@@ -86,7 +88,11 @@
   // Zapamatovaný klíč (jen na tomhle zařízení)
   (async () => {
     let ulozeny = null;
-    try { ulozeny = JSON.parse(localStorage.getItem(KLIC) || "null"); } catch { /* nic */ }
+    try {
+      // přihlášení v tomhle panelu (do zavření prohlížeče), nebo zapamatované na 30 dní
+      ulozeny = JSON.parse(sessionStorage.getItem(KLIC) || "null") || JSON.parse(localStorage.getItem(KLIC) || "null");
+      if (ulozeny?.do && ulozeny.do < Date.now()) { localStorage.removeItem(KLIC); ulozeny = null; }
+    } catch { /* nic */ }
     if (ulozeny?.sul === Z.sul && ulozeny.klic) {
       $("box").classList.add("odemykam");
       $("popis").textContent = "Odemykám…";
@@ -95,7 +101,7 @@
         await otevri(klic);
         return;
       } catch {
-        try { localStorage.removeItem(KLIC); } catch { /* nic */ }
+        try { localStorage.removeItem(KLIC); sessionStorage.removeItem(KLIC); } catch { /* nic */ }
         $("box").classList.remove("odemykam");
         $("popis").textContent = "Heslo se změnilo – zadej ho prosím znovu.";
       }
@@ -116,9 +122,11 @@
         $("heslo").select();
         return;
       }
-      if ($("pamatovat").checked) {
-        try { localStorage.setItem(KLIC, JSON.stringify({ sul: Z.sul, klic: doB64(await crypto.subtle.exportKey("raw", klic)) })); } catch { /* nic */ }
-      }
+      try {
+        const zaznam = { sul: Z.sul, klic: doB64(await crypto.subtle.exportKey("raw", klic)) };
+        sessionStorage.setItem(KLIC, JSON.stringify(zaznam));
+        if ($("pamatovat").checked) localStorage.setItem(KLIC, JSON.stringify({ ...zaznam, do: Date.now() + PAMATOVAT_MS }));
+      } catch { /* nic */ }
       await otevri(klic);
     } catch (err) {
       $("chyba").textContent = "Přihlášení se nepovedlo: " + err.message;

@@ -404,7 +404,7 @@ function init() {
 }
 
 function odhlasit() {
-  try { localStorage.removeItem("dhpf_zamek"); } catch { /* nic */ }
+  try { ["dhpf_zamek", "dhpf_zamek_v2"].forEach((k) => { localStorage.removeItem(k); sessionStorage.removeItem(k); }); } catch { /* nic */ }
   location.reload();
 }
 
