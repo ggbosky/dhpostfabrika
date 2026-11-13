@@ -122,6 +122,17 @@ async function prodlouzToken() {
 // Zkusí se všechny cesty a ta, která funguje, se zapamatuje.
 const KLIC_HOST = "dhpf_ig_host";
 const POLE_PROFILU = "username,name,profile_picture_url,followers_count,media_count";
+const KLIC_ID = "dhpf_ig_id";
+const zadaneId = () => { try { return (localStorage.getItem(KLIC_ID) || "").replace(/\D/g, ""); } catch { return ""; } };
+
+// Profil IG účtu – zkusí plnou sadu polí, pak menší. povinne = aspoň něco musí vrátit (ověření ID).
+async function doplnProfil(host, id, zaklad = {}, povinne = false) {
+  for (const f of [POLE_PROFILU, "username,followers_count,media_count", "username"]) {
+    try { return { ...zaklad, ...(await api(host, id, { fields: f })) }; } catch (e) { if (!/nonexisting field|#100/i.test(e.message)) { if (povinne) throw e; break; } }
+  }
+  if (povinne) await api(host, `${id}/media`, { fields: "id", limit: 1 });
+  return zaklad;
+}
 async function zjistiUcet() {
   const pokusy = {
     instagram: async () => {
@@ -129,9 +140,24 @@ async function zjistiUcet() {
       return { host: "graph.instagram.com", id: p.user_id || p.id, profil: p };
     },
     "facebook-ig": async () => {
-      const p = await api("graph.facebook.com", "me", { fields: `id,${POLE_PROFILU}` });
-      if (!p.username) throw new Error("není Instagram účet");
-      return { host: "graph.facebook.com", id: p.id, profil: p };
+      // /me u tokenu z jednotného přihlášení nemusí znát všechna pole → zkoušej menší sady
+      let p = null, posledni = null;
+      for (const f of [`id,${POLE_PROFILU}`, "id,username,followers_count,media_count", "id,username", "id"]) {
+        try { p = await api("graph.facebook.com", "me", { fields: f }); break; } catch (e) { posledni = e; if (!/nonexisting field|#100/i.test(e.message)) throw e; }
+      }
+      if (!p?.id) throw posledni || new Error("token nevrátil účet");
+      await api("graph.facebook.com", `${p.id}/media`, { fields: "id", limit: 1 }); // je to opravdu Instagram účet?
+      return { host: "graph.facebook.com", id: p.id, profil: await doplnProfil("graph.facebook.com", p.id, p) };
+    },
+    "zadane-id-fb": async () => {
+      const id = zadaneId();
+      if (!id) throw new Error("není zadané ID účtu");
+      return { host: "graph.facebook.com", id, profil: await doplnProfil("graph.facebook.com", id, {}, true) };
+    },
+    "zadane-id-ig": async () => {
+      const id = zadaneId();
+      if (!id) throw new Error("není zadané ID účtu");
+      return { host: "graph.instagram.com", id, profil: await doplnProfil("graph.instagram.com", id, {}, true) };
     },
     "facebook-stranka": async () => {
       const a = await api("graph.facebook.com", "me/accounts", { fields: `name,instagram_business_account{id,${POLE_PROFILU}}` });
@@ -142,7 +168,7 @@ async function zjistiUcet() {
   };
   let ulozeny = "";
   try { ulozeny = localStorage.getItem(KLIC_HOST) || ""; } catch { /* nic */ }
-  const poradi = [ulozeny, ...(/^EAA/.test(token()) ? ["facebook-stranka", "facebook-ig", "instagram"] : ["instagram", "facebook-ig", "facebook-stranka"])]
+  const poradi = [ulozeny, ...(/^EAA/.test(token()) ? ["zadane-id-fb", "facebook-ig", "facebook-stranka", "instagram", "zadane-id-ig"] : ["instagram", "zadane-id-ig", "zadane-id-fb", "facebook-ig", "facebook-stranka"])]
     .filter((k, i, a) => k && pokusy[k] && a.indexOf(k) === i);
   const chyby = [];
   for (const k of poradi) {
@@ -152,14 +178,14 @@ async function zjistiUcet() {
       return r;
     } catch (e) {
       if (/limit/.test(e.message)) throw e;
-      chyby.push(e.message);
+      if (!/není zadané ID/.test(e.message)) chyby.push(e.message);
     }
   }
   try { localStorage.removeItem(KLIC_HOST); } catch { /* nic */ }
   const neplatny = chyby.every((c) => /neplatný|vypršel/.test(c));
   throw new Error(neplatny
     ? `Token nefunguje (začíná „${token().slice(0, 4)}…“). Vygeneruj nový u účtu v kroku „Generate access tokens“ a vlož ho celý.`
-    : `K tokenu se nepodařilo najít Instagram účet (${[...new Set(chyby)].join(" · ").slice(0, 220)}).`);
+    : `K tokenu se nepodařilo najít Instagram účet${zadaneId() ? "" : " – vyplň pole Instagram account ID (číslo pod názvem účtu v Generate access tokens) a zkus to znovu"} (${[...new Set(chyby)].join(" · ").slice(0, 200)}).`);
 }
 
 // lehce = jen profil a příspěvky (lajky, komentáře); dosah/uložení/sdílení se převezmou z minula
@@ -632,6 +658,8 @@ function uvodHtml() {
         <li>Token (začíná <code>IG…</code>) vlož sem. Platí 60 dní, ale aplikace ho sama prodlužuje, takže tohle děláš jen jednou.</li>
       </ol>
       <label>Instagram access token<input id="stToken" type="password" autocomplete="off" placeholder="IGAA… nebo EAA…"></label>
+      <label style="margin-top:10px">Instagram account ID <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">(nepovinné – číslo pod názvem účtu v Generate access tokens, např. 1784…)</span>
+        <input id="stIgId" inputmode="numeric" autocomplete="off" placeholder="1784…" value="${esc(zadaneId())}"></label>
       <div class="akce"><button type="button" class="btn" data-st="pripojit">Připojit a načíst</button></div>
       <p class="muted" style="font-size:12.5px;margin:10px 0 0">Funguje i token z Graph API Explorer (EAA…) s oprávněními instagram_basic, instagram_manage_insights, pages_read_engagement. Token zůstává jen v tomhle prohlížeči a posílá se jen Metě.</p>
     </div>
@@ -717,6 +745,8 @@ function zprava(t, druh = "ok") {
 async function pripojit() {
   const v = $("#stToken")?.value.trim();
   if (v) { try { localStorage.setItem(KLIC_TOKEN, v.replace(/\s+/g, "")); localStorage.removeItem(KLIC_HOST); localStorage.removeItem(KLIC_PRODLOUZENO); } catch { /* nic */ } }
+  const igId = ($("#stIgId")?.value || "").replace(/\D/g, "");
+  try { if (igId) localStorage.setItem(KLIC_ID, igId); else localStorage.removeItem(KLIC_ID); localStorage.removeItem(KLIC_HOST); } catch { /* nic */ }
   if (!token()) { zprava("Vlož token.", "chyba"); return; }
   await obnovit();
 }
