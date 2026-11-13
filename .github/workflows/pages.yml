@@ -3,7 +3,7 @@ name: Zveřejnit web na GitHub Pages
 on:
   push:
     branches: [claude/intelligent-lovelace-qzitaa, main]
-    paths: ["web/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", "tools/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -24,8 +24,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Aplikace se zašifruje heslem ze secretu APP_HESLO – na webu je pak jen přihlašovací stránka.
+      - name: Zamknout aplikaci heslem
+        env:
+          APP_HESLO: ${{ secrets.APP_HESLO }}
+        run: |
+          pip install --quiet cryptography
+          python3 tools/zamkni.py web _site
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

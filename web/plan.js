@@ -121,6 +121,7 @@ function vykresli() {
   const pocet = (s) => vTydnu.filter((p) => p.stav === s).length;
   const zasobnik = polozky.filter((p) => !p.datum).sort((a, b) => b.vytvoreno - a.vytvoreno);
   const titulek = posun === 0 ? "Tento týden" : posun === 1 ? "Příští týden" : posun === -1 ? "Minulý týden" : "";
+  const nejCas = window.DHStatistiky?.prehled()?.nejCas || null;
 
   el.innerHTML = `
     <div class="card">
@@ -131,17 +132,19 @@ function vykresli() {
           <button type="button" class="ikona" data-pl-posun="1" aria-label="Další týden">›</button>
           ${posun ? `<button type="button" class="btn small ghost" data-pl-posun="0">Dnes</button>` : ""}
         </div>
-        <div class="plan-souhrn"><b>${vTydnu.length}</b> v týdnu · ${pocet("napad")} nápadů · ${pocet("rozpracovano")} rozpracováno · ${pocet("hotovo")} připraveno · ${pocet("publikovano")} publikováno</div>
+        <div class="plan-souhrn"><b>${vTydnu.length}</b> v týdnu · ${pocet("napad")} nápadů · ${pocet("rozpracovano")} rozpracováno · ${pocet("hotovo")} připraveno · ${pocet("publikovano")} publikováno
+          ${nejCas ? `<br><span class="plan-nej">🔥 Nejlepší čas na post: <b>${nejCas.denNazev} ${nejCas.od}–${nejCas.do} h</b> (podle statistik)</span>` : ""}</div>
         <div class="plan-legenda">${Object.values(FORMATY).slice(0, 4).map((f) => `<span style="--f:${f.barva}"><i></i>${f.nazev}</span>`).join("")}</div>
       </div>
       <div class="plan-mrizka">
         ${dny.map((d, i) => {
           const den = iso(d);
           const tu = polozky.filter((p) => p.datum === den).sort((a, b) => (a.cas || "99").localeCompare(b.cas || "99"));
-          return `<div class="plan-den ${den === dnes ? "dnes" : ""} ${den < dnes ? "minuly" : ""}" data-den="${den}">
-            <div class="pd-hlava"><span>${DNY[i]}${den === dnes ? " · dnes" : ""}</span><b>${d.getDate()}.</b></div>
+          const nej = nejCas && nejCas.den === i;
+          return `<div class="plan-den ${den === dnes ? "dnes" : ""} ${den < dnes ? "minuly" : ""} ${nej ? "nej" : ""}" data-den="${den}">
+            <div class="pd-hlava"><span>${DNY[i]}${den === dnes ? " · dnes" : ""}${nej ? ` <i title="Nejlepší den podle statistik (${nejCas.od}–${nejCas.do} h)">🔥</i>` : ""}</span><b>${d.getDate()}.</b></div>
             ${tu.map(polozkaHtml).join("")}
-            <button type="button" class="plan-pridat" data-plan-novy="${den}">+ Přidat</button>
+            <button type="button" class="plan-pridat" data-plan-novy="${den}"${nej ? ` data-plan-cas="${String(nejCas.od + 1).padStart(2, "0")}:00"` : ""}>+ Přidat</button>
           </div>`;
         }).join("")}
       </div>
@@ -247,7 +250,7 @@ function init() {
     const t = e.target.closest("[data-plan-novy], [data-pl-stav], [data-pl-tvor], [data-pl-uprav], [data-pl-posun], [data-plan-kopirovat]");
     if (!t) return;
     const d = t.dataset;
-    if (d.planNovy !== undefined) upravit({ datum: d.planNovy });
+    if (d.planNovy !== undefined) upravit({ datum: d.planNovy, cas: d.planCas || "" });
     else if (d.plStav) {
       const p = polozky.find((x) => x.id === d.plStav);
       if (p) zmen(p.id, { stav: PORADI[(PORADI.indexOf(p.stav) + 1) % PORADI.length] });
@@ -284,6 +287,8 @@ function init() {
     if (id) zmen(id, { datum: cil.dataset.den });
   });
 
+  document.addEventListener("dh:statistiky", vykresli);
+  document.addEventListener("dh:zalozka", (e) => { if (e.detail === "plan") vykresli(); });
   window.addEventListener("storage", (e) => { if (e.key === KLIC) { polozky = nacti(); obnovPocty(); vykresli(); } });
   obnovPocty();
   vykresli();

@@ -112,6 +112,28 @@ označená „automaticky“. Koncepty jsou vázané na prohlížeč a zařízen
   vždy s odkazy na zdroje.
 - AI se může splést i se zdroji – před zveřejněním si je proklikni.
 
+### 🔒 Přihlášení heslem
+
+Aplikace na GitHub Pages je zašifrovaná (AES-256-GCM, klíč z hesla přes PBKDF2-SHA256, 600 000 iterací).
+Na webu leží jen přihlašovací stránka – bez hesla aplikaci nikdo nespustí ani nepřečte její kód.
+
+- Heslo se nastavuje jako secret **`APP_HESLO`** (GitHub → Settings → Secrets and variables → Actions).
+  Po změně hesla spusť workflow „Zveřejnit web na GitHub Pages“ znovu (Actions → Run workflow).
+- Bez secretu se zveřejní jen stránka „aplikace je zamčená“ (nic z aplikace).
+- „Zapamatovat na tomhle zařízení“ uloží odvozený klíč do prohlížeče; **🔒 Odhlásit** v menu ho smaže.
+- Zdrojový kód v repozitáři zůstává veřejný (neobsahuje žádné klíče). Kdo by chtěl skrýt i ten,
+  musí repozitář přepnout na soukromý (GitHub Pages ze soukromého repa vyžaduje placený plán).
+
+### 📊 Statistiky Instagramu
+
+- **Připojení přes oficiální Instagram API** (token z developers.facebook.com → aplikace → Instagram →
+  API setup with Instagram login → Generate token; potřeba profesionální účet), nebo **import CSV**
+  z Meta Business Suite → Přehledy → Obsah → Exportovat. Žádné neoficiální stahování – nehrozí ban účtu.
+- Dosah, míra interakce, uložení a sdílení; graf dosahu po příspěvcích (barva = formát, tabulkový pohled),
+  **nejlepší čas na post** (heatmapa den × čas → doporučení i v Plánu a Přehledu), výkon podle formátu,
+  délky popisku a hashtagů, **top příspěvky** s tlačítkem ♻️ „zopakovat jako carousel / reel“
+  a **✨ rozbor od AI** se zjištěními, doporučeními a nápady, které jdou rovnou do plánu.
+
 ### 🧭 Ovládání a orientace
 
 - **Boční panel** (na mobilu spodní lišta) dělí aplikaci na *Start* (Přehled, Témata), *Tvořit*

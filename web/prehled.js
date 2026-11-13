@@ -38,6 +38,7 @@ function vykresli() {
         ${formaty.map(([k, f]) => `<button type="button" class="ph-format" style="--f:${f.barva}" data-jdi="${k}">
           <span class="ik-box" style="--f:${f.barva}">${ik(f.ikona)}</span><b>${f.nazev}</b><span>${f.popis}</span><em>Začít →</em></button>`).join("")}
       </div>
+      <div class="card ph-cela ph-statistiky" id="phStatistiky"></div>
       <div class="card ph-sirsi">
         <h2>Pokračuj v práci</h2>
         <div class="ph-seznam" id="phKoncepty"><p class="muted" style="margin:0">Načítám…</p></div>
@@ -72,6 +73,31 @@ function vykresli() {
   vyplnStav();
   vyplnKoncepty();
   vyplnPlan();
+  vyplnStatistiky();
+}
+
+function vyplnStatistiky() {
+  const el = $("#phStatistiky");
+  if (!el) return;
+  const s = window.DHStatistiky?.prehled();
+  if (!s) {
+    el.innerHTML = `<div class="ph-st-prazdne"><span class="ik-box">${ik("statistiky")}</span>
+      <div><b>Připoj Instagram a uvidíš, co funguje</b><small class="muted">Dosah, uložení, nejlepší čas na post a AI rozbor – oficiálně přes Instagram API nebo z exportu CSV.</small></div>
+      <button type="button" class="btn small" data-jdi="statistiky">📊 Otevřít statistiky</button></div>`;
+    return;
+  }
+  const k = (n, h, p) => `<div class="ph-st-k"><span>${n}</span><b>${h}</b>${p ? `<small>${p}</small>` : ""}</div>`;
+  const cislo = (n) => (n == null ? "–" : n >= 1e4 ? `${Math.round(n / 1e3)} tis.` : n >= 1e3 ? `${(n / 1e3).toLocaleString("cs-CZ", { maximumFractionDigits: 1 })} tis.` : Math.round(n).toLocaleString("cs-CZ"));
+  el.innerHTML = `<div class="ph-st">
+    <div class="ph-st-hlava"><b>📊 Instagram · posledních 30 dní</b>${s.demo ? `<span class="pill warn">ukázková data</span>` : ""}
+      <button type="button" class="btn small ghost" data-jdi="statistiky">Detail →</button></div>
+    <div class="ph-st-mrizka">
+      ${k("Sledující", cislo(s.profil?.sledujici))}
+      ${k("Příspěvků", cislo(s.souhrn.pocet))}
+      ${k("Průměrný dosah", cislo(s.souhrn.dosah))}
+      ${k("Míra interakce", s.souhrn.mira == null ? "–" : `${(s.souhrn.mira * 100).toLocaleString("cs-CZ", { maximumFractionDigits: 1 })} %`)}
+      ${k("Nejlepší čas", s.nejCas ? `${s.nejCas.denNazev} ${s.nejCas.od}–${s.nejCas.do} h` : "–", s.nejCas ? "🔥 podle tvých dat" : "málo dat")}
+    </div></div>`;
 }
 
 function vyplnStav() {
@@ -145,9 +171,10 @@ function init() {
       window.DHShell?.tvor("post", e.target.value);
     }
   });
-  document.addEventListener("dh:zalozka", (e) => { if (e.detail === "prehled") { vyplnStav(); vyplnKoncepty(); vyplnPlan(); } });
+  document.addEventListener("dh:zalozka", (e) => { if (e.detail === "prehled") { vyplnStav(); vyplnKoncepty(); vyplnPlan(); vyplnStatistiky(); } });
   document.addEventListener("dh:koncepty", () => { if (!$("#zalozkaPrehled").hidden) vyplnKoncepty(); });
   document.addEventListener("dh:plan", vyplnPlan);
+  document.addEventListener("dh:statistiky", vyplnStatistiky);
   vykresli();
 }
 

@@ -18,6 +18,9 @@ const FORMATY = {
 
 const STRANKY = {
   prehled: { skupina: "Start", nazev: "Přehled", ikona: "domu" },
+  statistiky: { skupina: "Start", nazev: "Statistiky", ikona: "statistiky",
+    popis: "Jak si vedou tvoje příspěvky: dosah, uložení, sdílení, nejlepší čas na post, co funguje a co ne. Hity jedním klikem zopakuješ v jiném formátu.",
+    kroky: ["Připoj Instagram nebo nahraj CSV", "Podívej se, co funguje", "Zopakuj hity, naplánuj další"] },
   temata: { skupina: "Start", nazev: "Témata", ikona: "temata",
     popis: "AI projde web a najde ověřené zajímavosti – milníky, rekordy, příběhy – vždy se zdroji. Z tématu jedním klikem uděláš post, carousel nebo reel, nebo si ho uložíš do plánu.",
     kroky: ["Vyber, co hledat", "Najdi témata", "Zvol formát nebo ulož do plánu"] },
@@ -266,6 +269,7 @@ async function polozkyPalety() {
     akce.unshift(["Náhled v Instagramu", "telefon", "ig instagram kontrola nahled", () => otevriIG(aktualni)]);
     akce.unshift(["Uložit koncept", "ulozit", "ulozit ctrl s", () => ulozKoncept(aktualni)]);
   }
+  if (window.__dhZamceno) akce.push(["Odhlásit (zamknout aplikaci)", "styl", "logout odhlasit heslo zamknout", odhlasit]);
   akce.forEach(([nazev, ikona, klic, spust]) => out.push({ skupina: "Akce", nazev, ikona, klic, spust }));
   try {
     const k = (await window.DHKoncepty?.seznam?.()) || [];
@@ -384,8 +388,24 @@ function init() {
   const zrcadli = () => tecka?.classList.toggle("ok", pAI.classList.contains("ok"));
   if (pAI) { new MutationObserver(zrcadli).observe(pAI, { attributes: true, childList: true }); zrcadli(); }
 
+  // Zamčená verze (přihlášení heslem): tlačítko Odhlásit
+  if (window.__dhZamceno) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pill odhlasit";
+    b.textContent = "🔒 Odhlásit";
+    b.title = "Zapomenout heslo na tomhle zařízení";
+    b.addEventListener("click", odhlasit);
+    $(".bok-stav")?.appendChild(b);
+  }
+
   const start = location.hash.slice(1);
   jdi(STRANKY[start] ? start : "prehled");
+}
+
+function odhlasit() {
+  try { localStorage.removeItem("dhpf_zamek"); } catch { /* nic */ }
+  location.reload();
 }
 
 window.DHToast = toast;

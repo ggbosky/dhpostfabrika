@@ -72,6 +72,9 @@
   .odznak.cerveny { background: var(--red-hot); color: #fff; }
   .bok-stav { margin-top: auto; display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
   .bok-stav .pill { text-align: left; cursor: pointer; }
+  .pill.odhlasit { background: none; color: var(--muted); font-family: var(--uzke); }
+  .pill.odhlasit::before { display: none; }
+  .pill.odhlasit:hover { color: #fff; border-color: var(--red-hot); }
   .obsah { min-width: 0; display: flex; flex-direction: column; }
   @media (min-width: 701px) { .app { background: linear-gradient(90deg, #0b0b0b calc(var(--bok) - 1px), var(--line) calc(var(--bok) - 1px), var(--line) var(--bok), transparent var(--bok)); } }
   .obsah > main { flex: 1; width: 100%; }
@@ -194,6 +197,85 @@
   .ph-kontrola li.ok i { background: rgba(63, 209, 106, .2); color: #8fe3a0; }
   .ph-zkratky { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; font-size: 14px; color: #cfcfcf; }
 
+  /* ------------------------------------------------------------ statistiky */
+  .st-lista { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; padding: 16px 20px; }
+  .st-profil { display: flex; align-items: center; gap: 12px; flex: 1 1 260px; min-width: 0; }
+  .st-profil img { width: 46px; height: 46px; border-radius: 50%; box-shadow: 0 0 0 2px #000, 0 0 0 3.5px #d62976; }
+  .st-profil b { display: block; font: 800 17px Inter, sans-serif; }
+  .st-profil small { color: var(--muted); }
+  .st-filtry { display: flex; gap: 6px; flex-wrap: wrap; }
+  .st-filtry .chip { padding: 6px 12px; font-size: 12.5px; }
+  .st-demo { margin: 0 0 14px; }
+  .st-dlazdice { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+  .st-dlazdice-k { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding: 16px 18px; border-radius: 16px; background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--line); }
+  .st-dlazdice-k::after { content: ""; position: absolute; inset: auto -30% -60% auto; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(224, 30, 38, .18), transparent 70%); }
+  .st-dlazdice-k span { font: 700 11.5px var(--uzke); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .st-dlazdice-k b { font: 900 clamp(22px, 2.4vw, 30px)/1.1 var(--nadpis); color: var(--text); font-variant-numeric: tabular-nums; }
+  .st-dlazdice-k small { color: var(--muted); font-size: 12.5px; }
+  .st-mrizka { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+  .st-siroka { grid-column: 1 / -1; }
+  .st-hlava { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 12px; }
+  .st-hlava h2 { margin: 0; }
+  .st-hlava .btn { margin-left: auto; }
+  .st-legenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: #cfcfcf; }
+  .st-legenda i, .st-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .st-graf { position: relative; }
+  .st-graf svg { display: block; overflow: visible; }
+  .st-gridline { stroke: #262626; stroke-width: 1; }
+  .st-osa { fill: #8a8a8a; font: 500 11px Inter, sans-serif; font-variant-numeric: tabular-nums; }
+  .st-prumer { stroke: #b5b5b5; stroke-width: 1; }
+  .st-prumer-text { fill: #b5b5b5; }
+  .st-sloupec { transition: opacity .12s; }
+  .st-sloupec.tlumeny { opacity: .35; }
+  .st-tip { position: absolute; z-index: 5; pointer-events: none; display: grid; gap: 3px; max-width: 300px; padding: 10px 12px; border-radius: 10px; background: #0b0b0b; border: 1px solid var(--line-2); box-shadow: 0 12px 30px rgba(0, 0, 0, .6); font-size: 12.5px; color: #cfcfcf; }
+  .st-tip b { color: var(--text); }
+  .st-tip-radek { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+  .st-heat { display: grid; grid-template-columns: 30px repeat(6, minmax(0, 1fr)); gap: 3px; }
+  .st-heat-h, .st-heat-d { font: 600 11px Inter, sans-serif; color: var(--muted); text-align: center; align-self: center; }
+  .st-heat-c { aspect-ratio: 1.6; border-radius: 6px; background: rgba(224, 30, 38, var(--a)); display: grid; place-items: center; font-size: 13px; }
+  .st-heat-c.prazdna { background: #161616; }
+  .st-heat-c.nej { box-shadow: 0 0 0 2px #fff inset; }
+  .st-heat-legenda { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .st-heat-legenda i { flex: 0 0 120px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, rgba(224, 30, 38, .12), rgba(224, 30, 38, 1)); }
+  .st-h3 { font: 800 12px var(--uzke); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+  .st-h3:first-of-type { margin-top: 0; }
+  .st-pruhy { display: grid; gap: 8px; }
+  .st-pruh { display: grid; grid-template-columns: minmax(110px, 38%) 1fr auto; align-items: center; gap: 10px; font-size: 13.5px; }
+  .st-pruh-nazev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-pruh-nazev small { color: var(--muted); }
+  .st-pruh-draha { height: 14px; background: #191919; border-radius: 0 4px 4px 0; }
+  .st-pruh-draha i { display: block; height: 100%; border-radius: 0 4px 4px 0; transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+  .st-pruh-hodnota { font-variant-numeric: tabular-nums; font-size: 13px; min-width: 56px; text-align: right; }
+  .st-top { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .st-top-p { display: flex; gap: 12px; padding: 10px; border-radius: 14px; background: #0f0f0f; border: 1px solid var(--line); }
+  .st-top-nahled { position: relative; flex: none; width: 76px; aspect-ratio: 4 / 5; border-radius: 8px; overflow: hidden; background: linear-gradient(135deg, #2a0507, #000); }
+  .st-top-nahled img { width: 100%; height: 100%; object-fit: cover; }
+  .st-top-nahled span { position: absolute; left: 5px; top: 5px; font: 900 13px var(--nadpis); background: rgba(0, 0, 0, .7); padding: 1px 6px; border-radius: 6px; }
+  .st-top-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .st-top-info small { color: var(--muted); }
+  .st-top-typ { --f: var(--red-hot); font: 800 11px var(--uzke); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .st-top-typ::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--f); margin-right: 6px; }
+  .st-tabulka { overflow-x: auto; }
+  .st-tabulka table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .st-tabulka th, .st-tabulka td { padding: 7px 8px; border-bottom: 1px solid #222; text-align: right; white-space: nowrap; }
+  .st-tabulka th:nth-child(-n+3), .st-tabulka td:nth-child(-n+3) { text-align: left; }
+  .st-tabulka th button { background: none; border: 0; color: var(--muted); font: 700 11.5px var(--uzke); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; padding: 0; }
+  .st-tab-text { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  .st-tab-text a { color: var(--text); text-decoration: none; }
+  .st-ai { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .st-ai ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+  .st-ai li::marker { color: var(--red-hot); }
+  .st-napady { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .st-napad { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 12px; background: #0f0f0f; border: 1px solid var(--line); }
+  .st-uvod { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: start; }
+  .st-uvod .zprava { grid-column: 1 / -1; }
+  .st-navod { margin: 0 0 12px; display: grid; gap: 4px; }
+  @media (max-width: 1100px) { .st-dlazdice { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 900px) {
+    .st-mrizka, .st-uvod, .st-ai { grid-template-columns: 1fr; }
+    .st-dlazdice { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
   /* ------------------------------------------------------- nástroje textu */
   .text-nastroje { display: grid; gap: 8px; margin-top: 8px; font: 400 13px/1.4 Inter, sans-serif; letter-spacing: 0; text-transform: none; color: var(--text); }
   .tn-radek { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -239,6 +321,45 @@
   .pp-akce button:hover { background: var(--red); color: #fff; }
   .plan-zasobnik { margin-top: 18px; }
   .plan-zasobnik .pz-mrizka { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .plan-nej { color: var(--warn-text); }
+  .plan-den.nej:not(.dnes) { border-color: rgba(255, 192, 0, .35); }
+  .ph-st-hlava { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .ph-st-hlava b { font: 900 16px var(--nadpis); text-transform: uppercase; }
+  .ph-st-hlava .btn { margin-left: auto; }
+  .ph-st-mrizka { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .ph-st-k { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; background: #0f0f0f; border: 1px solid var(--line); }
+  .ph-st-k span { font: 700 11px var(--uzke); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .ph-st-k b { font: 900 22px/1.15 var(--nadpis); font-variant-numeric: tabular-nums; }
+  .ph-st-k small { color: var(--muted); font-size: 12px; }
+  .ph-st-prazdne { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+  .ph-st-prazdne > div { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+  @media (max-width: 900px) { .ph-st-mrizka { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* --------------------------------------------------------- jemný pohyb */
+  main > section:not([hidden]) { animation: vstup .38s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes vstup { from { opacity: 0; transform: translateY(10px); } }
+  .stranka-hlava:not([hidden]) { animation: vstup .32s cubic-bezier(.2, .8, .2, 1); }
+  .card { box-shadow: 0 18px 40px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .045); }
+  .btn { position: relative; overflow: hidden; }
+  .btn::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .28), transparent); transform: skewX(-18deg); transition: left .55s ease; pointer-events: none; }
+  .btn:not(.ghost):hover::after { left: 120%; }
+  .ph-uvod::before { content: ""; position: absolute; inset: -40%; background: conic-gradient(from 0deg at 70% 40%, transparent, rgba(224, 30, 38, .22), transparent 30%, rgba(255, 192, 0, .08), transparent 55%); animation: aurora 18s linear infinite; pointer-events: none; }
+  .ph-uvod > * { position: relative; }
+  @keyframes aurora { to { transform: rotate(360deg); } }
+  .bok-znacka .avatar { transition: transform .3s, box-shadow .3s; }
+  .bok-znacka:hover .avatar { transform: rotate(-8deg) scale(1.05); box-shadow: 0 0 0 2px #000, 0 0 0 4px var(--red-hot), 0 10px 30px rgba(224, 30, 38, .55); }
+  .tab.on .ik { filter: drop-shadow(0 0 6px rgba(224, 30, 38, .7)); }
+  .ph-format .ik-box, .list-format .ik-box { transition: transform .2s; }
+  .ph-format:hover .ik-box { transform: scale(1.08) rotate(-4deg); }
+  :focus-visible { outline: 2px solid var(--red-hot); outline-offset: 2px; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+  * { scrollbar-width: thin; scrollbar-color: #333 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2c2c2c; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #444; background-clip: padding-box; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
   .plan-legenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
   .plan-legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--f); margin-right: 5px; vertical-align: -1px; }
   #planDialog .dva { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -598,6 +719,7 @@
   <symbol id="i-sdilet" viewBox="0 0 24 24"><path d="m22 3-10 10M22 3l-7 18-3-8-8-3z"/></symbol>
   <symbol id="i-zalozka" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-5-6 5z"/></symbol>
   <symbol id="i-blesk" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-statistiky" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
   <symbol id="i-sipka" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
 </svg>
 <div class="app">
@@ -611,6 +733,7 @@
     <div class="skupina">Start</div>
     <button type="button" class="tab" data-tab="prehled"><svg class="ik"><use href="#i-domu"/></svg><span class="tab-txt"><span>Přehled</span><em>Přehled</em><small>rychlý start a rozpracované</small></span></button>
     <button type="button" class="tab" data-tab="temata"><svg class="ik"><use href="#i-temata"/></svg><span class="tab-txt"><span>Témata</span><em>Témata</em><small>AI najde zajímavosti se zdroji</small></span></button>
+    <button type="button" class="tab" data-tab="statistiky"><svg class="ik"><use href="#i-statistiky"/></svg><span class="tab-txt"><span>Statistiky</span><em>Statistiky</em><small>co funguje na Instagramu</small></span></button>
     <div class="skupina">Tvořit</div>
     <button type="button" class="tab" data-tab="post"><svg class="ik"><use href="#i-post"/></svg><span class="tab-txt"><span>Nový post</span><em>Post</em><small>fotka + titulek + text</small></span></button>
     <button type="button" class="tab" data-tab="carousel"><svg class="ik"><use href="#i-carousel"/></svg><span class="tab-txt"><span>Carousel</span><em>Carousel</em><small>více slidů, swipe</small></span></button>
@@ -638,6 +761,7 @@
 <main>
   <section id="zalozkaPrehled" hidden data-zalozka="prehled"><div id="prehledObsah"></div></section>
   <section id="zalozkaPlan" hidden data-zalozka="plan"><div id="planObsah"></div></section>
+  <section id="zalozkaStatistiky" hidden data-zalozka="statistiky"><div id="statistikyObsah"></div></section>
   <section id="zalozkaTemata" hidden data-zalozka="temata">
     <div class="card">
       <h2>🔎 Najdi zajímavost <span class="muted">milníky · rekordy · výročí · příběhy – AI hledá na webu a dává zdroje</span></h2>
@@ -1241,21 +1365,22 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261113c"></script>
-<script src="grafika.js?v=20261113c"></script>
-<script src="koncepty.js?v=20261113c"></script>
-<script src="ai.js?v=20261113c"></script>
-<script src="app.js?v=20261113c"></script>
-<script src="carousel.js?v=20261113c"></script>
-<script src="vyroci.js?v=20261113c"></script>
-<script src="zpravy.js?v=20261113c"></script>
-<script src="reels-ulozeni.js?v=20261113c"></script>
-<script src="reels-hlas.js?v=20261113c"></script>
-<script src="reels-render.js?v=20261113c"></script>
-<script src="reels-zabery.js?v=20261113c"></script>
-<script src="reels.js?v=20261113c"></script>
-<script src="plan.js?v=20261113c"></script>
-<script src="prehled.js?v=20261113c"></script>
-<script src="shell.js?v=20261113c"></script>
+<script src="sablony.js?v=20261113e"></script>
+<script src="grafika.js?v=20261113e"></script>
+<script src="koncepty.js?v=20261113e"></script>
+<script src="ai.js?v=20261113e"></script>
+<script src="app.js?v=20261113e"></script>
+<script src="carousel.js?v=20261113e"></script>
+<script src="vyroci.js?v=20261113e"></script>
+<script src="zpravy.js?v=20261113e"></script>
+<script src="reels-ulozeni.js?v=20261113e"></script>
+<script src="reels-hlas.js?v=20261113e"></script>
+<script src="reels-render.js?v=20261113e"></script>
+<script src="reels-zabery.js?v=20261113e"></script>
+<script src="reels.js?v=20261113e"></script>
+<script src="plan.js?v=20261113e"></script>
+<script src="stats.js?v=20261113e"></script>
+<script src="prehled.js?v=20261113e"></script>
+<script src="shell.js?v=20261113e"></script>
 </body>
 </html>
