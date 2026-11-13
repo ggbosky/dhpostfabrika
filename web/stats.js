@@ -229,6 +229,8 @@ async function nactiZApi(pokrok = () => {}, { lehce = false, predchozi = null } 
   let hotovo = 0;
   const fronta = (lehce ? posty.slice(0, MAX_INSIGHTS).filter((p) => !stare.has(p.id)).slice(0, 10) : posty.slice(0, MAX_INSIGHTS)).map((p) => p);
   const celkemInsights = fronta.length;
+  let bezInsights = lehce ? !!predchozi?.bezInsights : false;
+  if (bezInsights) fronta.length = 0;
   const pracovnik = async () => {
     while (fronta.length) {
       const p = fronta.shift();
@@ -244,7 +246,10 @@ async function nactiZApi(pokrok = () => {}, { lehce = false, predchozi = null } 
             if (m.name === "views") p.zobrazeni = v;
           }
           break;
-        } catch (e) { if (/oprávnění|neplatný|limit/.test(e.message)) throw e; }
+        } catch (e) {
+          if (/neplatný|limit/.test(e.message)) throw e;
+          if (/oprávnění/.test(e.message)) { bezInsights = true; fronta.length = 0; break; } // token bez instagram_manage_insights
+        }
       }
       hotovo++;
       pokrok(`Načítám statistiky příspěvků… ${hotovo} / ${celkemInsights}`);
@@ -252,7 +257,7 @@ async function nactiZApi(pokrok = () => {}, { lehce = false, predchozi = null } 
   };
   await Promise.all([pracovnik(), pracovnik(), pracovnik(), pracovnik()]);
   return {
-    zdroj: "api", cas: Date.now(), plne: lehce ? (predchozi?.plne || Date.now()) : Date.now(),
+    zdroj: "api", cas: Date.now(), plne: lehce ? (predchozi?.plne || Date.now()) : Date.now(), bezInsights,
     profil: { jmeno: profil.username || profil.name || "", foto: profil.profile_picture_url || "", sledujici: profil.followers_count ?? null, prispevku: profil.media_count ?? null },
     posty: posty.map(normalizuj),
   };
@@ -389,8 +394,8 @@ function souhrn(posty) {
     pocet: posty.length,
     dosah: prumer(s("dosah")),
     mira: prumer(s("mira")),
-    ulozeni: s("ulozeni").reduce((a, b) => a + b, 0),
-    sdileni: s("sdileni").reduce((a, b) => a + b, 0),
+    ulozeni: s("ulozeni").length ? s("ulozeni").reduce((a, b) => a + b, 0) : null,
+    sdileni: s("sdileni").length ? s("sdileni").reduce((a, b) => a + b, 0) : null,
     interakce: prumer(s("interakce")),
     maDosah: s("dosah").length > 0,
   };
@@ -541,6 +546,9 @@ function vykresli() {
   const nejPost = top[0];
   const zdroj = { api: "Instagram API", csv: "import CSV", demo: "UKÁZKOVÁ DATA" }[data.zdroj];
   el.innerHTML = `
+    ${data.zdroj === "api" && data.bezInsights ? `<div class="zprava varovani st-demo"><b>Chybí dosah, uložení a sdílení.</b> Token nemá oprávnění <code>instagram_manage_insights</code>, takže teď vidíš jen lajky a komentáře.
+      Oprava v Metě: v kroku <b>1. Configure your app</b> klikni <b>Create another configuration</b>, mezi oprávnění přidej <b>instagram_manage_insights</b> (případně i pages_read_engagement), ulož,
+      v kroku <b>2. Generate access tokens</b> vygeneruj nový token a vlož ho přes <a href="#" data-st="pripojeni">⚙ Připojení</a>.</div>` : ""}
     ${data.zdroj === "demo" ? `<div class="zprava varovani st-demo"><b>Ukázková data</b> – čísla jsou vymyšlená, jen aby bylo vidět, jak statistiky vypadají. <a href="#" data-st="pripojeni">Připoj svůj Instagram</a>.</div>` : ""}
     <div class="st-lista card">
       <div class="st-profil">
