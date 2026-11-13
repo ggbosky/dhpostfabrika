@@ -994,7 +994,7 @@
               <label>Tempo <b id="rRychlostHodnota">100 %</b><input type="range" id="rRychlost" min="0.9" max="1.15" step="0.01" value="1"></label>
               <label style="align-self:end"><button type="button" class="btn" id="rGenHlas">🤖 Vygenerovat hlas pro všechny scény</button></label>
             </div>
-            <p class="muted" style="font-size:13px">Hlas Piper „Jirka“ běží zdarma přímo v prohlížeči (model ~60 MB se stáhne poprvé). Pro nejpřirozenější výsledek můžeš každou scénu namluvit sám (🎙️). Titulky se časují přesně podle hlasu každé scény – jdou ručně upravit.</p>
+            <p class="muted" style="font-size:13px"><span id="rHlasInfo"></span> Každou scénu můžeš i namluvit sám (🎙️). Titulky se časují přesně podle hlasu každé scény – jdou ručně upravit.</p>
             <div class="zprava" id="rHlasZprava" hidden></div>
           </div>
           <div class="card">
@@ -1079,6 +1079,34 @@
           <h2>Aktuální styl</h2>
           <div id="profil"></div>
         </div>
+        <div class="card" id="hlasKarta" style="margin-top:20px">
+          <h2>🎙️ Hlas pro reels (ElevenLabs)</h2>
+          <p class="muted" style="margin-top:0">Reels pak namlouvá tvůj hlas z ElevenLabs (např. „Kuba – Czech Social Media“) místo zdarma hlasu Jirka.
+            Hlas musí být v ElevenLabs v sekci <b>My Voices</b> (u knihovních hlasů klikni na <b>Add to my voices</b>).</p>
+          <ol class="muted" style="margin:0 0 12px">
+            <li>V ElevenLabs otevři <b>Developers → API Keys</b> a vytvoř klíč (stačí oprávnění Text to Speech + Voices: read).</li>
+            <li>Vlož ho sem a klikni <b>Uložit a načíst hlasy</b> – Kuba se vybere sám.</li>
+          </ol>
+          <label>ElevenLabs API klíč<input id="elKlic" type="password" autocomplete="off" placeholder="sk_…"></label>
+          <div class="akce" style="margin-top:12px">
+            <button type="button" class="btn" id="elUlozit">Uložit a načíst hlasy</button>
+            <button type="button" class="btn ghost" id="elSmazat">Smazat klíč</button>
+          </div>
+          <div class="filtry" style="margin-top:16px">
+            <label>Hlas<select id="elHlas"><option value="">– nejdřív ulož klíč –</option></select></label>
+            <label>Model<select id="elModel"></select></label>
+            <label>Stabilita <b id="elStabilitaH"></b><input type="range" id="elStabilita" min="0" max="1" step="0.05"></label>
+            <label>Podobnost <b id="elPodobnostH"></b><input type="range" id="elPodobnost" min="0" max="1" step="0.05"></label>
+            <label>Styl (víc emocí) <b id="elStylH"></b><input type="range" id="elStyl" min="0" max="1" step="0.05"></label>
+            <label>Rychlost <b id="elRychlostH"></b><input type="range" id="elRychlost" min="0.8" max="1.2" step="0.01"></label>
+          </div>
+          <div class="akce">
+            <button type="button" class="btn ghost" id="elZkusit">▶ Vyzkoušet hlas</button>
+          </div>
+          <div class="zprava" id="elZprava" hidden></div>
+          <p class="muted" style="font-size:13px;margin:12px 0 0">Výchozí nastavení odpovídá tvé ukázce (model v4, stabilita 50 %, podobnost 75 %). Každé namluvení stojí znaky z tvého ElevenLabs plánu – 45s reel je zhruba 600–900 znaků. Klíč zůstává jen v tomhle prohlížeči.</p>
+        </div>
+
         <div class="card" id="aiKarta" style="margin-top:20px">
           <h2>✨ AI pomocník (volitelné)</h2>
           <p class="muted" style="margin-top:0">AI navrhuje texty, carousely, scénáře reels, hledá témata a ověřuje fakta.
@@ -1187,21 +1215,21 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261112i"></script>
-<script src="grafika.js?v=20261112i"></script>
-<script src="koncepty.js?v=20261112i"></script>
-<script src="ai.js?v=20261112i"></script>
-<script src="app.js?v=20261112i"></script>
-<script src="carousel.js?v=20261112i"></script>
-<script src="vyroci.js?v=20261112i"></script>
-<script src="zpravy.js?v=20261112i"></script>
-<script src="reels-ulozeni.js?v=20261112i"></script>
-<script src="reels-hlas.js?v=20261112i"></script>
-<script src="reels-render.js?v=20261112i"></script>
-<script src="reels-zabery.js?v=20261112i"></script>
-<script src="reels.js?v=20261112i"></script>
-<script src="plan.js?v=20261112i"></script>
-<script src="prehled.js?v=20261112i"></script>
-<script src="shell.js?v=20261112i"></script>
+<script src="sablony.js?v=20261113a"></script>
+<script src="grafika.js?v=20261113a"></script>
+<script src="koncepty.js?v=20261113a"></script>
+<script src="ai.js?v=20261113a"></script>
+<script src="app.js?v=20261113a"></script>
+<script src="carousel.js?v=20261113a"></script>
+<script src="vyroci.js?v=20261113a"></script>
+<script src="zpravy.js?v=20261113a"></script>
+<script src="reels-ulozeni.js?v=20261113a"></script>
+<script src="reels-hlas.js?v=20261113a"></script>
+<script src="reels-render.js?v=20261113a"></script>
+<script src="reels-zabery.js?v=20261113a"></script>
+<script src="reels.js?v=20261113a"></script>
+<script src="plan.js?v=20261113a"></script>
+<script src="prehled.js?v=20261113a"></script>
+<script src="shell.js?v=20261113a"></script>
 </body>
 </html>

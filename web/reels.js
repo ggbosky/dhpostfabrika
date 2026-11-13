@@ -52,7 +52,7 @@ function novyProjekt({ tema, delka, ton, jazyky }) {
     vytvoreno: Date.now(), upraveno: Date.now(),
     vyzkum: { fakta: [] }, scenar: { hooky: [], hook: 0, cta: "", popisek: "", hashtagy: [], nejiste: [] },
     sceny: [], klipy: {}, vysledky: {}, webVysledky: [],
-    hlas: { hlasId: "cs_CZ-jirka-medium", rychlost: 1 },
+    hlas: { hlasId: A.maEleven() ? "eleven" : "cs_CZ-jirka-medium", rychlost: 1 },
     hudba: null,
     vzhled: { titulky: true, zvyrazneni: true, prolnuti: true, barvy: "prirozene", logo: true, outro: true },
   };
@@ -528,7 +528,12 @@ function vykresliStrih() {
 // ----------------------------------------------------------- 6. hlas a titulky --
 
 function vykresliHlas() {
-  $("#rHlasId").innerHTML = Object.entries(A.HLASY).map(([id, n]) => `<option value="${id}" ${p.hlas.hlasId === id ? "selected" : ""}>${esc(n)}</option>`).join("");
+  const el = A.elNastaveni();
+  $("#rHlasId").innerHTML = Object.entries(A.HLASY).map(([id, n]) => `<option value="${id}" ${p.hlas.hlasId === id ? "selected" : ""}>${esc(id === "eleven" && el.voiceName ? `🎙️ ${el.voiceName} (ElevenLabs)` : n)}</option>`).join("");
+  $("#rHlasInfo").innerHTML = p.hlas.hlasId === "eleven"
+    ? (A.maEleven() ? `Namlouvá <b>${esc(el.voiceName || "hlas z ElevenLabs")}</b> (${esc(A.EL_MODELY[el.model] || el.model)}). Platí se znaky z tvého ElevenLabs účtu. Nastavení hlasu: <a href="#styl" data-jdi-na-hlas>Můj styl → Hlas pro reels</a>.`
+      : `⚠️ ElevenLabs ještě není nastavený – <a href="#styl" data-jdi-na-hlas>vlož klíč a vyber hlas</a>.`)
+    : "Hlas Piper „Jirka“ běží zdarma přímo v prohlížeči (model ~60 MB se stáhne poprvé).";
   $("#rRychlost").value = p.hlas.rychlost;
   $("#rRychlostHodnota").textContent = `${Math.round(p.hlas.rychlost * 100)} %`;
   $("#rHudbaInfo").innerHTML = p.hudba ? `🎵 ${esc(p.hudba.nazev)} <button type="button" class="btn small ghost" id="rHudbaPryc">Odebrat</button>` : "bez hudby";
@@ -538,7 +543,7 @@ function vykresliHlas() {
     const zastaraly = s.hlas && s.hlas.textHash !== R.hashTextu(s.text);
     return `<div class="r-hlas-scena" data-i="${i}">
       <div class="slide-hlava"><b>Scéna ${i + 1}</b><span class="radek">
-        ${s.hlas ? `<span class="${zastaraly ? "bez-zdroje" : "r-prirazeno"}">${zastaraly ? "⚠️ text se změnil" : `✔ ${s.hlas.zdroj === "mikrofon" ? "🎙️" : "🤖"} ${s.hlas.delka.toFixed(1)} s`}</span><button type="button" class="btn small ghost" data-r-hakce="prehrat">▶</button>` : '<span class="bez-zdroje">bez hlasu</span>'}
+        ${s.hlas ? `<span class="${zastaraly ? "bez-zdroje" : "r-prirazeno"}">${zastaraly ? "⚠️ text se změnil" : `✔ ${s.hlas.zdroj === "mikrofon" ? "🎙️" : s.hlas.zdroj === "elevenlabs" ? "🎧" : "🤖"} ${s.hlas.delka.toFixed(1)} s`}</span><button type="button" class="btn small ghost" data-r-hakce="prehrat">▶</button>` : '<span class="bez-zdroje">bez hlasu</span>'}
         <button type="button" class="btn small ghost" data-r-hakce="tts">🤖 Hlas</button>
         <button type="button" class="btn small ghost" data-r-hakce="mic">🎙️ Nahrát sám</button></span></div>
       <p class="r-hlas-text">${esc(s.text.replace(/\*/g, ""))}</p>
@@ -551,11 +556,13 @@ function vykresliHlas() {
 
 async function hlasScenu(i, tiche = false) {
   const s = p.sceny[i];
-  if (!tiche) zprava("#rHlasZprava", `Generuji hlas pro scénu ${i + 1}… (poprvé se stahuje hlasový model ~60 MB)`);
-  const blob = await A.syntetizuj(s.text, p.hlas.hlasId, (pct) => zprava("#rHlasZprava", `Stahuji český hlasový model… ${pct} %`));
-  const souborId = await U.ulozSoubor(blob, { nazev: `hlas-${i + 1}.wav` });
+  const eleven = p.hlas.hlasId === "eleven";
+  if (!tiche) zprava("#rHlasZprava", eleven ? `Generuji hlas pro scénu ${i + 1} na ElevenLabs…` : `Generuji hlas pro scénu ${i + 1}… (poprvé se stahuje hlasový model ~60 MB)`);
+  const blob = await A.syntetizuj(s.text, p.hlas.hlasId, (pct) => zprava("#rHlasZprava", `Stahuji český hlasový model… ${pct} %`),
+    { predchozi: p.sceny[i - 1]?.text || "", dalsi: p.sceny[i + 1]?.text || "" });
+  const souborId = await U.ulozSoubor(blob, { nazev: `hlas-${i + 1}.${eleven ? "mp3" : "wav"}` });
   const buf = await A.dekoduj(souborId, async () => blob);
-  s.hlas = { souborId, delka: buf.duration, zdroj: "piper", textHash: R.hashTextu(s.text) };
+  s.hlas = { souborId, delka: buf.duration, zdroj: eleven ? "elevenlabs" : "piper", hlasId: p.hlas.hlasId, textHash: R.hashTextu(s.text) };
   if (!s.titulkyRucne) s.titulky = R.autoTitulky(s.text, buf.duration / p.hlas.rychlost);
 }
 
@@ -564,8 +571,8 @@ async function hlasVse() {
   try {
     for (let i = 0; i < p.sceny.length; i++) {
       const s = p.sceny[i];
-      if (s.hlas && s.hlas.textHash === R.hashTextu(s.text) && s.hlas.zdroj === "piper" && s.hlas.hlasId === p.hlas.hlasId) continue;
-      zprava("#rHlasZprava", `Generuji český hlas… scéna ${i + 1} / ${p.sceny.length}`);
+      if (s.hlas && s.hlas.textHash === R.hashTextu(s.text) && s.hlas.zdroj !== "mikrofon" && s.hlas.hlasId === p.hlas.hlasId) continue;
+      zprava("#rHlasZprava", `Generuji český hlas${p.hlas.hlasId === "eleven" ? " (ElevenLabs)" : ""}… scéna ${i + 1} / ${p.sceny.length}`);
       await hlasScenu(i, true);
       s.hlas.hlasId = p.hlas.hlasId;
       ulozPozdeji();

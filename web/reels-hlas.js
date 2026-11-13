@@ -6,9 +6,85 @@ const VZORKOVANI = 48000;
 // Piper (open-source, zdarma, běží v prohlížeči přes ONNX). Model se stáhne jednou (~60 MB) z Hugging Face
 // a prohlížeč si ho uloží; pak funguje i bez dalšího stahování.
 const HLASY = {
+  eleven: "🎙️ ElevenLabs (tvůj hlas z nastavení)",
   "cs_CZ-jirka-medium": "Jirka – lepší kvalita (Piper, zdarma)",
   "cs_CZ-jirka-low": "Jirka – rychlejší, menší model (Piper, zdarma)",
 };
+
+// ---------------------------------------------------------- ElevenLabs --
+// Klíč a nastavení hlasu jsou jen v tomhle prohlížeči; požadavky jdou přímo na api.elevenlabs.io.
+const EL_API = "https://api.elevenlabs.io";
+const EL_KLIC = "dhpf_eleven_klic";
+const EL_NAST = "dhpf_eleven_nastaveni";
+const EL_MODELY = {
+  eleven_v4: "Eleven v4 – nejpřirozenější (jako tvoje ukázka)",
+  eleven_v3: "Eleven v3 – nejvíc emocí, umí [tagy]",
+  eleven_multilingual_v2: "Multilingual v2 – stabilní",
+  eleven_flash_v2_5: "Flash v2.5 – rychlý a levný",
+};
+const EL_VYCHOZI = { voiceId: "", voiceName: "", model: "eleven_v4", stability: 0.5, similarity: 0.75, style: 0, speed: 1 };
+
+const elKlic = () => { try { return (localStorage.getItem(EL_KLIC) || "").trim(); } catch { return ""; } };
+const maEleven = () => !!elKlic() && !!elNastaveni().voiceId;
+function elNastaveni() {
+  try { return { ...EL_VYCHOZI, ...JSON.parse(localStorage.getItem(EL_NAST) || "{}") }; } catch { return { ...EL_VYCHOZI }; }
+}
+function elUloz(klic, nastaveni) {
+  try {
+    if (klic !== undefined) klic ? localStorage.setItem(EL_KLIC, klic) : localStorage.removeItem(EL_KLIC);
+    if (nastaveni) localStorage.setItem(EL_NAST, JSON.stringify({ ...elNastaveni(), ...nastaveni }));
+  } catch { /* nic */ }
+}
+
+async function elChyba(r) {
+  let detail = "";
+  try { const j = await r.json(); detail = j?.detail?.message || j?.detail?.status || (typeof j?.detail === "string" ? j.detail : JSON.stringify(j?.detail || j)); } catch { /* nic */ }
+  if (r.status === 401) return new Error(/quota|credit/i.test(detail) ? "Na ElevenLabs účtu došly kredity (znaky) – dobij je nebo počkej na další měsíc." : "Neplatný ElevenLabs klíč – zkontroluj ho v Můj styl → Hlas pro reels.");
+  if (r.status === 402 || /quota/i.test(detail)) return new Error("Na ElevenLabs účtu došly kredity (znaky) – dobij je nebo počkej na další měsíc.");
+  if (r.status === 404) return new Error("Hlas na ElevenLabs nenašel – přidej si ho do „My Voices“ a vyber ho znovu v Můj styl → Hlas pro reels.");
+  if (r.status === 429) return new Error("ElevenLabs: moc požadavků najednou, zkus to za chvíli.");
+  return new Error(`ElevenLabs chyba ${r.status}: ${String(detail).slice(0, 200)}`);
+}
+
+async function elHlasy(klic = elKlic()) {
+  const r = await fetch(`${EL_API}/v1/voices`, { headers: { "xi-api-key": klic } });
+  if (!r.ok) throw await elChyba(r);
+  const j = await r.json();
+  return (j.voices || []).map((v) => ({ id: v.voice_id, nazev: v.name, druh: v.category || "" }));
+}
+
+// [tagy] emocí umí jen v3; ostatní modely by je přečetly nahlas.
+function textProEleven(text, model) {
+  let t = String(text || "").replace(/\*/g, "")
+    .replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu, "");
+  if (!/^eleven_v3/.test(model)) t = t.replace(/\[[^\]]{1,40}\]/g, " ");
+  return t.replace(/\s+/g, " ").trim();
+}
+
+async function elevenTTS(text, { predchozi = "", dalsi = "", nastaveni = elNastaveni(), klic = elKlic() } = {}) {
+  if (!klic) throw new Error("Chybí ElevenLabs klíč – vlož ho v Můj styl → Hlas pro reels.");
+  if (!nastaveni.voiceId) throw new Error("Není vybraný hlas – vyber ho v Můj styl → Hlas pro reels.");
+  const cisty = textProEleven(text, nastaveni.model);
+  if (!cisty) throw new Error("Prázdný text pro hlas.");
+  const telo = {
+    text: cisty,
+    model_id: nastaveni.model,
+    language_code: nastaveni.model === "eleven_multilingual_v2" ? undefined : "cs",
+    voice_settings: { stability: nastaveni.stability, similarity_boost: nastaveni.similarity, style: nastaveni.style, speed: nastaveni.speed, use_speaker_boost: true },
+  };
+  if (predchozi) telo.previous_text = textProEleven(predchozi, nastaveni.model);
+  if (dalsi) telo.next_text = textProEleven(dalsi, nastaveni.model);
+  let r;
+  try {
+    r = await fetch(`${EL_API}/v1/text-to-speech/${encodeURIComponent(nastaveni.voiceId)}?output_format=mp3_44100_128`, {
+      method: "POST",
+      headers: { "xi-api-key": klic, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify(telo),
+    });
+  } catch { throw new Error("ElevenLabs je nedostupný (síť). Zkus to znovu."); }
+  if (!r.ok) throw await elChyba(r);
+  return new Blob([await r.arrayBuffer()], { type: "audio/mpeg" });
+}
 const VITS_URL = "https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm";
 
 let vits = null;
@@ -26,7 +102,8 @@ function textProHlas(text) {
     .trim();
 }
 
-async function syntetizuj(text, hlasId = "cs_CZ-jirka-medium", pokrok = () => {}) {
+async function syntetizuj(text, hlasId = "cs_CZ-jirka-medium", pokrok = () => {}, kontext = {}) {
+  if (hlasId === "eleven") return elevenTTS(text, kontext);
   const tts = await knihovnaTTS();
   const cisty = textProHlas(text);
   if (!cisty) throw new Error("Prázdný text pro hlas.");
@@ -152,5 +229,85 @@ function naWav(buffer) {
   return new Blob([data], { type: "audio/wav" });
 }
 
-window.DHReelsHlas = { HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
+// ------------------------------------------------- nastavení v „Můj styl“ --
+
+function initNastaveni() {
+  const $ = (q) => document.querySelector(q);
+  if (!$("#hlasKarta")) return;
+  const zprava = (t, druh = "ok") => { const el = $("#elZprava"); el.innerHTML = t; el.className = `zprava ${druh}`; el.hidden = !t; };
+  const esc = (x) => String(x ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const posuvniky = [["#elStabilita", "stability", "#elStabilitaH", (v) => `${Math.round(v * 100)} %`],
+    ["#elPodobnost", "similarity", "#elPodobnostH", (v) => `${Math.round(v * 100)} %`],
+    ["#elStyl", "style", "#elStylH", (v) => `${Math.round(v * 100)} %`],
+    ["#elRychlost", "speed", "#elRychlostH", (v) => `${Math.round(v * 100)} %`]];
+  $("#elModel").innerHTML = Object.entries(EL_MODELY).map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+
+  function vykresli(hlasy) {
+    const n = elNastaveni();
+    $("#elModel").value = EL_MODELY[n.model] ? n.model : "eleven_v4";
+    for (const [sel, k, h, f] of posuvniky) { $(sel).value = n[k]; $(h).textContent = f(n[k]); }
+    $("#elKlic").placeholder = elKlic() ? "•••••••• (klíč je uložený)" : "sk_…";
+    if (hlasy) {
+      $("#elHlas").innerHTML = hlasy.length
+        ? hlasy.map((v) => `<option value="${esc(v.id)}" ${v.id === n.voiceId ? "selected" : ""}>${esc(v.nazev)}${v.druh ? ` · ${esc(v.druh)}` : ""}</option>`).join("")
+        : `<option value="">Na účtu nejsou žádné hlasy</option>`;
+    } else if (n.voiceId) {
+      $("#elHlas").innerHTML = `<option value="${esc(n.voiceId)}">${esc(n.voiceName || n.voiceId)}</option>`;
+    }
+  }
+
+  async function nactiHlasy() {
+    zprava("Načítám hlasy z ElevenLabs…", "");
+    const hlasy = await elHlasy();
+    const n = elNastaveni();
+    let vybrany = hlasy.find((v) => v.id === n.voiceId) || hlasy.find((v) => /kuba/i.test(v.nazev)) || null;
+    if (vybrany) elUloz(undefined, { voiceId: vybrany.id, voiceName: vybrany.nazev });
+    vykresli(hlasy);
+    zprava(vybrany
+      ? `Hotovo ✓ Reels bude namlouvat <b>${esc(vybrany.nazev)}</b>. Klikni na ▶ Vyzkoušet hlas.`
+      : "Klíč funguje, ale hlas „Kuba“ jsem v My Voices nenašel. V ElevenLabs u hlasu klikni na <b>Add to my voices</b> a pak znovu na Uložit a načíst hlasy – nebo vyber jiný hlas.",
+    vybrany ? "ok" : "varovani");
+  }
+
+  $("#elUlozit").addEventListener("click", async () => {
+    const v = $("#elKlic").value.trim();
+    if (!v && !elKlic()) { zprava("Vlož ElevenLabs API klíč.", "chyba"); return; }
+    if (v) elUloz(v);
+    $("#elKlic").value = "";
+    try { await nactiHlasy(); } catch (e) { zprava(esc(e.message), "chyba"); }
+  });
+  $("#elSmazat").addEventListener("click", () => { elUloz(""); vykresli(); zprava("Klíč je smazaný z tohoto prohlížeče. Reels teď namlouvá Jirka (zdarma)."); });
+  $("#elHlas").addEventListener("change", (e) => {
+    elUloz(undefined, { voiceId: e.target.value, voiceName: e.target.selectedOptions[0]?.textContent.replace(/ · .*$/, "") || "" });
+    zprava(`Vybraný hlas: <b>${esc(elNastaveni().voiceName)}</b>`);
+  });
+  $("#elModel").addEventListener("change", (e) => elUloz(undefined, { model: e.target.value }));
+  for (const [sel, k, h, f] of posuvniky) {
+    $(sel).addEventListener("input", (e) => { const v = Number(e.target.value); elUloz(undefined, { [k]: v }); $(h).textContent = f(v); });
+  }
+  let prehravac = null;
+  $("#elZkusit").addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    zprava("Generuji ukázku…", "");
+    try {
+      const blob = await elevenTTS("Nagano. Rok devatenáct set devadesát osm. Pět nejlepších střelců světa. Proti jednomu brankáři. Tohle je Deník hokeje.");
+      if (prehravac) { prehravac.pause(); URL.revokeObjectURL(prehravac.src); }
+      prehravac = new Audio(URL.createObjectURL(blob));
+      await prehravac.play();
+      zprava("▶ Přehrávám ukázku. Nesedí? Uprav stabilitu (míň = víc emocí) nebo styl a zkus to znovu.");
+    } catch (err) { zprava(esc(err.message), "chyba"); }
+    finally { b.disabled = false; }
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-jdi-na-hlas]")) return;
+    e.preventDefault();
+    document.querySelector('.tab[data-tab="styl"]')?.click();
+    setTimeout(() => $("#hlasKarta")?.scrollIntoView({ behavior: "smooth" }), 60);
+  });
+  vykresli();
+}
+initNastaveni();
+
+window.DHReelsHlas = { EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
 })();
