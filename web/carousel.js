@@ -23,6 +23,34 @@ const UKAZKA = [
 let slidy = [];
 let vybrany = 0;
 let logoRezim = "auto";
+// Zvýraznění v nadpisech obsahových slidů: tematická barva (ne červená, ta je na titulu; ne žlutá, ta je v textu).
+const BARVA_NADPISU = "#4db8ff";
+const BARVY_NADPISU = [
+  ["#4db8ff", "Ledová modrá"], ["#2f7bff", "Reprezentační modrá"], ["#2ee6c8", "Tyrkysová"], ["#3fd16a", "Zelená"],
+  ["#ff8a1f", "Oranžová"], ["#b26bff", "Fialová"], ["#ff5fa2", "Růžová"], ["#c9d3dd", "Stříbrná"],
+];
+let barvaNadpisu = BARVA_NADPISU;
+
+// Barva musí být na černém pozadí čitelná a nesmí splývat s červenou titulu ani se žlutým textem.
+function tematickaBarva(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  let [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((x) => x / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d) h = max === r ? 60 * (((g - b) / d) % 6) : max === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+  if (h < 0) h += 360;
+  if (s > 0.35 && (h < 18 || h > 342)) return null;          // červená
+  if (s > 0.35 && h >= 38 && h <= 68) return null;           // žlutá / zlatá
+  if (l < 0.5) {                                             // příliš tmavá → zesvětlit, odstín zachovat
+    const L = 0.56, C = (1 - Math.abs(2 * L - 1)) * Math.min(0.8, Math.max(s, 0.55)), X = C * (1 - Math.abs(((h / 60) % 2) - 1)), M = L - C / 2;
+    const [r1, g1, b1] = h < 60 ? [C, X, 0] : h < 120 ? [X, C, 0] : h < 180 ? [0, C, X] : h < 240 ? [0, X, C] : h < 300 ? [X, 0, C] : [C, 0, X];
+    return "#" + [r1, g1, b1].map((v) => Math.round((v + M) * 255).toString(16).padStart(2, "0")).join("");
+  }
+  return `#${m[1].toLowerCase()}`;
+}
 
 // --------------------------------------------------------------- úložiště --
 
@@ -32,6 +60,7 @@ function ulozKoncept() {
       slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz }) => ({ typ, cerveny, bily, swipe, nadpis, text, dotaz })),
       popisek: $("#cPopisek").value,
       logo: logoRezim,
+      barvaNadpisu,
     }));
   } catch { /* soukromé okno */ }
 }
@@ -58,6 +87,14 @@ function nactiKoncept() {
   $("#cPopisek").value = k?.popisek || "";
   logoRezim = ["auto", "bila", "cerna", "vypnuto"].includes(k?.logo) ? k.logo : "auto";
   $("#cLogo").value = logoRezim;
+  barvaNadpisu = tematickaBarva(k?.barvaNadpisu) || BARVA_NADPISU;
+  ukazBarvu();
+}
+
+function ukazBarvu() {
+  const el = $("#cBarvaNadpisu");
+  if (el) el.value = barvaNadpisu;
+  document.querySelectorAll("#cBarvyVzory [data-barva]").forEach((b) => b.classList.toggle("on", b.dataset.barva === barvaNadpisu));
 }
 
 // ------------------------------------------------------------ bohatý text --
@@ -247,7 +284,7 @@ function kresliObsah(ctx, s) {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `700 ${vNadpis}px ${PISMO_OBSAH}`;
-  radkyNadpis.forEach((r, i) => kresliRadek(ctx, r, W / 2, prvniNadpis + i * rozestupNadpis, CERVENA));
+  radkyNadpis.forEach((r, i) => kresliRadek(ctx, r, W / 2, prvniNadpis + i * rozestupNadpis, barvaNadpisu));
   ctx.font = `italic 700 ${vText}px ${PISMO_OBSAH}`;
   radkyText.forEach((r, i) => kresliRadek(ctx, r, W / 2, prvniText + i * rozestupText, ZLUTA));
 }
@@ -453,12 +490,13 @@ const SCHEMA_CAROUSEL = {
         required: ["nadpis", "text", "foto_dotaz"],
       },
     },
+    barva_nadpisu: { type: "string", description: "hex barva zvýraznění v nadpisech slidů podle tématu (barvy týmu, země, emoce příběhu), světlá a čitelná na černém pozadí, NIKDY červená ani žlutá" },
     popisek: { type: "string", description: "text pod příspěvek bez hashtagů: hook (1 řádek), 1–2 krátké odstavce, krátká otázka. Max 400 znaků" },
     dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty prvního řádku popisku, každá podle jiného vzorce" },
     hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
     k_overeni: { type: "array", items: { type: "string" } },
   },
-  required: ["cerveny", "bily", "titul_foto_dotaz", "slidy", "popisek", "dalsi_hooky", "hashtagy", "k_overeni"],
+  required: ["cerveny", "bily", "titul_foto_dotaz", "slidy", "barva_nadpisu", "popisek", "dalsi_hooky", "hashtagy", "k_overeni"],
 };
 
 const SYSTEM_CAROUSEL = `Jsi redaktor Instagram účtu Deník hokeje (@denik_hokeje). Píšeš texty na příběhové carousely
@@ -468,7 +506,11 @@ Formát:
 - Titulní slide: "cerveny" = 1–2 slova (hlavní pojem), "bily" = krátký doplněk (např. rok s tečkou).
 - Každý další slide:
   - "nadpis": přesně 2 krátké věty (2–4 slova), každá na vlastním řádku (oddělené \\n), každá končí tečkou.
-    1–3 klíčová slova obal hvězdičkami *takhle* – zobrazí se červeně.
+    1–3 klíčová slova obal hvězdičkami *takhle* – zobrazí se tematickou barvou ("barva_nadpisu").
+- "barva_nadpisu": jedna barva pro zvýraznění v nadpisech celého carouselu, podle tématu – barva týmu nebo země
+  (Kometa/Rangers/Toronto modrá, Dallas/Minnesota zelená, Philadelphia/Flyers oranžová, Kings/Colorado fialová…),
+  u tragédií a vzpomínek stříbrná/ledová. Když je hlavní barva týmu červená nebo žlutá, vezmi jeho druhou barvu
+  (např. Detroit → stříbrná, Pittsburgh → stříbrná, Sparta → modrá). Musí být světlá a čitelná na černé.
   - "text": 1–2 krátké věty, celkem max 130 znaků, věty odděluj \\n. Jedna věta = jedna informace.
     Jména, čísla, data a důležitá slova obal hvězdičkami *takhle* – zobrazí se žlutě (zhruba každé 3.–4. slovo).
   - "foto_dotaz": dotaz na fotku pro tenhle slide.
@@ -539,6 +581,7 @@ window.DHKoncepty?.registruj("carousel", {
           ({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled })),
         popisek: $("#cPopisek").value,
         logo: logoRezim,
+        barvaNadpisu,
       },
       obrazky: Object.fromEntries(slidy.map((s, i) => [`s${i}`, s.img]).filter(([, img]) => img)),
       platno: slidy[0]?.platno,
@@ -555,6 +598,8 @@ window.DHKoncepty?.registruj("carousel", {
     vybrany = 0;
     logoRezim = d.logo || "auto";
     $("#cLogo").value = logoRezim;
+    barvaNadpisu = tematickaBarva(d.barvaNadpisu) || BARVA_NADPISU;
+    ukazBarvu();
     $("#cPopisek").value = d.popisek || "";
     vykresliSeznam();
     prepocitejPopisek();
@@ -598,6 +643,8 @@ async function navrhniCarousel(bezPotvrzeni = false) {
       zadani: `TÉMA A PODKLADY OD REDAKTORA:\n${zadani}\n\nVytvoř titulní slide a přesně ${pocet} dalších slidů.`,
       schema: SCHEMA_CAROUSEL,
     });
+    barvaNadpisu = tematickaBarva(r.barva_nadpisu) || BARVA_NADPISU;
+    ukazBarvu();
     slidy = [
       novySlide({ typ: "titul", cerveny: r.cerveny || "", bily: r.bily || "", swipe: true, dotaz: r.titul_foto_dotaz || "" }),
       ...(r.slidy || []).slice(0, MAX_SLIDU - 1).map((x) => novySlide({ typ: "obsah", nadpis: x.nadpis || "", text: x.text || "", dotaz: x.foto_dotaz || "" })),
@@ -707,6 +754,16 @@ function init() {
   });
 
   $("#cLogo").addEventListener("change", (e) => { logoRezim = e.target.value; vykresliVse(); ulozKoncept(); });
+  $("#cBarvyVzory").innerHTML = BARVY_NADPISU.map(([hex, nazev]) => `<button type="button" class="barva-vzor" data-barva="${hex}" title="${nazev}" style="background:${hex}"></button>`).join("");
+  const nastavBarvu = (hex, upozornit) => {
+    const ok = tematickaBarva(hex);
+    if (!ok) { if (upozornit) alert("Tahle barva by splývala s červenou titulu nebo se žlutým textem – vyber jinou."); ukazBarvu(); return; }
+    barvaNadpisu = ok;
+    ukazBarvu(); vykresliVse(); ulozKoncept();
+  };
+  $("#cBarvyVzory").addEventListener("click", (e) => { const b = e.target.closest("[data-barva]"); if (b) nastavBarvu(b.dataset.barva); });
+  $("#cBarvaNadpisu").addEventListener("change", (e) => nastavBarvu(e.target.value, true));
+  ukazBarvu();
   $("#cZoom").addEventListener("input", (e) => {
     const s = slidy[vybrany];
     if (!s.img) return;

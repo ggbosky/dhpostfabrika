@@ -411,6 +411,10 @@
   .foto-blok b { font: 800 13px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
   .barva-vzor { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #000; box-shadow: 0 0 0 1px var(--line-2); cursor: pointer; padding: 0; }
   .barva-vzor:hover { box-shadow: 0 0 0 2px #fff; }
+  .barva-vzor.on { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
+  .c-barvy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 14px; font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
+  .c-barvy input[type=color] { width: 44px; height: 32px; padding: 2px; }
+  .tematicka { color: #4db8ff; }
   input[type=radio] { width: auto; accent-color: var(--red-hot); }
   input:disabled { opacity: .55; }
   .koncept-stav { font-size: 13px; margin: 10px 0 0; min-height: 1em; }
@@ -754,8 +758,8 @@
           <h2 style="margin:0">Slidy</h2>
           <button type="button" class="btn ghost small" id="cReset">Začít znovu</button>
         </div>
-        <p class="muted napoveda">Slovo mezi hvězdičkami <code>*takhle*</code> bude v nadpisu <b class="cervena">červeně</b>
-          a v textu <b class="zluta">žlutě</b>. Enter v nadpisu = nový řádek. Fotku posuneš tažením po náhledu.</p>
+        <p class="muted napoveda">Slovo mezi hvězdičkami <code>*takhle*</code> bude v nadpisu <b class="tematicka">tematickou barvou</b>
+          (vybereš u náhledu) a v textu <b class="zluta">žlutě</b>. Červená zůstává jen na titulním slidu. Enter v nadpisu = nový řádek. Fotku posuneš tažením po náhledu.</p>
         <div id="slidy"></div>
         <div class="akce"><button type="button" class="btn ghost" id="cPridat">＋ Přidat slide</button></div>
       </div>
@@ -781,6 +785,11 @@
             <option value="auto">Automaticky</option><option value="bila">Bílé</option>
             <option value="cerna">Černé</option><option value="vypnuto">Bez loga</option>
           </select></label>
+      </div>
+      <div class="c-barvy">
+        <span class="muted">Barva nadpisů</span>
+        <div id="cBarvyVzory" class="radek" style="gap:6px"></div>
+        <input type="color" id="cBarvaNadpisu" title="Vlastní barva" value="#4db8ff">
       </div>
       <div id="cNahled" class="nahled"><canvas id="cPlatno" width="1080" height="1350" aria-label="Náhled slidu 1080×1350"></canvas></div>
       <div class="cela radek" id="cZoomRadek" hidden style="margin-top:12px">
@@ -1232,21 +1241,21 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261113b"></script>
-<script src="grafika.js?v=20261113b"></script>
-<script src="koncepty.js?v=20261113b"></script>
-<script src="ai.js?v=20261113b"></script>
-<script src="app.js?v=20261113b"></script>
-<script src="carousel.js?v=20261113b"></script>
-<script src="vyroci.js?v=20261113b"></script>
-<script src="zpravy.js?v=20261113b"></script>
-<script src="reels-ulozeni.js?v=20261113b"></script>
-<script src="reels-hlas.js?v=20261113b"></script>
-<script src="reels-render.js?v=20261113b"></script>
-<script src="reels-zabery.js?v=20261113b"></script>
-<script src="reels.js?v=20261113b"></script>
-<script src="plan.js?v=20261113b"></script>
-<script src="prehled.js?v=20261113b"></script>
-<script src="shell.js?v=20261113b"></script>
+<script src="sablony.js?v=20261113c"></script>
+<script src="grafika.js?v=20261113c"></script>
+<script src="koncepty.js?v=20261113c"></script>
+<script src="ai.js?v=20261113c"></script>
+<script src="app.js?v=20261113c"></script>
+<script src="carousel.js?v=20261113c"></script>
+<script src="vyroci.js?v=20261113c"></script>
+<script src="zpravy.js?v=20261113c"></script>
+<script src="reels-ulozeni.js?v=20261113c"></script>
+<script src="reels-hlas.js?v=20261113c"></script>
+<script src="reels-render.js?v=20261113c"></script>
+<script src="reels-zabery.js?v=20261113c"></script>
+<script src="reels.js?v=20261113c"></script>
+<script src="plan.js?v=20261113c"></script>
+<script src="prehled.js?v=20261113c"></script>
+<script src="shell.js?v=20261113c"></script>
 </body>
 </html>
