@@ -70,7 +70,7 @@ const prazdneBarvy = () => ({ hlavni: null, text: null, zvyrazneni: null });
 function barvySlidu(s) {
   const b = { ...prazdneBarvy(), ...(s.barvy || {}) };
   return s.typ === "titul"
-    ? { hlavni: b.hlavni || CERVENA, text: b.text || BILA }
+    ? { hlavni: b.hlavni || CERVENA, text: b.text || BILA, zvyrazneni: b.zvyrazneni || ZLUTA }
     : { hlavni: b.hlavni || barvaNadpisu, text: b.text || BILA, zvyrazneni: b.zvyrazneni || ZLUTA };
 }
 
@@ -235,8 +235,12 @@ function kresliSwipe(ctx) {
 }
 
 function kresliTitul(ctx, s) {
-  const cerveny = s.cerveny.trim().toUpperCase();
-  const bily = s.bily.trim().toUpperCase();
+  // *slovo* v nápisu = zvýraznění vlastní barvou (jen na tomhle slidu)
+  const cervenyZ = s.cerveny.trim().toUpperCase();
+  const bilyZ = s.bily.trim().toUpperCase();
+  const cerveny = cervenyZ.replace(/\*/g, "");
+  const bily = bilyZ.replace(/\*/g, "");
+  const barvy = barvySlidu(s);
   const sirka = W - 120;
   // Spodní řádek nesmí zasahovat do ikony „posuň dál“ vpravo dole (začíná na x ≈ 945):
   // text je na střed, takže jeho šířka je nejvýš 2 × (925 − 540) px.
@@ -251,13 +255,11 @@ function kresliTitul(ctx, s) {
   ctx.textBaseline = "alphabetic";
   if (cerveny) {
     ctx.font = `900 ${vCerveny}px ${PISMO_TITUL}`;
-    ctx.fillStyle = barvySlidu(s).hlavni;
-    ctx.fillText(cerveny, (W - ctx.measureText(cerveny).width) / 2, yCerveny);
+    kresliRadek(ctx, naSlova(cervenyZ), W / 2, yCerveny, barvy.zvyrazneni, barvy.hlavni);
   }
   if (bily) {
     ctx.font = `900 ${vBily}px ${PISMO_TITUL}`;
-    ctx.fillStyle = barvySlidu(s).text;
-    ctx.fillText(bily, (W - ctx.measureText(bily).width) / 2, yBily);
+    kresliRadek(ctx, naSlova(bilyZ), W / 2, yBily, barvy.zvyrazneni, barvy.text);
   }
   if (s.swipe) kresliSwipe(ctx);
 }
@@ -332,6 +334,7 @@ function kartaSlidu(s, i) {
          <label>Horní nápis (velký)<input data-k="cerveny" value="${esc(s.cerveny)}" placeholder="např. Jaroslavl"></label>
          <label>Dolní nápis<input data-k="bily" value="${esc(s.bily)}" placeholder="např. 2011."></label>
        </div>
+       <p class="muted" style="font-size:12px;margin:0">Tip: slovo v hvězdičkách (např. <code>*1990*</code>) dostane vlastní barvu zvýraznění.</p>
        <label class="check"><input type="checkbox" data-k="swipe"${s.swipe ? " checked" : ""}> Ikona „posuň dál“ vpravo dole</label>`
     : `<label>Nadpis<textarea data-k="nadpis" rows="2" placeholder="např. Černé *září*.&#10;Osudný *let* do *Minsku*.">${esc(s.nadpis)}</textarea></label>
        <label>Text<textarea data-k="text" rows="3" placeholder="např. *1. září 2011* mířil *Lokomotiv* na první zápas *sezóny*.">${esc(s.text)}</textarea></label>`;
@@ -364,9 +367,9 @@ let kapatko = null; // { i, klic } – čeká se na klik do náhledu (prohlíže
 function barvyHtml(s) {
   const b = barvySlidu(s);
   const pole = s.typ === "titul"
-    ? [["hlavni", "Horní nápis"], ["text", "Dolní nápis"]]
+    ? [["hlavni", "Horní nápis"], ["text", "Dolní nápis"], ["zvyrazneni", "Zvýraznění (*slovo*)"]]
     : [["hlavni", "Zvýraznění v nadpisu"], ["text", "Základní text"], ["zvyrazneni", "Zvýraznění v textu"]];
-  return `<div class="c-barvy-slidu">${pole.map(([k, n]) => `<div class="c-barva">
+  return `<div class="c-barvy-slidu"><b class="c-barvy-titulek">🎨 Barvy jen tohoto slidu</b>${pole.map(([k, n]) => `<div class="c-barva">
       <span>${n}</span>
       <input type="color" data-barva-slidu="${k}" value="${b[k]}" title="Vybrat barvu">
       <button type="button" class="ikona" data-akce="kapatko" data-klic="${k}" title="Kapátko – nabrat barvu z fotky">💧</button>
@@ -481,7 +484,7 @@ function prepocitejPopisek() {
 // ---------------------------------------------------------------- export --
 
 function nazevSouboru(i) {
-  const zaklad = G.slug([slidy[0].cerveny, slidy[0].bily].join(" ").trim() || "carousel");
+  const zaklad = G.slug([slidy[0].cerveny, slidy[0].bily].join(" ").replace(/\*/g, "").trim() || "carousel");
   return `denik-hokeje-${zaklad}-${String(i + 1).padStart(2, "0")}.jpg`;
 }
 
@@ -622,7 +625,7 @@ function nastavWebFoto(i, img, foto) {
 
 async function najdiFotku(i) {
   const s = slidy[i];
-  const vychozi = s.dotaz || (s.typ === "titul" ? [s.cerveny, s.bily].join(" ") : bezZnacek(s.nadpis)).trim();
+  const vychozi = s.dotaz || (s.typ === "titul" ? [s.cerveny, s.bily].join(" ").replace(/\*/g, "") : bezZnacek(s.nadpis)).trim();
   const v = await window.DHAI.vyberFoto(vychozi);
   if (!v) return;
   nastavWebFoto(i, v.img, v.foto);
@@ -638,7 +641,7 @@ window.DHKoncepty?.registruj("carousel", {
     vykresliVse();
     const titul = slidy[0] || {};
     return {
-      nazev: [titul.cerveny, titul.bily].filter(Boolean).join(" ").trim() || (slidy[1]?.nadpis || "").replace(/\*/g, "").split("\n")[0] || "Carousel",
+      nazev: [titul.cerveny, titul.bily].filter(Boolean).join(" ").replace(/\*/g, "").trim() || (slidy[1]?.nadpis || "").replace(/\*/g, "").split("\n")[0] || "Carousel",
       data: {
         slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled, barvy, varianty }) =>
           ({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled, barvy, varianty })),

@@ -653,6 +653,7 @@
   .c-barvy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 14px; font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
   .c-barvy input[type=color] { width: 44px; height: 32px; padding: 2px; }
   .c-barvy-slidu { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+  .c-barvy-titulek { flex-basis: 100%; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted, #9a9a9a); }
   .c-barva { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--uzke); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .c-barva input[type=color] { width: 36px; height: 30px; padding: 2px; border-radius: 8px; cursor: pointer; }
   .c-barva .ikona { width: 30px; height: 30px; font-size: 14px; }
@@ -1433,7 +1434,7 @@
           <p class="muted" style="font-size:13px;margin:14px 0 0">Zdarma je asi 20 návrhů denně na model (aplikace sama střídá modely), limit se obnovuje v 9:00. Fotky hledá na Wikimedia Commons – tam jsou fotky, které se smí použít s uvedením autora; ten se do popisku přidá sám.</p>
           <h3 style="margin:18px 0 6px">🖼️ Generování obrázků (YouTube miniatury)</h3>
           <label>Model pro obrázky<select id="aiObrModel"></select></label>
-          <p class="muted" style="font-size:13px;margin:8px 0 0">Obrázky generuje Google Gemini (stejný klíč jako výše). <b>V bezplatném režimu se obrázky negenerují</b> – v Google AI Studio je potřeba zapnout placení (Billing). Cena za jeden obrázek je u modelu uvedená; miniatury z vlastních fotek a texty fungují i bez toho.</p>
+          <p class="muted" style="font-size:13px;margin:8px 0 0"><b>Zdarma – Pollinations</b> nepotřebuje klíč ani placení (asi 1 obrázek za 15 s, logo služby se samo ořízne). Bere jen textové zadání – u konceptu se skutečným hráčem se fotka hráče položí na vygenerované pozadí, tvář se nemění. Modely <b>Nano Banana</b> mají vyšší kvalitu a umí pracovat s referenčními fotkami, ale vyžadují Gemini klíč se zapnutým placením v Google AI Studio (cena u modelu).</p>
         </div>
       </div>
     </div>
@@ -1506,27 +1507,27 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261114b"></script>
-<script src="grafika.js?v=20261114b"></script>
-<script src="koncepty.js?v=20261114b"></script>
-<script src="ai.js?v=20261114b"></script>
-<script src="app.js?v=20261114b"></script>
-<script src="carousel.js?v=20261114b"></script>
-<script src="vyroci.js?v=20261114b"></script>
-<script src="zpravy.js?v=20261114b"></script>
-<script src="reels-ulozeni.js?v=20261114b"></script>
-<script src="reels-hlas.js?v=20261114b"></script>
-<script src="reels-render.js?v=20261114b"></script>
-<script src="reels-zabery.js?v=20261114b"></script>
-<script src="reels.js?v=20261114b"></script>
-<script src="plan.js?v=20261114b"></script>
-<script src="stats.js?v=20261114b"></script>
-<script src="prehled.js?v=20261114b"></script>
-<script src="yt-ulozeni.js?v=20261114b"></script>
-<script src="miniatury.js?v=20261114b"></script>
-<script src="yt-api.js?v=20261114b"></script>
-<script src="yt-studio.js?v=20261114b"></script>
-<script src="yt-analytics.js?v=20261114b"></script>
-<script src="shell.js?v=20261114b"></script>
+<script src="sablony.js?v=20261114c"></script>
+<script src="grafika.js?v=20261114c"></script>
+<script src="koncepty.js?v=20261114c"></script>
+<script src="ai.js?v=20261114c"></script>
+<script src="app.js?v=20261114c"></script>
+<script src="carousel.js?v=20261114c"></script>
+<script src="vyroci.js?v=20261114c"></script>
+<script src="zpravy.js?v=20261114c"></script>
+<script src="reels-ulozeni.js?v=20261114c"></script>
+<script src="reels-hlas.js?v=20261114c"></script>
+<script src="reels-render.js?v=20261114c"></script>
+<script src="reels-zabery.js?v=20261114c"></script>
+<script src="reels.js?v=20261114c"></script>
+<script src="plan.js?v=20261114c"></script>
+<script src="stats.js?v=20261114c"></script>
+<script src="prehled.js?v=20261114c"></script>
+<script src="yt-ulozeni.js?v=20261114c"></script>
+<script src="miniatury.js?v=20261114c"></script>
+<script src="yt-api.js?v=20261114c"></script>
+<script src="yt-studio.js?v=20261114c"></script>
+<script src="yt-analytics.js?v=20261114c"></script>
+<script src="shell.js?v=20261114c"></script>
 </body>
 </html>

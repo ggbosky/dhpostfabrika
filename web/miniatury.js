@@ -17,11 +17,11 @@ const W = 1280, H = 720;
 const MAX_YT = 2 * 1024 * 1024; // YouTube: miniatura max. 2 MB
 
 const STYLY = {
-  A: { nazev: "Filmový dokument", popis: "dramatické světlo, tmavé pozadí, filmové barvy, vysoký kontrast", grade: "film" },
-  B: { nazev: "Historický archiv", popis: "autentická dobová atmosféra, archivní textura, dobová výstroj", grade: "archiv" },
-  C: { nazev: "Extrémní CTR", popis: "jeden dominantní subjekt, silná emoce, max. kontrast, minimum textu", grade: "ctr" },
-  D: { nazev: "Historická koláž", popis: "víc skutečných osobností, jasná hierarchie, redakční kompozice", grade: "film" },
-  E: { nazev: "Temná záhada", popis: "temná atmosféra, napětí, jedna akcentní barva", grade: "zahada" },
+  A: { nazev: "Filmový dokument", popis: "dramatické světlo, tmavé pozadí, filmové barvy, vysoký kontrast", en: "dramatic cinematic lighting, dark background, film color grade, high contrast", grade: "film" },
+  B: { nazev: "Historický archiv", popis: "autentická dobová atmosféra, archivní textura, dobová výstroj", en: "authentic vintage era atmosphere, archival film texture, period hockey equipment", grade: "archiv" },
+  C: { nazev: "Extrémní CTR", popis: "jeden dominantní subjekt, silná emoce, max. kontrast, minimum textu", en: "one dominant subject, strong emotion, maximum contrast, minimal clutter", grade: "ctr" },
+  D: { nazev: "Historická koláž", popis: "víc skutečných osobností, jasná hierarchie, redakční kompozice", en: "editorial collage feel, clear hierarchy", grade: "film" },
+  E: { nazev: "Temná záhada", popis: "temná atmosféra, napětí, jedna akcentní barva", en: "dark mysterious atmosphere, tension, a single accent color", grade: "zahada" },
 };
 const GRADY = {
   zadny: { nazev: "Bez úprav", filtr: "none" },
@@ -42,6 +42,12 @@ const REZIMY = {
   "ai-foto": "AI kompozice ze skutečné fotky",
   "ai-scena": "AI scéna bez tváří skutečných lidí",
   foto: "Jen skutečné fotky (bez AI, zdarma)",
+};
+
+// Popisky režimů, když je vybraný bezplatný generátor (jen text, bez referenčních fotek).
+const REZIMY_ZDARMA = {
+  "ai-foto": "Skutečná fotka na AI pozadí (zdarma)",
+  "ai-scena": "AI scéna bez tváří (zdarma)",
 };
 
 let p = null;            // otevřený projekt
@@ -208,15 +214,23 @@ function kresliCover(ctx, img, x, y, w, h, cy = 0.4) {
 }
 
 // Pozadí jen ze skutečných fotek – bez generování, bez úprav tváří.
-async function slozZFotek(k, fotky) {
+// pozadi (volitelné) = AI scéna bez lidí; skutečná fotka se na ni jen položí, tvář se nijak nemění.
+async function slozZFotek(k, fotky, pozadi = null) {
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d");
   const akcent = /^#[0-9a-f]{6}$/i.test(k.akcent || "") ? k.akcent : "#b0121a";
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#050505"); bg.addColorStop(1, akcent + "55");
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  const rozvrzeni = k.rozvrzeni || (fotky.length >= 3 ? "kolaz" : fotky.length === 2 ? "duel" : k.text_pozice === "vpravo" ? "vlevo" : "vpravo");
+  if (pozadi) {
+    kresliCover(ctx, pozadi, 0, 0, W, H, 0.5);
+    ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(0, 0, W, H);
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, "#050505"); bg.addColorStop(1, akcent + "55");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  }
+  const strana = k.text_pozice === "vpravo" ? "vlevo" : "vpravo";
+  let rozvrzeni = k.rozvrzeni || (fotky.length >= 3 ? "kolaz" : fotky.length === 2 ? "duel" : strana);
+  if (pozadi && rozvrzeni === "plna") rozvrzeni = strana;
   if (rozvrzeni === "kolaz" && fotky.length >= 2) {
     const n = Math.min(fotky.length, 4), sirka = W / n, sk = 70;
     const hrana = (j, nahore) => (j <= 0 ? 0 : j >= n ? W : j * sirka + (nahore ? sk / 2 : -sk / 2));
@@ -244,7 +258,18 @@ async function slozZFotek(k, fotky) {
     const vpravo = rozvrzeni !== "vlevo";
     const x = vpravo ? W * 0.36 : 0, w = W * 0.64;
     if (rozvrzeni === "plna") kresliCover(ctx, f, 0, 0, W, H);
-    else {
+    else if (pozadi) {
+      // fotka plynule přechází do AI pozadí (maska do průhledna)
+      const v = document.createElement("canvas");
+      v.width = W; v.height = H;
+      const vc = v.getContext("2d");
+      kresliCover(vc, f, x, 0, w, H);
+      vc.globalCompositeOperation = "destination-in";
+      const m = vc.createLinearGradient(vpravo ? x : x + w, 0, vpravo ? x + w * 0.5 : x + w * 0.5, 0);
+      m.addColorStop(0, "rgba(0,0,0,0)"); m.addColorStop(1, "rgba(0,0,0,1)");
+      vc.fillStyle = m; vc.fillRect(x, 0, w, H);
+      ctx.drawImage(v, 0, 0);
+    } else {
       kresliCover(ctx, f, x, 0, w, H);
       const pr = ctx.createLinearGradient(vpravo ? x : x + w, 0, vpravo ? x + w * 0.45 : x + w * 0.55, 0);
       pr.addColorStop(0, "rgba(5,5,5,1)"); pr.addColorStop(1, "rgba(5,5,5,0)");
@@ -403,6 +428,26 @@ async function vytvorPozadi(i, rezim = null) {
       if (!fotky.length) throw new Error("Nenašel jsem vhodnou skutečnou fotku – nahraj ji v kroku Zadání (Fotka hráče).");
       blob = await slozZFotek(k, fotky);
       zdroj = "foto";
+    } else if (AI().obrZdarma()) {
+      // Zdarma (Pollinations): generátor bere jen text, žádné referenční fotky.
+      const strana = { vlevo: "left", vpravo: "right", stred: "center", dole: "bottom", nahore: "top" }[k.text_pozice] || "left";
+      const bezLidi = rezim === "ai-foto";
+      let fotky = [];
+      if (bezLidi) {
+        fotky = await fotkyProKoncept(k);
+        if (!fotky.length) throw new Error("Režim AI kompozice ze skutečné fotky potřebuje fotku hráče – nahraj ji v kroku Zadání (Fotka hráče).");
+      }
+      const scena = String(k.prompt_en || "").split(/(?<=[.!?])\s+/).filter((v) => !bezLidi || !/reference|person|player|face|he |his |him /i.test(v)).join(" ") || "Dark atmospheric empty ice hockey arena, spotlight on the ice.";
+      const prompt = `${bezLidi ? "Empty background plate only, absolutely no people, no players, no faces, no silhouettes. " : ""}${scena}
+${STYLY[k.styl]?.en || ""}. Cinematic documentary photograph, 16:9 YouTube thumbnail background, dramatic lighting, strong contrast, clean empty space on the ${bezLidi ? (strana === "right" ? "right" : "left") : strana} side.
+No text, no letters, no numbers, no logos, no watermark, no recognizable real people.`;
+      const r = await AI().generujObrazek({ prompt, onStav: stav });
+      if (bezLidi) {
+        stav("Skládám skutečnou fotku na AI pozadí…");
+        const pozadi = await U().blobNaImg(r.blob);
+        blob = await slozZFotek(k, fotky, pozadi);
+      } else blob = r.blob;
+      zdroj = rezim; cena = 0;
     } else {
       const obrazky = [];
       if (rezim === "ai-foto") {
@@ -645,7 +690,7 @@ async function vykresliKoncepty() {
   if (!el) return;
   if (!p.koncepty.length) { el.innerHTML = `<div class="card"><p class="muted" style="margin:0">Zatím žádné koncepty – v kroku Zadání klikni na <b>🎬 Analyzovat a navrhnout koncepty</b>.</p></div>`; return; }
   const a = p.analyza;
-  const cena = AI().OBR_MODELY[AI().obrModel()]?.cena || 0.05;
+  const cena = AI().OBR_MODELY[AI().obrModel()]?.cena ?? 0.05;
   el.innerHTML = `
     ${a ? `<div class="card ai-karta mt-analyza"><h2>🎬 Kreativní ředitel</h2>
       <dl><dt>Publikum</dt><dd>${esc(a.publikum)}</dd><dt>Nejsilnější emoce</dt><dd>${esc(a.emoce)}</dd><dt>Klíčový detail</dt><dd>${esc(a.detail)}</dd>
@@ -653,7 +698,7 @@ async function vykresliKoncepty() {
       <dt>Doporučený styl</dt><dd><b>${esc(a.doporuceny_styl)} – ${esc(STYLY[a.doporuceny_styl]?.nazev || "")}</b>: ${esc(a.proc_styl)}</dd>
       ${a.poznatky_z_referenci && !/bez referencí/i.test(a.poznatky_z_referenci) ? `<dt>Z referencí</dt><dd>${esc(a.poznatky_z_referenci)}</dd>` : ""}</dl></div>` : ""}
     <div class="akce" style="margin:14px 0"><button type="button" class="btn small" data-mt="vse">⚡ Vytvořit pozadí u všech</button>
-      <span class="muted" style="align-self:center;font-size:13px">AI obrázek ≈ ${cena.toLocaleString("cs-CZ")} USD · „Jen skutečné fotky“ je zdarma</span></div>
+      <span class="muted" style="align-self:center;font-size:13px">${AI().obrZdarma() ? "AI obrázky zdarma (Pollinations) · 1 obrázek za ~15 s · placený Gemini jde zapnout v Můj styl" : `AI obrázek ≈ ${cena.toLocaleString("cs-CZ")} USD · „Jen skutečné fotky“ je zdarma`}</span></div>
     <div class="mt-koncepty">${p.koncepty.map((k, i) => `
       <article class="card mt-koncept" data-i="${i}">
         <div class="mt-koncept-hlava"><span class="mt-styl">${esc(k.styl)} · ${esc(STYLY[k.styl]?.nazev || "")}</span><b>${esc(k.nazev)}</b></div>
@@ -661,7 +706,7 @@ async function vykresliKoncepty() {
         <p>${esc(k.kompozice)}</p>
         <p class="mt-proc">💡 ${esc(k.proc_klikne)}</p>
         <p class="muted" style="font-size:13px;margin:0">Text: ${k.texty?.filter(Boolean).length ? k.texty.filter(Boolean).map((t) => `<b>${esc(t)}</b>`).join(" / ") : "<i>bez textu</i>"}</p>
-        <label style="margin-top:8px">Jak vytvořit pozadí<select data-mt-rezim="${i}">${Object.entries(REZIMY).map(([r, n]) => `<option value="${r}" ${k.rezim === r ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label style="margin-top:8px">Jak vytvořit pozadí<select data-mt-rezim="${i}">${Object.entries(REZIMY).map(([r, n]) => `<option value="${r}" ${k.rezim === r ? "selected" : ""}>${AI().obrZdarma() && REZIMY_ZDARMA[r] || n}</option>`).join("")}</select></label>
         <div class="mt-stav muted"></div>
         <div class="radek" style="gap:6px;margin-top:8px">
           <button type="button" class="btn small" data-mt-vytvor="${i}">${k.varianty.length ? "↻ Nová varianta" : "Vytvořit pozadí"}</button>
@@ -919,13 +964,13 @@ function init() {
     if (d.mt === "vse") {
       const ai = p.koncepty.filter((k) => k.rezim !== "foto").length;
       const cena = (AI().OBR_MODELY[AI().obrModel()]?.cena || 0.05) * ai;
-      if (ai && !confirm(`Vytvořit pozadí u ${p.koncepty.length} konceptů? ${ai}× AI obrázek ≈ ${cena.toFixed(2)} USD (účtuje Google).`)) return;
+      if (ai && !AI().obrZdarma() && !confirm(`Vytvořit pozadí u ${p.koncepty.length} konceptů? ${ai}× AI obrázek ≈ ${cena.toFixed(2)} USD (účtuje Google).`)) return;
       for (let i = 0; i < p.koncepty.length; i++) await vytvorPozadi(i);
       return;
     }
     if (d.mtVytvor !== undefined) {
       const i = +d.mtVytvor, k = p.koncepty[i];
-      if (k.rezim !== "foto" && !confirm(`Vygenerovat AI obrázek? ≈ ${(AI().OBR_MODELY[AI().obrModel()]?.cena || 0.05).toLocaleString("cs-CZ")} USD (účtuje Google).`)) return;
+      if (k.rezim !== "foto" && !AI().obrZdarma() && !confirm(`Vygenerovat AI obrázek? ≈ ${(AI().OBR_MODELY[AI().obrModel()]?.cena || 0.05).toLocaleString("cs-CZ")} USD (účtuje Google).`)) return;
       await vytvorPozadi(i);
       if (krok === "editor") vykresliEditor();
       return;

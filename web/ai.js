@@ -468,17 +468,66 @@ async function obrazekProAI(zdroj, max = 1280, kvalita = 0.85) {
   return { mime: "image/jpeg", data: url.split(",")[1] };
 }
 
-// Generování obrázků: Gemini (Nano Banana). Bezplatný tier obrázky negeneruje – je potřeba placení v Google AI Studio.
+// Generování obrázků: zdarma přes Pollinations (bez klíče) nebo placeně přes Gemini (Nano Banana).
 const KLIC_OBR_MODEL = "dhpf_obr_model";
 const OBR_MODELY = {
+  "pollinations": { nazev: "Zdarma – Pollinations (bez klíče, bez placení)", cena: 0, zdarma: true },
   "gemini-nano-banana-2.1": { nazev: "Nano Banana 2.1 – nejlepší poměr cena/kvalita (doporučeno)", cena: 0.0504 },
   "gemini-3-pro-image": { nazev: "Nano Banana Pro – nejvyšší kvalita, složité kompozice", cena: 0.134 },
   "gemini-3.1-flash-image": { nazev: "Nano Banana 2 (3.1 Flash Image)", cena: 0.101 },
   "gemini-3.1-flash-lite-image": { nazev: "Nano Banana 2 Lite – nejlevnější (jen 1K)", cena: 0.0336, velikost: "1K" },
 };
-const obrModel = () => (OBR_MODELY[nacti(KLIC_OBR_MODEL)] ? nacti(KLIC_OBR_MODEL) : "gemini-nano-banana-2.1");
+const obrModel = () => (OBR_MODELY[nacti(KLIC_OBR_MODEL)] ? nacti(KLIC_OBR_MODEL) : "pollinations");
+const obrZdarma = (m = obrModel()) => !!OBR_MODELY[m]?.zdarma;
 
-async function generujObrazek({ prompt, obrazky = [], model = obrModel(), pomer = "16:9", velikost, casovyLimit = 150000 }) {
+// Pollinations: anonymní přístup = 1 obrázek / ~15 s a malé logo vpravo dole (to se ořízne).
+let pollPosledni = 0;
+async function generujZdarma({ prompt, casovyLimit = 150000, onStav }) {
+  const text = prompt.replace(/\s+/g, " ").trim().slice(0, 1500);
+  const seed = Math.floor(Math.random() * 1e9);
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(text)}?width=1280&height=800&seed=${seed}&nologo=true&safe=true`;
+  for (let pokus = 0; pokus < 4; pokus++) {
+    const cekat = pollPosledni + 16000 - Date.now();
+    if (cekat > 0) { onStav?.(`Bezplatný generátor povoluje 1 obrázek za 15 s – čekám ${Math.ceil(cekat / 1000)} s…`); await pockej(cekat); }
+    pollPosledni = Date.now();
+    onStav?.("Generuji obrázek zdarma (Pollinations)… obvykle 10–40 s");
+    const preruseni = new AbortController();
+    const casovac = setTimeout(() => preruseni.abort(), casovyLimit);
+    let r;
+    try { r = await fetch(url, { signal: preruseni.signal }); }
+    catch (e) { clearTimeout(casovac); throw new AIChyba(e.name === "AbortError" ? "Generování obrázku trvalo moc dlouho, zkus to znovu." : "Bezplatný generátor (Pollinations) je nedostupný – zkus to za chvíli."); }
+    clearTimeout(casovac);
+    if (r.status === 429 || r.status === 503 || r.status === 502) {
+      const s = Math.min(60, Math.max(16, +r.headers.get("Retry-After") || 20));
+      onStav?.(`Generátor je vytížený – zkusím to znovu za ${s} s…`);
+      pollPosledni = Date.now() + s * 1000 - 16000;
+      continue;
+    }
+    if (!r.ok) throw new AIChyba(`Bezplatný generátor vrátil chybu ${r.status}. Zkus to znovu nebo uprav koncept.`);
+    const blob = await r.blob();
+    if (!/^image\//.test(blob.type)) throw new AIChyba("Bezplatný generátor nevrátil obrázek. Zkus to znovu.");
+    return { blob: await oriznNa169(blob), model: "pollinations", cena: 0 };
+  }
+  throw new AIChyba("Bezplatný generátor je teď přetížený – zkus to za pár minut.");
+}
+
+// Ořízne spodní pruh (logo služby) a vystředí výřez 16:9 v rozlišení 1280×720.
+async function oriznNa169(blob) {
+  const img = await new Promise((ok, chyba) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => chyba(new AIChyba("Obrázek z generátoru nejde načíst.")); i.src = URL.createObjectURL(blob); });
+  const w = img.naturalWidth, h = img.naturalHeight * 0.92;
+  let sw = w, sh = (w * 9) / 16;
+  if (sh > h) { sh = h; sw = (h * 16) / 9; }
+  const c = document.createElement("canvas");
+  c.width = 1280; c.height = 720;
+  const ctx = c.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, (w - sw) / 2, Math.max(0, (h - sh) / 2), sw, sh, 0, 0, 1280, 720);
+  URL.revokeObjectURL(img.src);
+  return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.93));
+}
+
+async function generujObrazek({ prompt, obrazky = [], model = obrModel(), pomer = "16:9", velikost, casovyLimit = 150000, onStav }) {
+  if (OBR_MODELY[model]?.zdarma) return generujZdarma({ prompt, casovyLimit, onStav });
   if (!maGemini()) throw new AIChyba("Generování obrázků běží přes Google Gemini – vlož Gemini klíč v Můj styl → AI pomocník (a v Google AI Studio zapni placení).");
   velikost = velikost || OBR_MODELY[model]?.velikost || "2K";
   const casti = [...obrazky.map((o) => ({ inlineData: { mimeType: o.mime, data: o.data } })), { text: prompt }];
@@ -1018,7 +1067,7 @@ function init() {
   initNastroje();
   const sel = $("#aiObrModel");
   if (sel) {
-    sel.innerHTML = Object.entries(OBR_MODELY).map(([k, m]) => `<option value="${k}">${m.nazev} · ~${m.cena.toLocaleString("cs-CZ")} USD/obrázek</option>`).join("");
+    sel.innerHTML = Object.entries(OBR_MODELY).map(([k, m]) => `<option value="${k}">${m.nazev}${m.zdarma ? "" : ` · ~${m.cena.toLocaleString("cs-CZ")} USD/obrázek`}</option>`).join("");
     sel.value = obrModel();
     sel.addEventListener("change", () => uloz(KLIC_OBR_MODEL, sel.value));
   }
@@ -1089,6 +1138,6 @@ function init() {
   });
 }
 
-window.DHAI = { obrazekProAI, generujObrazek, OBR_MODELY, obrModel, nastavObrModel: (m) => uloz(KLIC_OBR_MODEL, m), COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
+window.DHAI = { obrazekProAI, generujObrazek, OBR_MODELY, obrModel, obrZdarma, nastavObrModel: (m) => uloz(KLIC_OBR_MODEL, m), COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
 init();
 })();
