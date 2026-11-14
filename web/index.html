@@ -652,6 +652,14 @@
   .barva-vzor.on { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
   .c-barvy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 14px; font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
   .c-barvy input[type=color] { width: 44px; height: 32px; padding: 2px; }
+  .c-barvy-slidu { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+  .c-barva { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--uzke); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .c-barva input[type=color] { width: 36px; height: 30px; padding: 2px; border-radius: 8px; cursor: pointer; }
+  .c-barva .ikona { width: 30px; height: 30px; font-size: 14px; }
+  .c-varianty { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+  .c-varianty .tn-hook { font: 700 12.5px var(--uzke); letter-spacing: .03em; text-transform: uppercase; }
+  .c-stav { font-size: 12.5px; }
+  #cNahled.kapatko, #cNahled.kapatko canvas { cursor: crosshair !important; outline: 3px dashed var(--yellow); outline-offset: 3px; }
   .tematicka { color: #4db8ff; }
   input[type=radio] { width: auto; accent-color: var(--red-hot); }
   input:disabled { opacity: .55; }
@@ -1010,7 +1018,7 @@
           <button type="button" class="btn ghost small" id="cReset">Začít znovu</button>
         </div>
         <p class="muted napoveda">Slovo mezi hvězdičkami <code>*takhle*</code> bude v nadpisu <b class="tematicka">tematickou barvou</b>
-          (vybereš u náhledu) a v textu <b class="zluta">žlutě</b>. Červená zůstává jen na titulním slidu. Enter v nadpisu = nový řádek. Fotku posuneš tažením po náhledu.</p>
+          (vybereš u náhledu) a v textu <b class="zluta">žlutě</b>. Barvy jde u každého slidu změnit – 💧 kapátko nabere barvu přímo z fotky. Enter v nadpisu = nový řádek. Fotku posuneš tažením po náhledu.</p>
         <div id="slidy"></div>
         <div class="akce"><button type="button" class="btn ghost" id="cPridat">＋ Přidat slide</button></div>
       </div>
@@ -1498,27 +1506,27 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261114a"></script>
-<script src="grafika.js?v=20261114a"></script>
-<script src="koncepty.js?v=20261114a"></script>
-<script src="ai.js?v=20261114a"></script>
-<script src="app.js?v=20261114a"></script>
-<script src="carousel.js?v=20261114a"></script>
-<script src="vyroci.js?v=20261114a"></script>
-<script src="zpravy.js?v=20261114a"></script>
-<script src="reels-ulozeni.js?v=20261114a"></script>
-<script src="reels-hlas.js?v=20261114a"></script>
-<script src="reels-render.js?v=20261114a"></script>
-<script src="reels-zabery.js?v=20261114a"></script>
-<script src="reels.js?v=20261114a"></script>
-<script src="plan.js?v=20261114a"></script>
-<script src="stats.js?v=20261114a"></script>
-<script src="prehled.js?v=20261114a"></script>
-<script src="yt-ulozeni.js?v=20261114a"></script>
-<script src="miniatury.js?v=20261114a"></script>
-<script src="yt-api.js?v=20261114a"></script>
-<script src="yt-studio.js?v=20261114a"></script>
-<script src="yt-analytics.js?v=20261114a"></script>
-<script src="shell.js?v=20261114a"></script>
+<script src="sablony.js?v=20261114b"></script>
+<script src="grafika.js?v=20261114b"></script>
+<script src="koncepty.js?v=20261114b"></script>
+<script src="ai.js?v=20261114b"></script>
+<script src="app.js?v=20261114b"></script>
+<script src="carousel.js?v=20261114b"></script>
+<script src="vyroci.js?v=20261114b"></script>
+<script src="zpravy.js?v=20261114b"></script>
+<script src="reels-ulozeni.js?v=20261114b"></script>
+<script src="reels-hlas.js?v=20261114b"></script>
+<script src="reels-render.js?v=20261114b"></script>
+<script src="reels-zabery.js?v=20261114b"></script>
+<script src="reels.js?v=20261114b"></script>
+<script src="plan.js?v=20261114b"></script>
+<script src="stats.js?v=20261114b"></script>
+<script src="prehled.js?v=20261114b"></script>
+<script src="yt-ulozeni.js?v=20261114b"></script>
+<script src="miniatury.js?v=20261114b"></script>
+<script src="yt-api.js?v=20261114b"></script>
+<script src="yt-studio.js?v=20261114b"></script>
+<script src="yt-analytics.js?v=20261114b"></script>
+<script src="shell.js?v=20261114b"></script>
 </body>
 </html>

@@ -57,7 +57,7 @@ function tematickaBarva(hex) {
 function ulozKoncept() {
   try {
     localStorage.setItem("dhpf_carousel", JSON.stringify({
-      slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz }) => ({ typ, cerveny, bily, swipe, nadpis, text, dotaz })),
+      slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz, barvy, varianty }) => ({ typ, cerveny, bily, swipe, nadpis, text, dotaz, barvy, varianty })),
       popisek: $("#cPopisek").value,
       logo: logoRezim,
       barvaNadpisu,
@@ -65,8 +65,19 @@ function ulozKoncept() {
   } catch { /* soukromé okno */ }
 }
 
+// Barvy slidu: null = výchozí (titul: červená + bílá, obsah: tematická barva nadpisů + bílá + žlutá).
+const prazdneBarvy = () => ({ hlavni: null, text: null, zvyrazneni: null });
+function barvySlidu(s) {
+  const b = { ...prazdneBarvy(), ...(s.barvy || {}) };
+  return s.typ === "titul"
+    ? { hlavni: b.hlavni || CERVENA, text: b.text || BILA }
+    : { hlavni: b.hlavni || barvaNadpisu, text: b.text || BILA, zvyrazneni: b.zvyrazneni || ZLUTA };
+}
+
 function novySlide(data) {
   const s = { typ: "obsah", cerveny: "", bily: "", swipe: true, nadpis: "", text: "", ...data };
+  s.barvy = { ...prazdneBarvy(), ...(data?.barvy || {}) };
+  s.varianty = data?.varianty || [];
   s.img = null;
   s.nazevFota = "";
   s.kredit = "";
@@ -142,13 +153,13 @@ function zalom(ctx, text, maxSirka) {
   return radky;
 }
 
-function kresliRadek(ctx, radek, stred, y, barvaZvyrazneni) {
+function kresliRadek(ctx, radek, stred, y, barvaZvyrazneni, zaklad = BILA) {
   const mezera = ctx.measureText(" ").width;
   const celkem = radek.reduce((s, sl) => s + sirkaSlova(ctx, sl), 0) + mezera * (radek.length - 1);
   let x = stred - celkem / 2;
   for (const slovo of radek) {
     for (const u of slovo) {
-      ctx.fillStyle = u.a ? barvaZvyrazneni : BILA;
+      ctx.fillStyle = u.a ? barvaZvyrazneni : zaklad;
       ctx.fillText(u.t, x, y);
       x += ctx.measureText(u.t).width;
     }
@@ -240,12 +251,12 @@ function kresliTitul(ctx, s) {
   ctx.textBaseline = "alphabetic";
   if (cerveny) {
     ctx.font = `900 ${vCerveny}px ${PISMO_TITUL}`;
-    ctx.fillStyle = CERVENA;
+    ctx.fillStyle = barvySlidu(s).hlavni;
     ctx.fillText(cerveny, (W - ctx.measureText(cerveny).width) / 2, yCerveny);
   }
   if (bily) {
     ctx.font = `900 ${vBily}px ${PISMO_TITUL}`;
-    ctx.fillStyle = BILA;
+    ctx.fillStyle = barvySlidu(s).text;
     ctx.fillText(bily, (W - ctx.measureText(bily).width) / 2, yBily);
   }
   if (s.swipe) kresliSwipe(ctx);
@@ -284,9 +295,10 @@ function kresliObsah(ctx, s) {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `700 ${vNadpis}px ${PISMO_OBSAH}`;
-  radkyNadpis.forEach((r, i) => kresliRadek(ctx, r, W / 2, prvniNadpis + i * rozestupNadpis, barvaNadpisu));
+  const b = barvySlidu(s);
+  radkyNadpis.forEach((r, i) => kresliRadek(ctx, r, W / 2, prvniNadpis + i * rozestupNadpis, b.hlavni, b.text));
   ctx.font = `italic 700 ${vText}px ${PISMO_OBSAH}`;
-  radkyText.forEach((r, i) => kresliRadek(ctx, r, W / 2, prvniText + i * rozestupText, ZLUTA));
+  radkyText.forEach((r, i) => kresliRadek(ctx, r, W / 2, prvniText + i * rozestupText, b.zvyrazneni, b.text));
 }
 
 function vykresliSlide(i) {
@@ -317,8 +329,8 @@ function esc(s) {
 function kartaSlidu(s, i) {
   const pole = s.typ === "titul"
     ? `<div class="dva">
-         <label>Červený nápis<input data-k="cerveny" value="${esc(s.cerveny)}" placeholder="např. Jaroslavl"></label>
-         <label>Bílý nápis<input data-k="bily" value="${esc(s.bily)}" placeholder="např. 2011."></label>
+         <label>Horní nápis (velký)<input data-k="cerveny" value="${esc(s.cerveny)}" placeholder="např. Jaroslavl"></label>
+         <label>Dolní nápis<input data-k="bily" value="${esc(s.bily)}" placeholder="např. 2011."></label>
        </div>
        <label class="check"><input type="checkbox" data-k="swipe"${s.swipe ? " checked" : ""}> Ikona „posuň dál“ vpravo dole</label>`
     : `<label>Nadpis<textarea data-k="nadpis" rows="2" placeholder="např. Černé *září*.&#10;Osudný *let* do *Minsku*.">${esc(s.nadpis)}</textarea></label>
@@ -334,6 +346,9 @@ function kartaSlidu(s, i) {
     </div>
     <div class="slide-pole">
       ${pole}
+      ${s.typ === "titul" && s.varianty?.length ? `<div class="c-varianty"><span class="muted">Varianty obálky:</span>${s.varianty.map((v, j) => `<button type="button" class="tn-hook ${v.cerveny === s.cerveny && v.bily === s.bily ? "on" : ""}" data-akce="varianta" data-j="${j}"><b style="color:${barvySlidu(s).hlavni}">${esc(v.cerveny)}</b> ${esc(v.bily)}</button>`).join("")}</div>` : ""}
+      ${barvyHtml(s)}
+      <div class="radek" style="gap:6px"><button type="button" class="btn ghost small" data-akce="uderneji" title="AI přepíše texty tohoto slidu úderněji">🔥 Úderněji</button><span class="c-stav muted"></span></div>
       <div class="foto-radek">
         <label class="btn ghost small" style="color:var(--text);font-weight:600">📷 ${s.img ? "Vlastní fotka" : "Nahrát fotku"}<input type="file" accept="image/*" data-akce="foto"></label>
         <button type="button" class="btn ghost small" data-akce="webFoto">🔍 Najít fotku</button>
@@ -341,6 +356,43 @@ function kartaSlidu(s, i) {
       </div>
     </div>
   </div>`;
+}
+
+const KAPATKO_NATIVNI = typeof window.EyeDropper === "function";
+let kapatko = null; // { i, klic } – čeká se na klik do náhledu (prohlížeče bez EyeDropper)
+
+function barvyHtml(s) {
+  const b = barvySlidu(s);
+  const pole = s.typ === "titul"
+    ? [["hlavni", "Horní nápis"], ["text", "Dolní nápis"]]
+    : [["hlavni", "Zvýraznění v nadpisu"], ["text", "Základní text"], ["zvyrazneni", "Zvýraznění v textu"]];
+  return `<div class="c-barvy-slidu">${pole.map(([k, n]) => `<div class="c-barva">
+      <span>${n}</span>
+      <input type="color" data-barva-slidu="${k}" value="${b[k]}" title="Vybrat barvu">
+      <button type="button" class="ikona" data-akce="kapatko" data-klic="${k}" title="Kapátko – nabrat barvu z fotky">💧</button>
+      ${s.barvy?.[k] ? `<button type="button" class="ikona" data-akce="barvaReset" data-klic="${k}" title="Výchozí barva">↺</button>` : ""}
+    </div>`).join("")}</div>`;
+}
+
+async function spustKapatko(i, klic) {
+  if (KAPATKO_NATIVNI) {
+    try {
+      const r = await new window.EyeDropper().open();
+      nastavBarvuSlidu(i, klic, r.sRGBHex);
+    } catch { /* uživatel zrušil */ }
+    return;
+  }
+  kapatko = { i, klic };
+  vyber(i, false);
+  $("#cNahled").classList.add("kapatko");
+  window.DHToast?.("💧 Klikni do náhledu na místo, odkud chceš barvu nabrat.", "info");
+}
+
+function nastavBarvuSlidu(i, klic, hex) {
+  const s = slidy[i];
+  s.barvy = { ...prazdneBarvy(), ...(s.barvy || {}), [klic]: hex };
+  vykresliSeznam();
+  ulozKoncept();
 }
 
 function vykresliSeznam() {
@@ -475,8 +527,9 @@ async function stahniVse() {
 const SCHEMA_CAROUSEL = {
   type: "object",
   properties: {
-    cerveny: { type: "string", description: "titulní slide: 1–2 slova, hlavní pojem (místo, jméno, tým) – obří červené písmo" },
-    bily: { type: "string", description: "titulní slide: krátký doplněk 1–3 slova, např. rok s tečkou – bílé písmo" },
+    cerveny: { type: "string", description: "obálka – horní obří nápis: 1–3 slova, háček (číslo, silné slovo, zvrat)" },
+    bily: { type: "string", description: "obálka – dolní nápis: 2–4 slova, které doplní háček a vyvolají otázku" },
+    dalsi_obalky: { type: "array", items: { type: "object", properties: { cerveny: { type: "string" }, bily: { type: "string" } }, required: ["cerveny", "bily"] }, description: "3 další varianty obálky, každá jiným vzorcem" },
     titul_foto_dotaz: { type: "string" },
     slidy: {
       type: "array",
@@ -496,14 +549,22 @@ const SCHEMA_CAROUSEL = {
     hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
     k_overeni: { type: "array", items: { type: "string" } },
   },
-  required: ["cerveny", "bily", "titul_foto_dotaz", "slidy", "barva_nadpisu", "popisek", "dalsi_hooky", "hashtagy", "k_overeni"],
+  required: ["cerveny", "bily", "dalsi_obalky", "titul_foto_dotaz", "slidy", "barva_nadpisu", "popisek", "dalsi_hooky", "hashtagy", "k_overeni"],
 };
 
 const SYSTEM_CAROUSEL = `Jsi redaktor Instagram účtu Deník hokeje (@denik_hokeje). Píšeš texty na příběhové carousely
 o hokeji: krátké, úderné, emotivní, každá věta končí tečkou.
 
+OBÁLKA (titulní slide) rozhoduje, jestli člověk swipne. Musí otevřít otázku, na kterou chce znát odpověď.
+- "cerveny" = 1–3 slova, obří písmo: číslo, silné slovo nebo zvrat. "bily" = 2–4 slova, která háček dokončí.
+- Vzorce: šokující číslo („44 ZÁPASŮ“ / „ANI JEDNA PROHRA“) · zvrat („ODEŠEL ZA SLÁVOU“ / „VRÁTIL SE S NIČÍM“)
+  · otázka bez odpovědi („PROČ HO“ / „NIKDO NECHTĚL?“) · tajemství („TOHLE O JÁGROVI“ / „SKORO NIKDO NEVÍ“)
+  · kontrast („HRDINA NAGANA“ / „DOMA ZATRACENÝ“) · rok + událost jen když je sama o sobě silná („JAROSLAVL“ / „2011.“).
+- ŠPATNĚ: obecné a nic neslibující obálky typu „OSUD / JAROMÍRA JÁGRA“, „PŘÍBĚH / LEGENDY“, „HISTORIE / KOMETY“.
+- Obálka musí být PRAVDIVÁ – slibuje jen to, co carousel opravdu ukáže. Do "dalsi_obalky" dej 3 další varianty jinými vzorci.
+
 Formát:
-- Titulní slide: "cerveny" = 1–2 slova (hlavní pojem), "bily" = krátký doplněk (např. rok s tečkou).
+- Titulní slide: viz OBÁLKA.
 - Každý další slide:
   - "nadpis": přesně 2 krátké věty (2–4 slova), každá na vlastním řádku (oddělené \\n), každá končí tečkou.
     1–3 klíčová slova obal hvězdičkami *takhle* – zobrazí se tematickou barvou ("barva_nadpisu").
@@ -515,7 +576,9 @@ Formát:
     Jména, čísla, data a důležitá slova obal hvězdičkami *takhle* – zobrazí se žlutě (zhruba každé 3.–4. slovo).
   - "foto_dotaz": dotaz na fotku pro tenhle slide.
 - Titulní slide musí vzbudit zvědavost – člověk MUSÍ chtít swipnout (jméno/místo + rok nebo číslo).
-- Slidy tvoří příběh: háček → průběh → vyvrcholení → pointa. Každý slide končí tak, aby chtěl člověk vidět další.
+- Slidy tvoří příběh: háček → průběh → vyvrcholení → pointa. Každý slide končí tak, aby chtěl člověk vidět další
+  (otevřená otázka, „ale pak…“, nečekaný detail). Slide 2 okamžitě navazuje na slib obálky – žádný pomalý úvod.
+- Nadpisy jsou úderné jako titulky novin: konkrétní slovo, sloveso v akci, žádné „Začátek příběhu.“, „Co se stalo dál.“.
   Poslední slide má emoci nebo překvapivou pointu, žádné shrnutí.
 - Na slidech žádná vata: žádné „V tomto příspěvku“, „Pojďme na to“, žádné opakování titulku.
 
@@ -577,8 +640,8 @@ window.DHKoncepty?.registruj("carousel", {
     return {
       nazev: [titul.cerveny, titul.bily].filter(Boolean).join(" ").trim() || (slidy[1]?.nadpis || "").replace(/\*/g, "").split("\n")[0] || "Carousel",
       data: {
-        slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled }) =>
-          ({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled })),
+        slidy: slidy.map(({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled, barvy, varianty }) =>
+          ({ typ, cerveny, bily, swipe, nadpis, text, dotaz, kredit, url, nazevFota, pohled, barvy, varianty })),
         popisek: $("#cPopisek").value,
         logo: logoRezim,
         barvaNadpisu,
@@ -625,6 +688,44 @@ window.DHCarousel = {
   ].filter(Boolean).join("\n\n"),
 };
 
+// AI přepíše jeden slide úderněji (u obálky vrátí 4 varianty na výběr).
+async function uderneji(i, tlacitko) {
+  const AI = window.DHAI;
+  const s = slidy[i];
+  const stav = tlacitko.closest(".slide-karta").querySelector(".c-stav");
+  if (!AI.maKlic()) { stav.innerHTML = 'Potřebuje AI klíč – <a href="#" data-jdi-na-ai>nastavit</a>.'; return; }
+  const kontext = slidy.map((x, j) => `${j + 1}. ${x.typ === "titul" ? `OBÁLKA: ${x.cerveny} / ${x.bily}` : `${x.nadpis.replace(/\n/g, " ")} — ${x.text.replace(/\n/g, " ")}`}`).join("\n");
+  tlacitko.disabled = true; stav.textContent = "Přepisuji…";
+  try {
+    if (s.typ === "titul") {
+      const r = await AI.gemini({
+        system: `${SYSTEM_CAROUSEL}\nFakta a jména NEMĚŇ a nevymýšlej. Vrať 4 nové varianty obálky, každou jiným vzorcem, verzálky.`,
+        zadani: `CELÝ CAROUSEL:\n${kontext}\n\nNapiš 4 údernější varianty obálky (cerveny + bily), které víc lákají ke swipnutí.`,
+        schema: { type: "object", properties: { varianty: { type: "array", items: { type: "object", properties: { cerveny: { type: "string" }, bily: { type: "string" } }, required: ["cerveny", "bily"] } } }, required: ["varianty"] },
+      });
+      const v = (r.varianty || []).filter((x) => x.cerveny || x.bily);
+      if (!v.length) throw new Error("AI žádnou variantu nevymyslela.");
+      s.varianty = [{ cerveny: s.cerveny, bily: s.bily }, ...v].slice(0, 5);
+      Object.assign(s, { cerveny: v[0].cerveny, bily: v[0].bily });
+    } else {
+      const r = await AI.gemini({
+        system: `${SYSTEM_CAROUSEL}\nFakta, čísla, jména a data NEMĚŇ a nevymýšlej. Zachovej formát nadpisu (2 krátké věty na 2 řádcích) a *hvězdičky*.`,
+        zadani: `CELÝ CAROUSEL:\n${kontext}\n\nPřepiš slide ${i + 1} úderněji: silnější nadpis, kratší text (max 130 znaků), konec, který táhne na další slide.`,
+        schema: { type: "object", properties: { nadpis: { type: "string" }, text: { type: "string" } }, required: ["nadpis", "text"] },
+      });
+      s.nadpis = r.nadpis || s.nadpis;
+      s.text = r.text || s.text;
+    }
+    vybrany = i;
+    vykresliSeznam();
+    ulozKoncept();
+  } catch (e) {
+    stav.textContent = e.message;
+  } finally {
+    tlacitko.disabled = false;
+  }
+}
+
 async function navrhniCarousel(bezPotvrzeni = false) {
   window.DHKoncepty?.zapomen("carousel");
   const AI = window.DHAI;
@@ -646,7 +747,8 @@ async function navrhniCarousel(bezPotvrzeni = false) {
     barvaNadpisu = tematickaBarva(r.barva_nadpisu) || BARVA_NADPISU;
     ukazBarvu();
     slidy = [
-      novySlide({ typ: "titul", cerveny: r.cerveny || "", bily: r.bily || "", swipe: true, dotaz: r.titul_foto_dotaz || "" }),
+      novySlide({ typ: "titul", cerveny: r.cerveny || "", bily: r.bily || "", swipe: true, dotaz: r.titul_foto_dotaz || "",
+        varianty: [{ cerveny: r.cerveny || "", bily: r.bily || "" }, ...(r.dalsi_obalky || [])].filter((v) => v.cerveny || v.bily).slice(0, 4) }),
       ...(r.slidy || []).slice(0, MAX_SLIDU - 1).map((x) => novySlide({ typ: "obsah", nadpis: x.nadpis || "", text: x.text || "", dotaz: x.foto_dotaz || "" })),
     ];
     vybrany = 0;
@@ -705,6 +807,12 @@ function init() {
   const seznam = $("#slidy");
   seznam.addEventListener("input", (e) => {
     const karta = e.target.closest(".slide-karta");
+    if (karta && e.target.dataset.barvaSlidu) { // živý náhled při tažení v barevníku
+      const i = Number(karta.dataset.i);
+      slidy[i].barvy = { ...prazdneBarvy(), ...(slidy[i].barvy || {}), [e.target.dataset.barvaSlidu]: e.target.value };
+      vyber(i); vykresliSlide(i);
+      return;
+    }
     const k = e.target.dataset.k;
     if (!karta || !k) return;
     const i = Number(karta.dataset.i);
@@ -714,6 +822,10 @@ function init() {
     ulozKoncept();
   });
   seznam.addEventListener("change", (e) => {
+    if (e.target.dataset.barvaSlidu) {
+      nastavBarvuSlidu(Number(e.target.closest(".slide-karta").dataset.i), e.target.dataset.barvaSlidu, e.target.value);
+      return;
+    }
     if (e.target.dataset.akce !== "foto") return;
     const i = Number(e.target.closest(".slide-karta").dataset.i);
     nastavFoto(i, e.target.files[0]);
@@ -731,6 +843,10 @@ function init() {
       vykresliSeznam(); ulozKoncept();
     } else if (akce === "bezFota") { Object.assign(slidy[i], { img: null, kredit: "", url: "" }); vybrany = i; vykresliSeznam(); aktualizujKredity(); }
     else if (akce === "webFoto") najdiFotku(i);
+    else if (akce === "kapatko") spustKapatko(i, e.target.closest("button").dataset.klic);
+    else if (akce === "barvaReset") { const k = e.target.closest("button").dataset.klic; slidy[i].barvy = { ...slidy[i].barvy, [k]: null }; vykresliSeznam(); ulozKoncept(); }
+    else if (akce === "varianta") { const v = slidy[i].varianty[Number(e.target.closest("button").dataset.j)]; Object.assign(slidy[i], { cerveny: v.cerveny, bily: v.bily }); vybrany = i; vykresliSeznam(); ulozKoncept(); }
+    else if (akce === "uderneji") uderneji(i, e.target.closest("button"));
     else vyber(i);
   });
 
@@ -771,6 +887,18 @@ function init() {
     G.omezPohled(s.img, s.pohled, W, H);
     vykresliSlide(vybrany);
   });
+  $("#cNahled").addEventListener("pointerdown", (e) => {
+    if (!kapatko) return;
+    e.stopPropagation(); e.preventDefault();
+    const c = $("#cPlatno"), r = c.getBoundingClientRect();
+    const x = Math.round(((e.clientX - r.left) / r.width) * W), y = Math.round(((e.clientY - r.top) / r.height) * H);
+    let hex = null;
+    try { const d = c.getContext("2d").getImageData(x, y, 1, 1).data; hex = "#" + [d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, "0")).join(""); } catch { /* fotka bez CORS */ }
+    const { i, klic } = kapatko;
+    kapatko = null;
+    $("#cNahled").classList.remove("kapatko");
+    if (hex) nastavBarvuSlidu(i, klic, hex); else window.DHToast?.("Z této fotky nejde barvu nabrat – vyber ji v barevníku.", "chyba");
+  }, true);
   G.tahani($("#cPlatno"), W, H, () => (slidy[vybrany].img ? slidy[vybrany] : null), () => vykresliSlide(vybrany));
 
   const cil = $("#cNahled");
