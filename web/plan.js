@@ -14,6 +14,7 @@ const FORMATY = {
   carousel: { nazev: "Carousel", barva: "#ffc000" },
   vyroci: { nazev: "Dnes před lety", barva: "#4da3ff" },
   reels: { nazev: "Reel", barva: "#b26bff" },
+  youtube: { nazev: "YouTube video", barva: "#ff4e45" },
   jine: { nazev: "Jiné", barva: "#8a8a8a" },
 };
 const DNY = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];

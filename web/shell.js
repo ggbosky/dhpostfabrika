@@ -36,6 +36,14 @@ const STRANKY = {
   reels: { skupina: "Tvořit", nazev: "Reels", ikona: "reels",
     popis: "Krátké video 9:16: rešerše se zdroji, český scénář a hlas, legální záběry, střih a kontrola kvality před exportem.",
     kroky: ["Téma", "Rešerše a scénář", "Záběry a hlas", "Střih, kontrola, MP4"] },
+  miniatury: { skupina: "YouTube", nazev: "Thumbnail Factory", ikona: "miniatura",
+    popis: "Profesionální miniatury 1280×720 pro YouTube. AI kreativní ředitel rozebere téma, navrhne 3–5 různých kompozic, pozadí vznikne ze skutečných fotek nebo AI, texty jsou upravitelné vrstvy.",
+    kroky: ["Téma, název a reference", "Koncepty od kreativního ředitele", "Porovnání a hodnocení", "Úpravy a export"] },
+  youtube: { skupina: "YouTube", nazev: "YouTube Studio", ikona: "youtube",
+    popis: "Připojený kanál Deník hokeje: videa, nahrávání s SEO od AI, miniatury, playlisty, plánování a komentáře – vše přes oficiální YouTube API.",
+    kroky: ["Vyber video", "SEO od AI", "Miniatura", "Nastavení a kontrola", "Nahrání a ověření"] },
+  ytstats: { skupina: "YouTube", nazev: "YouTube Analytics", ikona: "ytstats",
+    popis: "Zhlédnutí, doba sledování, udržení a odběratelé za zvolené období ze skutečných dat kanálu (YouTube Analytics API) + AI rozbor." },
   plan: { skupina: "Organizace", nazev: "Plán publikace", ikona: "plan",
     popis: "Rozvrhni si obsah do týdne. Záznamy přetahuj mezi dny, kliknutím měň stav a jedním tlačítkem je otevři k tvorbě.",
     akce: ["novy", "kopirovat"] },
@@ -115,6 +123,7 @@ function reel(tema, poznamka = "") {
 
 function tvor(format, zadani = "", zdroje = []) {
   zadani = zadani.trim();
+  if (format === "youtube") { jdi("youtube"); return; }
   if (format === "reels") { if (zadani) reel(zadani.split("\n")[0].slice(0, 160)); else jdi("reels"); return; }
   if (!zadani) { jdi(format); setTimeout(() => $(AI_POLE[format])?.focus(), 50); return; }
   if (!window.DHAI?.maKlic()) {

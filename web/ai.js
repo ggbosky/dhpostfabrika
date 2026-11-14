@@ -38,7 +38,7 @@ class AIChyba extends Error {}
 
 // ------------------------------------------------------------------ Gemini --
 
-async function geminiPrimo({ system, zadani, schema, teplota = 0.9 }) {
+async function geminiPrimo({ system, zadani, schema, teplota = 0.9, obrazky = [] }) {
   if (!maGemini()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
   const poradi = MODELY; // vždy od nejrychlejšího (přetížené / vyčerpané modely se přeskočí za pár sekund)
   const konec = Date.now() + LIMIT_CELKEM_MS;
@@ -57,7 +57,7 @@ async function geminiPrimo({ system, zadani, schema, teplota = 0.9 }) {
         headers: { "Content-Type": "application/json", "x-goog-api-key": klic() },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: zadani }] }],
+          contents: [{ role: "user", parts: [...obrazky.map((o) => ({ inlineData: { mimeType: o.mime, data: o.data } })), { text: zadani }] }],
           generationConfig: {
             responseMimeType: "application/json", responseJsonSchema: schema, temperature: teplota,
             // psaní textu podle zadaných faktů nepotřebuje dlouhé „přemýšlení“ – 2× rychlejší
@@ -298,11 +298,14 @@ function prisneSchema(s) {
 
 // Jedno volání se streamováním. Text chodí průběžně do priTextu; po vypršení limitu
 // se vrátí, co stihlo dorazit. pause_turn (dlouhé hledání) se automaticky dokončí.
-async function claudeVolani({ system, zadani, nastaveni = {}, casovyLimit, priTextu }) {
+async function claudeVolani({ system, zadani, nastaveni = {}, casovyLimit, priTextu, obrazky = [] }) {
   const klient = await claudeKlient();
   const preruseni = new AbortController();
   const casovac = setTimeout(() => preruseni.abort(), casovyLimit);
-  const zpravy = [{ role: "user", content: zadani }];
+  const obsah = obrazky.length
+    ? [...obrazky.map((o) => ({ type: "image", source: { type: "base64", media_type: o.mime, data: o.data } })), { type: "text", text: zadani }]
+    : zadani;
+  const zpravy = [{ role: "user", content: obsah }];
   const bloky = [];
   let text = "", posledni = null;
   try {
@@ -334,10 +337,11 @@ async function claudeVolani({ system, zadani, nastaveni = {}, casovyLimit, priTe
   return { text, bloky, preruseno: false };
 }
 
-async function claudeJson({ system, zadani, schema }) {
+async function claudeJson({ system, zadani, schema, obrazky = [] }) {
   const r = await claudeVolani({
     system,
     zadani,
+    obrazky,
     casovyLimit: 120000,
     nastaveni: { output_config: { effort: "low", format: { type: "json_schema", schema: prisneSchema(schema) } } },
   });
@@ -440,6 +444,93 @@ const hledatNaWebu = (o) => sZalohou(
 const hledatNaWebuProud = (o) => sZalohou(
   () => claudeWeb({ ...o, casovyLimit: Math.max(o.casovyLimit || 30000, 40000), hledani: 3 }),
   () => hledatNaWebuProudGemini(o));
+
+// ------------------------------------------------------ obrázky pro AI a z AI --
+
+// Libovolný obrázek (HTMLImageElement / canvas / Blob / File) → JPEG base64 pro AI (max. delší strana `max` px).
+async function obrazekProAI(zdroj, max = 1280, kvalita = 0.85) {
+  let el = zdroj;
+  if (zdroj instanceof Blob) {
+    el = await new Promise((ok, chyba) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = () => chyba(new AIChyba("Obrázek se nepodařilo načíst."));
+      img.src = URL.createObjectURL(zdroj);
+    });
+  }
+  const w = el.naturalWidth || el.width, h = el.naturalHeight || el.height;
+  const k = Math.min(1, max / Math.max(w, h));
+  const c = document.createElement("canvas");
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  c.getContext("2d").drawImage(el, 0, 0, c.width, c.height);
+  let url;
+  try { url = c.toDataURL("image/jpeg", kvalita); } catch { throw new AIChyba("Obrázek z cizího webu nejde poslat AI (chybí povolení CORS) – nahraj ho jako soubor."); }
+  return { mime: "image/jpeg", data: url.split(",")[1] };
+}
+
+// Generování obrázků: Gemini (Nano Banana). Bezplatný tier obrázky negeneruje – je potřeba placení v Google AI Studio.
+const KLIC_OBR_MODEL = "dhpf_obr_model";
+const OBR_MODELY = {
+  "gemini-nano-banana-2.1": { nazev: "Nano Banana 2.1 – nejlepší poměr cena/kvalita (doporučeno)", cena: 0.0504 },
+  "gemini-3-pro-image": { nazev: "Nano Banana Pro – nejvyšší kvalita, složité kompozice", cena: 0.134 },
+  "gemini-3.1-flash-image": { nazev: "Nano Banana 2 (3.1 Flash Image)", cena: 0.101 },
+  "gemini-3.1-flash-lite-image": { nazev: "Nano Banana 2 Lite – nejlevnější (jen 1K)", cena: 0.0336, velikost: "1K" },
+};
+const obrModel = () => (OBR_MODELY[nacti(KLIC_OBR_MODEL)] ? nacti(KLIC_OBR_MODEL) : "gemini-nano-banana-2.1");
+
+async function generujObrazek({ prompt, obrazky = [], model = obrModel(), pomer = "16:9", velikost, casovyLimit = 150000 }) {
+  if (!maGemini()) throw new AIChyba("Generování obrázků běží přes Google Gemini – vlož Gemini klíč v Můj styl → AI pomocník (a v Google AI Studio zapni placení).");
+  velikost = velikost || OBR_MODELY[model]?.velikost || "2K";
+  const casti = [...obrazky.map((o) => ({ inlineData: { mimeType: o.mime, data: o.data } })), { text: prompt }];
+  // Pokusy od nejúplnějšího nastavení; když API nějaké pole nezná, zkusí se bez něj.
+  const varianty = [
+    { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: pomer, imageSize: velikost } },
+    { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: pomer } },
+    { responseModalities: ["TEXT", "IMAGE"] },
+  ];
+  let posledni = null;
+  for (const generationConfig of varianty) {
+    const preruseni = new AbortController();
+    const casovac = setTimeout(() => preruseni.abort(), casovyLimit);
+    let r, j;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        signal: preruseni.signal,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": klic() },
+        body: JSON.stringify({ contents: [{ role: "user", parts: casti }], generationConfig }),
+      });
+      j = await r.json().catch(() => ({}));
+    } catch (e) {
+      clearTimeout(casovac);
+      throw new AIChyba(e.name === "AbortError" ? "Generování obrázku trvalo moc dlouho, zkus to znovu." : "Gemini je nedostupný (síť).");
+    }
+    clearTimeout(casovac);
+    const zprava = String(j?.error?.message || "");
+    if (!r.ok) {
+      if (r.status === 400 && /imageSize|imageConfig|aspectRatio|responseModalities|Unknown name|Invalid JSON payload/i.test(zprava)) { posledni = zprava; continue; }
+      if (r.status === 404) throw new AIChyba(`Model ${model} není dostupný – vyber jiný v Můj styl → AI pomocník.`);
+      if (/free.?tier|billing|limit: ?0|paid/i.test(zprava) || r.status === 403) {
+        throw new AIChyba("Gemini klíč nemá zapnuté placení – obrázky se v bezplatném režimu negenerují. V Google AI Studio (aistudio.google.com → Billing) zapni placení; jeden obrázek stojí cca 0,03–0,13 USD.");
+      }
+      if (r.status === 429) throw new AIChyba("Gemini: vyčerpaný limit požadavků, zkus to za chvíli.");
+      if (r.status === 400 && /API key/i.test(zprava)) throw new AIChyba("Neplatný Gemini klíč.");
+      throw new AIChyba(`Gemini (obrázek) chyba ${r.status}: ${zprava.slice(0, 200)}`);
+    }
+    if (j.promptFeedback?.blockReason) throw new AIChyba(`Gemini odmítl zadání (${j.promptFeedback.blockReason}). Zkus jiný koncept nebo použij skutečnou fotku.`);
+    const casti2 = j.candidates?.[0]?.content?.parts || [];
+    const obr = casti2.find((p) => (p.inlineData || p.inline_data)?.data);
+    if (!obr) {
+      const duvod = j.candidates?.[0]?.finishReason;
+      const text = casti2.map((p) => p.text || "").join(" ").trim();
+      throw new AIChyba(`Model nevrátil obrázek${duvod && duvod !== "STOP" ? ` (${duvod})` : ""}${text ? `: ${text.slice(0, 160)}` : ""}. Zkus koncept upravit nebo použít skutečnou fotku.`);
+    }
+    const d = obr.inlineData || obr.inline_data;
+    const bin = Uint8Array.from(atob(d.data), (c) => c.charCodeAt(0));
+    return { blob: new Blob([bin], { type: d.mimeType || d.mime_type || "image/png" }), model, cena: OBR_MODELY[model]?.cena ?? null };
+  }
+  throw new AIChyba(`Gemini nepřijal nastavení obrázku: ${String(posledni).slice(0, 200)}`);
+}
 
 // Všechny celé JSON objekty nejvyšší úrovně z (i nedokončeného) textu.
 function objektyZTextu(text) {
@@ -925,6 +1016,12 @@ function initNastroje() {
 
 function init() {
   initNastroje();
+  const sel = $("#aiObrModel");
+  if (sel) {
+    sel.innerHTML = Object.entries(OBR_MODELY).map(([k, m]) => `<option value="${k}">${m.nazev} · ~${m.cena.toLocaleString("cs-CZ")} USD/obrázek</option>`).join("");
+    sel.value = obrModel();
+    sel.addEventListener("change", () => uloz(KLIC_OBR_MODEL, sel.value));
+  }
   vykresliStav();
   const zprava = (t, chyba) => {
     const el = $("#aiKlicZprava");
@@ -992,6 +1089,6 @@ function init() {
   });
 }
 
-window.DHAI = { COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
+window.DHAI = { obrazekProAI, generujObrazek, OBR_MODELY, obrModel, nastavObrModel: (m) => uloz(KLIC_OBR_MODEL, m), COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
 init();
 })();

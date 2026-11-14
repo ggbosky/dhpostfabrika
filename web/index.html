@@ -282,6 +282,117 @@
     .st-dlazdice { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
+
+  /* --------------------------------------------------- Thumbnail Factory */
+  .mt-kroky { margin-bottom: 14px; }
+  .mt-mrizka { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .mt-reference { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+  .mt-ref { position: relative; display: grid; gap: 6px; background: #0f0f0f; border: 1px solid var(--line); border-radius: 10px; padding: 6px; }
+  .mt-ref img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 6px; background: #000; }
+  .mt-ref select { font-size: 12.5px; padding: 5px 26px 5px 8px; }
+  .mt-ref small { font-size: 10.5px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .mt-ref .ikona { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; background: rgba(0, 0, 0, .7); }
+  .mt-analyza dl { grid-template-columns: max-content 1fr; margin: 0; }
+  .mt-koncepty { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .mt-koncept { display: flex; flex-direction: column; gap: 6px; }
+  .mt-koncept p { margin: 0; font-size: 14px; }
+  .mt-koncept-hlava { display: flex; flex-direction: column; gap: 2px; }
+  .mt-koncept-hlava b { font: 900 17px var(--nadpis); text-transform: uppercase; }
+  .mt-styl { font: 800 11px var(--uzke); letter-spacing: .12em; text-transform: uppercase; color: var(--yellow); }
+  .mt-proc { color: #d6d6d6; }
+  .mt-nahled { aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #1a0507, #000); display: grid; place-items: center; color: var(--muted); font-size: 13px; margin: 6px 0; }
+  .mt-nahled canvas, .mt-por-velka canvas, .mt-por-mala canvas, .mt-platno canvas { display: block; width: 100%; height: auto; }
+  .mt-stav { font-size: 13px; min-height: 1em; }
+  .mt-varianty { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 6px; }
+  .mt-varianty button { width: 30px; height: 28px; border-radius: 8px; border: 1px solid var(--line-2); background: #141414; color: #ddd; cursor: pointer; font: 700 12px Inter, sans-serif; }
+  .mt-varianty button.on { background: var(--red-hot); border-color: var(--red-hot); color: #fff; }
+  .mt-porovnani { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+  .mt-por-velka { border-radius: 12px; overflow: hidden; background: #000; }
+  .mt-por-info { display: flex; gap: 12px; margin-top: 10px; align-items: flex-start; }
+  .mt-por-mala { flex: none; width: 168px; border-radius: 8px; overflow: hidden; }
+  .mt-por-info > div:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .yt-titulek { color: #f1f1f1 !important; font-size: 13px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .mt-editor { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
+  .mt-platno { border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px #000, 0 20px 50px rgba(0, 0, 0, .6); }
+  .mt-platno canvas { touch-action: none; cursor: grab; }
+  .mt-mobil { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 14px; align-items: flex-end; }
+  .mt-mobil div { display: grid; gap: 4px; font-size: 12px; }
+  .mt-mobil canvas { border-radius: 6px; background: #000; }
+  .mt-vrstvy { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .mt-vrstvy button { border: 1px solid var(--line-2); background: #121212; color: #ddd; border-radius: 8px; padding: 6px 10px; cursor: pointer; font: 700 12.5px var(--uzke); letter-spacing: .04em; }
+  .mt-vrstvy button.on { border-color: var(--red-hot); color: #fff; background: rgba(224, 30, 38, .16); }
+  .mt-vrstva-form input[type=color] { height: 36px; }
+  .mt-celkem { display: flex; align-items: baseline; gap: 8px; }
+  .mt-celkem b { font: 900 40px var(--nadpis); color: var(--text); }
+  .mt-pozn { font-size: 12.5px; margin: 4px 0 10px; }
+  .mt-kontroly { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 4px; font-size: 13.5px; }
+  .mt-kontroly li.ok { color: var(--ok-text); } .mt-kontroly li.warn { color: var(--warn-text); }
+  .mt-kriteria { display: grid; gap: 5px; margin: 8px 0; }
+  .mt-kriteria div { display: grid; grid-template-columns: 130px 1fr 24px; gap: 8px; align-items: center; font-size: 12.5px; }
+  .mt-kriteria i { height: 8px; background: #1e1e1e; border-radius: 4px; overflow: hidden; } .mt-kriteria i b { display: block; height: 100%; background: var(--red-hot); }
+  .mt-kriteria em { font-style: normal; text-align: right; font-variant-numeric: tabular-nums; }
+  #mtSkore h4 { margin: 10px 0 4px; font: 800 12px var(--uzke); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  #mtSkore ul { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 3px; }
+  .mt-historie { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .mt-hist { display: grid; gap: 4px; padding: 10px; border-radius: 12px; background: #0f0f0f; border: 1px solid var(--line); }
+  .mt-hist.on { border-color: var(--red-hot); }
+  .mt-hist-nahled { aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; } .mt-hist-nahled img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* ------------------------------------------------------- YouTube Studio */
+  .ys-kanal { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin-bottom: 14px; padding: 16px 20px; }
+  .ys-profil { display: flex; align-items: center; gap: 12px; flex: 1 1 260px; min-width: 0; }
+  .ys-profil img { width: 48px; height: 48px; border-radius: 50%; box-shadow: 0 0 0 2px #000, 0 0 0 3.5px #ff0033; }
+  .ys-profil b { display: block; font: 800 17px Inter, sans-serif; }
+  .ys-cisla { display: flex; gap: 20px; flex-wrap: wrap; }
+  .ys-cisla div { display: grid; } .ys-cisla span { font: 700 11px var(--uzke); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .ys-cisla b { font: 900 22px var(--nadpis); font-variant-numeric: tabular-nums; }
+  .ys-navod { display: grid; gap: 8px; padding-left: 20px; margin: 0 0 14px; font-size: 14px; }
+  .ys-info { display: grid; gap: 10px; padding-left: 18px; margin: 0; font-size: 13.5px; color: #cfcfcf; }
+  .ys-videa { display: grid; gap: 10px; }
+  .ys-video { display: grid; grid-template-columns: 196px 1fr; gap: 14px; padding: 10px; border-radius: 12px; background: #0f0f0f; border: 1px solid var(--line); }
+  .ys-nahled { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; display: block; }
+  .ys-nahled img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ys-nahled em { position: absolute; right: 6px; bottom: 6px; background: rgba(0, 0, 0, .8); color: #fff; font: 700 11.5px Inter, sans-serif; font-style: normal; padding: 1px 5px; border-radius: 4px; }
+  .ys-video-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .ys-video-info b { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .ys-kroky-pub { display: grid; gap: 18px; }
+  .ys-soubor { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .ys-popisek { font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .ys-c { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--red-hot); color: #fff; font: 800 13px Inter, sans-serif; margin-right: 4px; }
+  .ys-tituly { display: grid; gap: 6px; }
+  .ys-titul { flex-direction: row; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #0f0f0f; border: 1px solid var(--line); cursor: pointer; text-transform: none; letter-spacing: 0; font: 500 14.5px Inter, sans-serif; color: var(--text); }
+  .ys-titul.on { border-color: var(--red-hot); background: rgba(224, 30, 38, .1); }
+  .ys-titul input { width: auto; margin-top: 3px; accent-color: var(--red-hot); }
+  .ys-titul span { display: grid; gap: 2px; } .ys-titul small { font-size: 12px; }
+  .ys-chipy { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ys-chipy .chip { text-transform: none; letter-spacing: 0; font: 600 13px Inter, sans-serif; padding: 6px 12px; }
+  .ys-chipy .chip:disabled { opacity: .55; cursor: default; }
+  .ys-kapitoly { background: #0d0d0d; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; white-space: pre-wrap; margin: 0; }
+  .ys-miniatury { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+  .ys-mini { display: grid; gap: 4px; padding: 6px; border-radius: 10px; background: #0f0f0f; border: 2px solid var(--line); color: var(--text); cursor: pointer; text-align: left; }
+  .ys-mini.on { border-color: var(--red-hot); }
+  .ys-mini span { aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: #000; display: block; } .ys-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ys-mini small { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ys-volby { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .ys-volba { flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border-radius: 10px; background: #0f0f0f; border: 1px solid var(--line-2); cursor: pointer; text-transform: none; letter-spacing: 0; font: 500 13px Inter, sans-serif; color: var(--text); }
+  .ys-volba.on { border-color: var(--red-hot); background: rgba(224, 30, 38, .1); }
+  .ys-volba input { display: none; } .ys-volba b { font-size: 14.5px; } .ys-volba small { color: var(--muted); }
+  .ys-otazka { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .ys-otazka span { flex: 1 1 320px; }
+  .ys-potvrzeni { padding: 10px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-text); }
+  .ys-pokrok { position: relative; height: 26px; border-radius: 13px; background: #1a1a1a; overflow: hidden; margin: 12px 0; }
+  .ys-pokrok i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--red), var(--red-hot)); transition: width .3s; }
+  .ys-pokrok span { position: relative; display: block; text-align: center; font: 700 13px/26px Inter, sans-serif; }
+  .ys-playlisty, .ys-komentare, .ys-historie { display: grid; gap: 10px; }
+  .ys-pl, .ys-kom, .ys-hist { display: grid; gap: 6px; padding: 12px; border-radius: 12px; background: #0f0f0f; border: 1px solid var(--line); }
+  .ys-kom p { margin: 0; font-size: 14px; white-space: pre-wrap; }
+  .ya-zdroj { font-size: 12.5px; margin: -6px 0 14px; }
+  .ya-graf svg { display: block; }
+  .ya-video { background: none; border: 0; color: var(--text); cursor: pointer; text-align: left; padding: 0; font: 500 13px Inter, sans-serif; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ya-video:hover { color: var(--red-hot); }
+  .st-tabulka tr.on td { background: rgba(224, 30, 38, .08); }
+  @media (max-width: 1000px) { .mt-mrizka, .mt-editor { grid-template-columns: 1fr; } .mt-porovnani { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) { .ys-video { grid-template-columns: 1fr; } .ys-volby { grid-template-columns: 1fr; } .mt-koncepty { grid-template-columns: 1fr; } }
+
   /* ------------------------------------------------------- nástroje textu */
   .text-nastroje { display: grid; gap: 8px; margin-top: 8px; font: 400 13px/1.4 Inter, sans-serif; letter-spacing: 0; text-transform: none; color: var(--text); }
   .tn-radek { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -725,6 +836,9 @@
   <symbol id="i-sdilet" viewBox="0 0 24 24"><path d="m22 3-10 10M22 3l-7 18-3-8-8-3z"/></symbol>
   <symbol id="i-zalozka" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-5-6 5z"/></symbol>
   <symbol id="i-blesk" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-miniatura" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m2 16 5-5 4 4 3-3 8 7"/><circle cx="16" cy="9" r="1.5"/></symbol>
+  <symbol id="i-youtube" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="m10 9 5 3-5 3z"/></symbol>
+  <symbol id="i-ytstats" viewBox="0 0 24 24"><path d="M3 20h18M6 16l4-5 3 3 5-7"/><circle cx="18" cy="7" r="1.5"/></symbol>
   <symbol id="i-statistiky" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
   <symbol id="i-sipka" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
 </svg>
@@ -745,6 +859,10 @@
     <button type="button" class="tab" data-tab="carousel"><svg class="ik"><use href="#i-carousel"/></svg><span class="tab-txt"><span>Carousel</span><em>Carousel</em><small>více slidů, swipe</small></span></button>
     <button type="button" class="tab" data-tab="vyroci"><svg class="ik"><use href="#i-vyroci"/></svg><span class="tab-txt"><span>Dnes před lety</span><em>Výročí</em><small>šablona výročí</small></span></button>
     <button type="button" class="tab" data-tab="reels"><svg class="ik"><use href="#i-reels"/></svg><span class="tab-txt"><span>Reels</span><em>Reels</em><small>video 9:16 s hlasem</small></span></button>
+    <div class="skupina">YouTube</div>
+    <button type="button" class="tab" data-tab="miniatury"><svg class="ik"><use href="#i-miniatura"/></svg><span class="tab-txt"><span>Thumbnail Factory</span><em>Miniatury</em><small>miniatury 1280×720</small></span></button>
+    <button type="button" class="tab" data-tab="youtube"><svg class="ik"><use href="#i-youtube"/></svg><span class="tab-txt"><span>YouTube Studio</span><em>Studio</em><small>nahrát, SEO, playlisty</small></span></button>
+    <button type="button" class="tab" data-tab="ytstats"><svg class="ik"><use href="#i-ytstats"/></svg><span class="tab-txt"><span>YT Analytics</span><em>YT data</em><small>výkon videí a kanálu</small></span></button>
     <div class="skupina">Organizace</div>
     <button type="button" class="tab" data-tab="plan"><svg class="ik"><use href="#i-plan"/></svg><span class="tab-txt"><span>Plán publikace</span><em>Plán</em><small>týden a zásobník nápadů</small></span><span class="odznak" data-plan-pocet></span></button>
     <button type="button" class="tab" data-tab="koncepty"><svg class="ik"><use href="#i-koncepty"/></svg><span class="tab-txt"><span>Koncepty</span><em>Koncepty</em><small>uložená rozpracovaná práce</small></span><span class="odznak" id="kPocet"></span></button>
@@ -768,6 +886,9 @@
   <section id="zalozkaPrehled" hidden data-zalozka="prehled"><div id="prehledObsah"></div></section>
   <section id="zalozkaPlan" hidden data-zalozka="plan"><div id="planObsah"></div></section>
   <section id="zalozkaStatistiky" hidden data-zalozka="statistiky"><div id="statistikyObsah"></div></section>
+  <section id="zalozkaMiniatury" hidden data-zalozka="miniatury"><div id="miniaturyObsah"></div></section>
+  <section id="zalozkaYoutube" hidden data-zalozka="youtube"><div id="youtubeObsah"></div></section>
+  <section id="zalozkaYtstats" hidden data-zalozka="ytstats"><div id="ytstatsObsah"></div></section>
   <section id="zalozkaTemata" hidden data-zalozka="temata">
     <div class="card">
       <h2>🔎 Najdi zajímavost <span class="muted">milníky · rekordy · výročí · příběhy – AI hledá na webu a dává zdroje</span></h2>
@@ -1302,6 +1423,9 @@
           </div>
           <div class="zprava" id="aiKlicZprava" hidden></div>
           <p class="muted" style="font-size:13px;margin:14px 0 0">Zdarma je asi 20 návrhů denně na model (aplikace sama střídá modely), limit se obnovuje v 9:00. Fotky hledá na Wikimedia Commons – tam jsou fotky, které se smí použít s uvedením autora; ten se do popisku přidá sám.</p>
+          <h3 style="margin:18px 0 6px">🖼️ Generování obrázků (YouTube miniatury)</h3>
+          <label>Model pro obrázky<select id="aiObrModel"></select></label>
+          <p class="muted" style="font-size:13px;margin:8px 0 0">Obrázky generuje Google Gemini (stejný klíč jako výše). <b>V bezplatném režimu se obrázky negenerují</b> – v Google AI Studio je potřeba zapnout placení (Billing). Cena za jeden obrázek je u modelu uvedená; miniatury z vlastních fotek a texty fungují i bez toho.</p>
         </div>
       </div>
     </div>
@@ -1327,6 +1451,9 @@
     <div class="list-formaty" id="listFormaty"></div>
     <div class="list-odkazy">
       <button type="button" class="list-odkaz" data-jdi="temata"><svg class="ik"><use href="#i-temata"/></svg>Najít téma s AI</button>
+      <button type="button" class="list-odkaz" data-jdi="miniatury"><svg class="ik"><use href="#i-miniatura"/></svg>YouTube miniatura (Thumbnail Factory)</button>
+      <button type="button" class="list-odkaz" data-jdi="youtube"><svg class="ik"><use href="#i-youtube"/></svg>YouTube Studio – nahrát a publikovat</button>
+      <button type="button" class="list-odkaz" data-jdi="ytstats"><svg class="ik"><use href="#i-ytstats"/></svg>YouTube Analytics</button>
       <button type="button" class="list-odkaz" data-jdi="styl"><svg class="ik"><use href="#i-styl"/></svg>Můj styl a AI klíč</button>
     </div>
   </div>
@@ -1371,22 +1498,27 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261113j"></script>
-<script src="grafika.js?v=20261113j"></script>
-<script src="koncepty.js?v=20261113j"></script>
-<script src="ai.js?v=20261113j"></script>
-<script src="app.js?v=20261113j"></script>
-<script src="carousel.js?v=20261113j"></script>
-<script src="vyroci.js?v=20261113j"></script>
-<script src="zpravy.js?v=20261113j"></script>
-<script src="reels-ulozeni.js?v=20261113j"></script>
-<script src="reels-hlas.js?v=20261113j"></script>
-<script src="reels-render.js?v=20261113j"></script>
-<script src="reels-zabery.js?v=20261113j"></script>
-<script src="reels.js?v=20261113j"></script>
-<script src="plan.js?v=20261113j"></script>
-<script src="stats.js?v=20261113j"></script>
-<script src="prehled.js?v=20261113j"></script>
-<script src="shell.js?v=20261113j"></script>
+<script src="sablony.js?v=20261114a"></script>
+<script src="grafika.js?v=20261114a"></script>
+<script src="koncepty.js?v=20261114a"></script>
+<script src="ai.js?v=20261114a"></script>
+<script src="app.js?v=20261114a"></script>
+<script src="carousel.js?v=20261114a"></script>
+<script src="vyroci.js?v=20261114a"></script>
+<script src="zpravy.js?v=20261114a"></script>
+<script src="reels-ulozeni.js?v=20261114a"></script>
+<script src="reels-hlas.js?v=20261114a"></script>
+<script src="reels-render.js?v=20261114a"></script>
+<script src="reels-zabery.js?v=20261114a"></script>
+<script src="reels.js?v=20261114a"></script>
+<script src="plan.js?v=20261114a"></script>
+<script src="stats.js?v=20261114a"></script>
+<script src="prehled.js?v=20261114a"></script>
+<script src="yt-ulozeni.js?v=20261114a"></script>
+<script src="miniatury.js?v=20261114a"></script>
+<script src="yt-api.js?v=20261114a"></script>
+<script src="yt-studio.js?v=20261114a"></script>
+<script src="yt-analytics.js?v=20261114a"></script>
+<script src="shell.js?v=20261114a"></script>
 </body>
 </html>

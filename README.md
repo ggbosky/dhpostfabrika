@@ -112,6 +112,63 @@ označená „automaticky“. Koncepty jsou vázané na prohlížeč a zařízen
   vždy s odkazy na zdroje.
 - AI se může splést i se zdroji – před zveřejněním si je proklikni.
 
+### 🎨 YouTube Thumbnail Factory (záložka YouTube → Thumbnail Factory)
+
+Miniatury 1280×720 pro YouTube kanál Deník hokeje.
+
+1. **Zadání** – téma, název videa, hlavní hráč, popis/scénář, vizuální směr (A filmový dokument · B historický archiv ·
+   C extrémní CTR · D historická koláž · E temná záhada, nebo „ať vybere AI“) a **reference**: skutečné fotky hráčů
+   (nahrát nebo najít na Wikimedia Commons), historické fotky, naše starší miniatury, vzory stylu, cizí miniatury.
+2. **AI kreativní ředitel** (Claude / Gemini – vidí i referenční obrázky) rozebere publikum, emoci, klíčový detail
+   a navrhne 3–5 opravdu odlišných kompozic s vysvětlením, proč mohou zaujmout. Každý koncept jde přepsat.
+3. **Pozadí** každého konceptu vznikne jedním ze tří způsobů:
+   - *Jen skutečné fotky* – kompozice ze skutečných fotek (výřez, duel, koláž), **zdarma, bez AI**, tváře se nemění;
+   - *AI kompozice ze skutečné fotky* – Gemini (Nano Banana) dostane skutečnou fotku jako referenci a má zakázáno měnit tvář;
+   - *AI scéna bez tváří* – atmosféra (aréna, led, siluety, výstroj) bez rozpoznatelných skutečných lidí.
+   Skutečné hráče AI nikdy negeneruje „z hlavy“ a nevytváří falešné historické fotky.
+4. **Porovnání** ve velikosti pro počítač i mobil (168 a 246 px).
+5. **Editor** – texty jsou vrstvy aplikace (ne v obrázku): písma Anton / Montserrat / Oswald / Roboto Condensed, obrys,
+   stín, akcentní barva (`*slovo*`), tažení myší, víc vrstev, barevné ladění (filmový, archiv se zrnem, extrémní kontrast,
+   temný s červeným akcentem), vinětace, ztmavení pod textem, logo. Export PNG/JPG 1280×720, vždy do 2 MB (limit YouTube).
+6. **Hodnocení** – automatické kontroly (počet slov, velikost písma, kontrast textu) + AI hodnocení designu včetně
+   kontroly realismu (AI artefakty). **Není to předpověď CTR** – to ukáže až YouTube.
+7. **Historie & A/B** – uložené projekty a ruční záznamy imprese / CTR / zhlédnutí / prům. doba sledování
+   (imprese a CTR miniatur YouTube API nevydává). Na skutečný A/B test slouží v YouTube Studiu funkce *Test & Compare*.
+
+**Generování obrázků:** Google Gemini, model volitelný v Můj styl → AI pomocník (výchozí *Nano Banana 2.1*,
+~0,05 USD za obrázek 2K; *Nano Banana Pro* ~0,13 USD; *Nano Banana 2 Lite* ~0,03 USD). **V bezplatném režimu Gemini
+obrázky negeneruje** – v Google AI Studio je potřeba zapnout placení. Kreativní ředitel, kompozice ze skutečných fotek,
+editor, hodnocení a export fungují i bez toho. Všechny obrázky z Gemini nesou neviditelný vodoznak SynthID.
+
+### ▶ YouTube Studio & Growth Factory (záložky YouTube Studio a YT Analytics)
+
+- **Připojení kanálu** přes Google OAuth 2.0 (oficiální Google Identity Services). Heslo se nikam nezadává, tajemství
+  klienta se nepoužívá, přístupový token je jen v paměti (~1 h) a nikdy se neukládá. Aplikace nemá server (GitHub Pages),
+  proto po zavření stránky stačí kliknout znovu na *Připojit YouTube*. (Trvalé přihlášení s obnovovacím tokenem by
+  vyžadovalo vlastní backend, např. Cloudflare Worker.)
+- **Kanál & videa** – odběratelé, zhlédnutí, videa (Data API), úprava titulku/popisu/tagů, nastavení miniatury, komentáře.
+- **Publikovat** – video z Reels Factory (▶ YT v historii renderů) nebo soubor → **SEO od AI**: 10 titulků (zvědavost,
+  dokument, emoce, SEO, krátký) se skóre a zdůvodněním, popis (do 5000 bajtů), hashtagy (doporučené 3), tagy
+  (do 500 znaků podle pravidel YouTube), kapitoly jen ze **skutečných časů** (scény reelu nebo časové značky ve scénáři),
+  návrh playlistu → miniatura z Thumbnail Factory nebo vlastní → kategorie, playlist, jazyk, licence, vkládání,
+  datum natáčení, placená propagace, **povinná** odpověď „pro děti“ a „syntetický obsah“ → viditelnost
+  (**výchozí soukromé**; veřejné / neveřejné / naplánované jen s výslovným potvrzením) → **resumable upload**
+  po 8 MB s navázáním po výpadku → miniatura → playlist → ověření na YouTube → odkaz + záznam v Plánu.
+- **Playlisty** – seznam, popisy, vytvoření navržených rubrik bez duplicit.
+- **Komentáře** – načtení, AI rozbor reakcí a častých otázek, návrhy odpovědí (odeslání vždy po potvrzení),
+  návrh připnutého komentáře (připnout jde jen v YouTube Studiu – API to neumí).
+- **Historie** publikací (včetně přerušených nahrávání).
+- **YT Analytics** – období 7/28/90/365 dní nebo vlastní: zhlédnutí, doba sledování, prům. doba a % zhlédnutí,
+  odběratelé (Analytics API), graf po dnech, top 50 videí s řazením, **udržení diváků** u videa, AI rozbor
+  (s upozorněním, že korelace není příčina) a nápady → Plán.
+
+**Nastavení Google Cloud (jednou):** projekt → zapnout *YouTube Data API v3* a *YouTube Analytics API* →
+OAuth consent screen (External, Test users = tvůj účet) → scopes `youtube.readonly`, `youtube.upload`, `youtube`,
+`youtube.force-ssl`, `yt-analytics.readonly` → OAuth Client (Web application) s *Authorized JavaScript origin*
+`https://ggbosky.github.io` → Client ID vložit v YouTube Studio → ⚙ Připojení. Dokud aplikaci Google neověří,
+ukazuje při přihlášení varování „neověřená aplikace“ (pro vlastní kanál stačí *Pokračovat*). Kvóta Data API je
+10 000 jednotek denně, nahrávání má vlastní limit. Vlastní miniatury vyžadují ověřený kanál (youtube.com/verify).
+
 ### 🔒 Přihlášení heslem
 
 Aplikace na GitHub Pages je zašifrovaná (AES-256-GCM, klíč z hesla přes PBKDF2-SHA256, 600 000 iterací).

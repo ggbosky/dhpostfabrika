@@ -757,7 +757,7 @@ async function vykresliHistorii() {
   r.sort((a, b) => b.cas - a.cas);
   $("#rHistorie").innerHTML = r.length ? r.map((x) => `<label class="r-render check"><input type="checkbox" data-r-vyber="${x.id}">
       <span><b>${esc(x.nazev)}</b><br><small class="muted">${new Date(x.cas).toLocaleString("cs-CZ")} · ${x.delka.toFixed(0)} s · ${(x.velikost / 1048576).toFixed(1)} MB</small></span>
-      <button type="button" class="btn small ghost" data-r-stahnirender="${x.id}">⬇️</button><button type="button" class="btn small ghost" data-r-smazrender="${x.id}">✕</button></label>`).join("")
+      <button type="button" class="btn small ghost" data-r-stahnirender="${x.id}">⬇️</button><button type="button" class="btn small ghost" data-r-yt="${x.id}" title="Nahrát na YouTube">▶ YT</button><button type="button" class="btn small ghost" data-r-smazrender="${x.id}">✕</button></label>`).join("")
     : '<p class="muted">Zatím žádné vyrenderované reels.</p>';
 }
 
@@ -848,6 +848,7 @@ function init() {
       delete p.klipy[d.rSmazklip]; R.zapomenMedium(d.rSmazklip);
       vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled(); return;
     }
+    if (d.rYt) { window.DHYtStudio?.publikovatReel(d.rYt); return; }
     if (d.rStahnirender) { const r = await U.nacti("rendery", d.rStahnirender); if (r) stahni(r.blob, `denik-hokeje-${slug(r.nazev)}.mp4`); return; }
     if (d.rSmazrender) { if (confirm("Smazat render z historie?")) { await U.smaz("rendery", d.rSmazrender); vykresliHistorii(); } return; }
     if (t.id === "rHudbaPryc") { p.hudba = null; vykresliHlas(); ulozPozdeji(); return; }
