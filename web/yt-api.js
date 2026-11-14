@@ -67,7 +67,7 @@ async function prihlas(skupiny = ["cteni"]) {
         document.dispatchEvent(new CustomEvent("dh:youtube", { detail: { pripojeno: true } }));
         ok(token);
       },
-      error_callback: (e) => chyba(new YtChyba(e?.type === "popup_closed" ? "Okno přihlášení bylo zavřeno." : e?.type === "popup_failed_to_open" ? "Prohlížeč zablokoval okno přihlášení – povol vyskakovací okna pro tuhle stránku." : `Přihlášení se nepovedlo (${e?.type || "chyba"}).`, e?.type)),
+      error_callback: (e) => chyba(new YtChyba(e?.type === "popup_closed" ? "Okno přihlášení bylo zavřeno. Pokud Google ukázal „Access blocked … Error 403: access_denied“, přidej svůj Google účet v Google Cloud Console → Google Auth Platform → Audience → Test users a zkus to znovu." : e?.type === "popup_failed_to_open" ? "Prohlížeč zablokoval okno přihlášení – povol vyskakovací okna pro tuhle stránku." : `Přihlášení se nepovedlo (${e?.type || "chyba"}).`, e?.type)),
     });
     klient.requestAccessToken({ prompt: token ? "" : undefined });
   });
