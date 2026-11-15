@@ -54,7 +54,7 @@ function novyProjekt({ tema, delka, ton, jazyky }) {
     sceny: [], klipy: {}, vysledky: {}, webVysledky: [],
     hlas: { hlasId: A.maEleven() ? "eleven" : "cs_CZ-jirka-medium", rychlost: 1 },
     hudba: null,
-    vzhled: { titulky: true, zvyrazneni: true, prolnuti: true, barvy: "prirozene", logo: true, outro: true },
+    vzhled: { titulky: true, zvyrazneni: true, prolnuti: true, barvy: "prirozene", logo: false, logoVolba: true, outro: true, strih: "fire" },
   };
 }
 
@@ -63,6 +63,10 @@ async function otevri(id) {
   if (!z) return;
   p = z;
   p.webVysledky = p.webVysledky || [];
+  p.vzhled = p.vzhled || {};
+  // vodoznak v rohu je nově vypnutý; starší projekty ho měly zapnutý automaticky
+  if (!p.vzhled.logoVolba) { p.vzhled.logo = false; p.vzhled.logoVolba = true; }
+  if (!p.vzhled.strih) p.vzhled.strih = "fire";
   vykresliVse();
   prepniKrok(p.sceny.length ? "strih" : p.vyzkum.fakta.length ? "scenar" : "vyzkum");
   obnovNahled();
@@ -339,6 +343,10 @@ function vykresliScenar() {
 
 // ---------------------------------------------------------------- 4. záběry --
 
+const zabery = (s) => R.zaberySceny(s);
+const pouziteKlipy = () => new Set(p.sceny.flatMap((s) => zabery(s).map((z) => z.klipId)));
+const MAX_DALSICH = 3;
+
 const STAV_LIC = { volna: ["ok", "✅ volná licence"], prava: ["ok", "✅ práva potvrzena"], neovereno: ["warn", "⚠️ práva neověřena"], chranena: ["err", "⛔ chráněno"], "cc-yt": ["warn", "ⓒ CC na YouTube"] };
 
 function kartaVysledku(v, i) {
@@ -353,7 +361,7 @@ function kartaVysledku(v, i) {
       <span class="radek">
         ${v.url || v.embed ? `<button type="button" class="btn small ghost" data-r-nahled="${i}">▶ Náhled</button>` : ""}
         <a class="btn small ghost" href="${esc(v.stranka)}" target="_blank" rel="noopener">Zdroj ↗</a>
-        ${v.lze.pouzit && v.lze.stahnout === true ? `<button type="button" class="btn small" data-r-pouzit="${i}">Použít</button>` : ""}
+        ${v.lze.pouzit && v.lze.stahnout === true ? `<button type="button" class="btn small" data-r-pouzit="${i}">Použít</button><button type="button" class="btn small ghost" data-r-dalsi="${i}" title="Přidat jako další rychlý střih ve scéně">➕ Střih</button>` : ""}
       </span>
     </div></div>`;
 }
@@ -379,11 +387,12 @@ function vykresliZabery() {
   // scény
   $("#rScenyZabery").innerHTML = p.sceny.map((s, si) => {
     const k = s.klip && p.klipy[s.klip.klipId];
+    const navic = (s.extra || []).length;
     const vys = p.vysledky[s.id] || [];
     const web = (p.webVysledky || []).filter((w) => w.scena === si);
     const html = [...vys, ...web].slice(0, 12).map((v) => { vysledkyIndex.push({ scena: si, v }); return kartaVysledku(v, vysledkyIndex.length - 1); }).join("");
     return `<div class="r-scena-zabery">
-      <div class="slide-hlava"><b>Scéna ${si + 1}</b><span class="radek">${k ? `<span class="r-prirazeno">✔ ${esc(k.nazev)}</span>` : '<span class="bez-zdroje">bez záběru</span>'}<button type="button" class="btn small ghost" data-r-hledat="${si}">🔎 Hledat</button></span></div>
+      <div class="slide-hlava"><b>Scéna ${si + 1}</b><span class="radek">${k ? `<span class="r-prirazeno">✔ ${esc(k.nazev)}${navic ? ` + ${navic} ${navic === 1 ? "střih" : "střihy"}` : ""}</span>` : '<span class="bez-zdroje">bez záběru</span>'}${navic ? `<button type="button" class="btn small ghost" data-r-bezstrihu="${si}" title="Odebrat další střihy">✕ střihy</button>` : ""}<button type="button" class="btn small ghost" data-r-hledat="${si}">🔎 Hledat</button></span></div>
       <p class="muted" style="margin:0 0 6px">🎬 ${esc(s.zaber || "")} <span class="muted">— „${esc(s.text.replace(/\*/g, "").slice(0, 90))}…“</span></p>
       <select data-r-zknihovny="${si}"><option value="">Použít z knihovny…</option>${Object.values(p.klipy).map((x) => `<option value="${x.id}" ${s.klip?.klipId === x.id ? "selected" : ""}>${esc(x.nazev)}</option>`).join("")}</select>
       <div class="r-vysledky">${html || '<p class="muted">Zatím bez výsledků.</p>'}</div>
@@ -442,37 +451,74 @@ function priradKlip(si, klipId) {
   p.sceny[si].klip = { klipId, start: +start.toFixed(2), fokus: 0.5, rezim: naSirku ? "vyplnit" : "vyplnit", zoom: 1, zvuk: k.typ === "video" ? 0.25 : 0 };
 }
 
-async function pouzitVysledek(idx) {
+function novyZaber(si, klipId) {
+  const k = p.klipy[klipId];
+  const osa = R.casovaOsa(p);
+  const s = p.sceny[si];
+  const delka = (osa.segmenty[si]?.delka || 4) / Math.max(1, zabery(s).length + 1);
+  const obsazene = p.sceny.flatMap((x) => zabery(x)).filter((z) => z.klipId === klipId).map((z) => z.start || 0);
+  let start = k.delka ? Math.min(Math.max(0, k.delka * 0.15), Math.max(0, k.delka - delka)) : 0;
+  for (const od of obsazene.sort((a, b) => a - b)) if (start < od + delka + 0.1 && start + delka > od) start = od + delka + 0.1;
+  if (k.delka && start + delka > k.delka) start = Math.max(0, k.delka - delka);
+  return { klipId, start: +start.toFixed(2), fokus: 0.5, rezim: "vyplnit", zoom: 1, zvuk: 0 };
+}
+function pridejStrih(si, klipId) {
+  const s = p.sceny[si];
+  if (!s.klip) { priradKlip(si, klipId); return true; }
+  s.extra = s.extra || [];
+  if (s.extra.length >= MAX_DALSICH || zabery(s).some((z) => z.klipId === klipId)) return false;
+  s.extra.push(novyZaber(si, klipId));
+  return true;
+}
+
+async function pouzitVysledek(idx, jakoDalsi = false) {
   const { scena, v } = vysledkyIndex[idx];
   zprava("#rZaberyZprava", "Načítám záběr…");
   try {
     const k = await Z.pridejZVysledku(p, v);
-    priradKlip(scena, k.id);
+    if (jakoDalsi) {
+      if (!pridejStrih(scena, k.id)) throw new Error(`Scéna ${scena + 1} už má maximum střihů nebo tenhle záběr obsahuje.`);
+    } else priradKlip(scena, k.id);
     vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled();
     zprava("#rZaberyZprava", `Záběr „${esc(k.nazev)}“ je ve scéně ${scena + 1}.`, "ok");
   } catch (e) { zprava("#rZaberyZprava", esc(e.message), "chyba"); }
 }
 
+// Poskládá scény: hlavní záběr + ve fire stylu další rychlé střihy (video má přednost, pak fotky).
 async function automatickyPriradit() {
   let pridano = 0;
-  const pouzite = new Set(p.sceny.map((s) => s.klip?.klipId).filter(Boolean));
+  const pouzite = pouziteKlipy();
+  const fire = (p.vzhled?.strih || "fire") === "fire";
+  const osa = R.casovaOsa(p);
   for (let i = 0; i < p.sceny.length; i++) {
-    if (p.sceny[i].klip) continue;
-    zprava("#rZaberyZprava", `Přiřazuji záběry… scéna ${i + 1}`);
-    const kandidati = (p.vysledky[p.sceny[i].id] || []).filter((v) => v.lze.pouzit && v.lze.stahnout === true);
+    const s = p.sceny[i];
+    const cil = fire ? Math.max(1, Math.min(1 + MAX_DALSICH, Math.round((osa.segmenty[i]?.delka || 4) / 2.4))) : 1;
+    if (zabery(s).length >= cil) continue;
+    zprava("#rZaberyZprava", `Skládám záběry… scéna ${i + 1} / ${p.sceny.length}`);
+    const kandidati = (p.vysledky[s.id] || []).filter((v) => v.lze.pouzit && v.lze.stahnout === true)
+      .sort((a, b) => (b.relevance || 0) + (b.typ !== "foto" ? 15 : 0) - (a.relevance || 0) - (a.typ !== "foto" ? 15 : 0));
     for (const v of kandidati) {
+      if (zabery(s).length >= cil) break;
       const existujici = Object.values(p.klipy).find((k) => k.vysledekId === v.id);
       if (existujici && pouzite.has(existujici.id)) continue;
       try {
         const k = existujici || await Z.pridejZVysledku(p, v);
-        priradKlip(i, k.id); pouzite.add(k.id); pridano++;
-        break;
+        if (pridejStrih(i, k.id)) { pouzite.add(k.id); pridano++; }
       } catch { /* další kandidát */ }
     }
   }
   vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled();
   const chybi = p.sceny.filter((s) => !s.klip).length;
-  zprava("#rZaberyZprava", `Přiřazeno ${pridano} záběrů.${chybi ? ` ${chybi} scén stále nemá záběr – importuj autorizované video nebo zkus jiné dotazy. Reel bez skutečných záběrů nevyrobím.` : ""}`, chybi ? "varovani" : "ok");
+  zprava("#rZaberyZprava", `Přidáno ${pridano} záběrů a fotek.${chybi ? ` ${chybi} scén stále nemá nic – zkus 🔎 Hledat u scény s jiným dotazem, nebo importuj vlastní video/fotku.` : " Všechny scény mají obraz ✓"}`, chybi ? "varovani" : "ok");
+}
+
+// Jedno tlačítko: najdi záběry i fotky pro všechny scény a rovnou je poskládej.
+async function najdiAPoskladej() {
+  const b = $("#rFire"); if (b) b.disabled = true;
+  try {
+    await hledatVse();
+    await automatickyPriradit();
+  } finally { if (b) b.disabled = false; }
 }
 
 async function importuj(soubory) {
@@ -500,6 +546,7 @@ function nahledVysledku(idx) {
 function vykresliStrih() {
   const osa = R.casovaOsa(p);
   const vz = p.vzhled;
+  $("#rStrihStyl").value = vz.strih || "fire";
   $("#rBarvy").value = vz.barvy; $("#rProlnuti").checked = vz.prolnuti; $("#rTitulkyZap").checked = vz.titulky;
   $("#rZvyrazneni").checked = vz.zvyrazneni; $("#rLogoZap").checked = vz.logo; $("#rOutro").checked = vz.outro;
   $("#rStrih").innerHTML = osa.segmenty.map((seg) => {
@@ -518,11 +565,12 @@ function vykresliStrih() {
           <label>Režim<select data-r-k="rezim"><option value="vyplnit" ${s.klip.rezim !== "rozmazane" ? "selected" : ""}>Vyplnit na výšku (ořez)</option><option value="rozmazane" ${s.klip.rezim === "rozmazane" ? "selected" : ""}>Celý záběr + rozmazané pozadí</option></select></label>
           <label>Přiblížení<input type="range" data-r-k="zoom" min="1" max="2" step="0.01" value="${s.klip.zoom || 1}"></label>
           <label>Původní zvuk (atmosféra)<input type="range" data-r-k="zvuk" min="0" max="1" step="0.05" value="${s.klip.zvuk || 0}"></label>
-          <span class="muted" style="font-size:12px;align-self:end">${k.typ === "foto" ? "📷 fotka – jen doplněk" : `🎞️ ${delkaText(k.delka)} · ${k.sirka || "?"}×${k.vyska || "?"}`}</span>
+          <span class="muted" style="font-size:12px;align-self:end">${k.typ === "foto" ? "📷 fotka – s pohybem kamery" : `🎞️ ${delkaText(k.delka)} · ${k.sirka || "?"}×${k.vyska || "?"}`}</span>
         </div>` : ""}
+        ${(s.extra || []).length ? `<div class="r-strihy"><span class="muted">Další střihy ve scéně:</span>${s.extra.map((z, j) => { const kk = p.klipy[z.klipId]; return `<span class="r-strih-chip">${kk?.nahled ? `<img src="${esc(kk.nahled)}" alt="">` : ""}${esc((kk?.nazev || "?").slice(0, 28))} <button type="button" class="ikona" data-r-smazstrih="${si}:${j}" title="Odebrat střih">✕</button></span>`; }).join("")}</div>` : ""}
       </div></div>`;
   }).join("") || '<p class="muted">Nejdřív napiš scénář.</p>';
-  $("#rStrihStat").textContent = osa.segmenty.length ? `Celkem ${osa.celkem.toFixed(1)} s · ${p.sceny.filter((s) => s.klip).length}/${p.sceny.length} scén má záběr` : "";
+  $("#rStrihStat").textContent = osa.segmenty.length ? `Celkem ${osa.celkem.toFixed(1)} s · ${p.sceny.filter((s) => s.klip).length}/${p.sceny.length} scén má záběr · ${p.sceny.reduce((a, s) => a + zabery(s).length, 0)} střihů` : "";
 }
 
 // ----------------------------------------------------------- 6. hlas a titulky --
@@ -555,12 +603,42 @@ function vykresliHlas() {
   }).join("") || '<p class="muted">Nejdřív napiš scénář.</p>';
 }
 
+// Čísla v textu převede AI na slova ve správném pádě („s 5 góly“ → „s pěti góly“).
+// Bez AI klíče (nebo při chybě) se použijí pravidla v DHReelsHlas.ceskaCisla.
+let mluvaSelhala = 0;
+async function pripravMluvu(indexy) {
+  const potreba = indexy.filter((i) => {
+    const s = p.sceny[i];
+    return /\d/.test(s.text) && s.mluva?.hash !== R.hashTextu(s.text);
+  });
+  if (!potreba.length || !AI()?.maKlic() || Date.now() - mluvaSelhala < 120000) return;
+  try {
+    const r = await AI().gemini({
+      system: `Připravuješ český text pro hlasového robota (text-to-speech). Přepiš VŠECHNA čísla slovy ve správném pádě a rodě podle češtiny:
+roky („1998“ → „devatenáct set devadesát osm“, „2011“ → „dva tisíce jedenáct“), data („1. září“ → „prvního září“), řadové číslovky („v 68. minutě“ → „v šedesáté osmé minutě“),
+skóre („5:3“ → „pět ku třem“), čísla s předložkami („s 5 góly“ → „s pěti góly“), procenta, desetinná čísla, čísla dresů („č. 68“ → „s číslem šedesát osm“ podle kontextu), „3×“ → „třikrát“.
+Nic jiného neměň – slova, interpunkci, hvězdičky *zvýraznění* i [tagy] v hranatých závorkách nech přesně tak. Ve výsledku nesmí zůstat žádná číslice.`,
+      zadani: JSON.stringify(potreba.map((i) => ({ i, text: p.sceny[i].text }))),
+      schema: { type: "object", properties: { sceny: { type: "array", items: { type: "object", properties: { i: { type: "integer" }, text: { type: "string" } }, required: ["i", "text"] } } }, required: ["sceny"] },
+      teplota: 0.1,
+    });
+    for (const x of r.sceny || []) {
+      const s = p.sceny[x.i];
+      if (!s || !potreba.includes(x.i) || !x.text?.trim()) continue;
+      const delkaOk = x.text.length < s.text.length * 3 + 200;
+      if (delkaOk) s.mluva = { hash: R.hashTextu(s.text), text: x.text.trim() };
+    }
+  } catch (e) { mluvaSelhala = Date.now(); console.warn("AI převod čísel selhal, použijí se pravidla:", e?.message); }
+}
+const mluvenyText = (s) => (s.mluva?.hash === R.hashTextu(s.text) ? s.mluva.text : s.text);
+
 async function hlasScenu(i, tiche = false) {
   const s = p.sceny[i];
+  await pripravMluvu([i]);
   const eleven = p.hlas.hlasId === "eleven";
   if (!tiche) zprava("#rHlasZprava", eleven ? `Generuji hlas pro scénu ${i + 1} na ElevenLabs…` : `Generuji hlas pro scénu ${i + 1}… (poprvé se stahuje hlasový model ~60 MB)`);
-  const blob = await A.syntetizuj(s.text, p.hlas.hlasId, (pct) => zprava("#rHlasZprava", `Stahuji český hlasový model… ${pct} %`),
-    { predchozi: p.sceny[i - 1]?.text || "", dalsi: p.sceny[i + 1]?.text || "" });
+  const blob = await A.syntetizuj(mluvenyText(s), p.hlas.hlasId, (pct) => zprava("#rHlasZprava", `Stahuji český hlasový model… ${pct} %`),
+    { predchozi: p.sceny[i - 1] ? mluvenyText(p.sceny[i - 1]) : "", dalsi: p.sceny[i + 1] ? mluvenyText(p.sceny[i + 1]) : "" });
   const souborId = await U.ulozSoubor(blob, { nazev: `hlas-${i + 1}.${eleven ? "mp3" : "wav"}` });
   const buf = await A.dekoduj(souborId, async () => blob);
   s.hlas = { souborId, delka: buf.duration, zdroj: eleven ? "elevenlabs" : "piper", hlasId: p.hlas.hlasId, textHash: R.hashTextu(s.text) };
@@ -570,6 +648,10 @@ async function hlasScenu(i, tiche = false) {
 async function hlasVse() {
   const b = $("#rGenHlas"); b.disabled = true;
   try {
+    if (p.sceny.some((s) => /\d/.test(s.text))) {
+      zprava("#rHlasZprava", "Připravuji čísla pro hlas (roky, skóre, data)…");
+      await pripravMluvu(p.sceny.map((_, i) => i));
+    }
     for (let i = 0; i < p.sceny.length; i++) {
       const s = p.sceny[i];
       if (s.hlas && s.hlas.textHash === R.hashTextu(s.text) && s.hlas.zdroj !== "mikrofon" && s.hlas.hlasId === p.hlas.hlasId) continue;
@@ -588,7 +670,7 @@ async function hlasVse() {
 
 async function kopirujProEleven() {
   if (!p?.sceny.length) { zprava("#rHlasZprava", "Nejdřív napiš scénář.", "chyba"); return; }
-  const text = A.textProElevenLabs(p.sceny);
+  const text = A.textProElevenLabs(p.sceny.map((s) => ({ ...s, text: mluvenyText(s) })));
   try {
     await navigator.clipboard.writeText(text);
     zprava("#rHlasZprava", `Text zkopírován ✓ (${text.length} znaků, ${p.sceny.length} scén). V ElevenLabs ho vlož do <b>Text to Speech</b>, vyber hlas <b>Kuba</b>, klikni <b>Generate</b>, stáhni MP3 a nahraj ho sem tlačítkem <b>📥 Nahrát celé audio</b>.`, "ok");
@@ -738,15 +820,15 @@ function scenarText() {
 }
 
 function zdrojeText() {
-  const pouzite = new Set(p.sceny.map((s) => s.klip?.klipId).filter(Boolean));
+  const pouzite = pouziteKlipy();
   return ["ZDROJE FAKTŮ", ...p.vyzkum.fakta.filter((f) => f.pouzit !== false).map((f) => `- ${f.text} [${JISTOTA[f.jistota] || f.jistota}]\n  ${(f.zdroje || []).map((z) => `${z.titulek}: ${z.uri}`).join("\n  ") || "bez zdroje"}`),
     "", "ZÁBĚRY A LICENCE", ...[...pouzite].map((id) => p.klipy[id]).filter(Boolean).map((k) => `- ${k.nazev} · ${k.licence?.nazev || ""}${k.licence?.autor ? ` · autor: ${k.licence.autor}` : ""}${k.puvod ? ` · ${k.puvod}` : ""}`),
     p.hudba ? `\nHUDBA: ${p.hudba.nazev} · ${p.hudba.licence || "licence neuvedena"}` : ""].join("\n");
 }
 
 function popisekSKredity() {
-  const pouzite = [...new Set(p.sceny.map((s) => s.klip?.klipId).filter(Boolean))].map((id) => p.klipy[id]).filter((k) => k && k.licence?.stav === "volna");
-  const kredity = pouzite.length ? `📹 Záběry: ${pouzite.map((k) => `${k.licence.autor || k.nazev} (${k.licence.nazev})`).join(", ")}` : "";
+  const pouzite = [...pouziteKlipy()].map((id) => p.klipy[id]).filter((k) => k && k.licence?.stav === "volna");
+  const kredity = pouzite.length ? `📹 Záběry a fotky: ${pouzite.map((k) => `${k.licence.autor || k.nazev} (${k.licence.nazev})`).join(", ")}` : "";
   const t = $("#rPopisekReel").value.trim();
   return [t, kredity].filter(Boolean).join("\n\n");
 }
@@ -841,10 +923,16 @@ function init() {
     }
     if (d.rHledat !== undefined) { t.disabled = true; try { await hledatScenu(+d.rHledat); } catch (er) { zprava("#rZaberyZprava", esc(er.message), "chyba"); } t.disabled = false; return; }
     if (d.rPouzit !== undefined) return pouzitVysledek(+d.rPouzit);
+    if (d.rDalsi !== undefined) return pouzitVysledek(+d.rDalsi, true);
+    if (d.rBezstrihu !== undefined) { p.sceny[+d.rBezstrihu].extra = []; vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled(); return; }
+    if (d.rSmazstrih) { const [si, j] = d.rSmazstrih.split(":").map(Number); p.sceny[si].extra.splice(j, 1); vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled(R.casovaOsa(p).segmenty[si]?.od + 0.3); return; }
     if (d.rNahled !== undefined) return nahledVysledku(+d.rNahled);
     if (d.rSmazklip) {
-      if (p.sceny.some((s) => s.klip?.klipId === d.rSmazklip) && !confirm("Záběr je použitý ve scéně. Odebrat?")) return;
-      p.sceny.forEach((s) => { if (s.klip?.klipId === d.rSmazklip) s.klip = null; });
+      if (pouziteKlipy().has(d.rSmazklip) && !confirm("Záběr je použitý ve scéně. Odebrat?")) return;
+      p.sceny.forEach((s) => {
+        s.extra = (s.extra || []).filter((z) => z.klipId !== d.rSmazklip);
+        if (s.klip?.klipId === d.rSmazklip) s.klip = s.extra.shift() || null;
+      });
       delete p.klipy[d.rSmazklip]; R.zapomenMedium(d.rSmazklip);
       vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled(); return;
     }
@@ -899,6 +987,7 @@ function init() {
   $("#rHledatVse").addEventListener("click", hledatVse);
   $("#rHledatWeb").addEventListener("click", hledatWeb);
   $("#rPriradit").addEventListener("click", automatickyPriradit);
+  $("#rFire")?.addEventListener("click", najdiAPoskladej);
   $("#rImport").addEventListener("change", (e) => { importuj([...e.target.files]); e.target.value = ""; });
   const drop = $("#rDrop");
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("drop"); });
@@ -911,7 +1000,7 @@ function init() {
     zprava("#rYtZprava", Z.ytKlic() ? "YouTube klíč uložen (jen v tomhle prohlížeči)." : "YouTube klíč odebrán.", "ok");
     if (p) vykresliZabery();
   });
-  for (const [id, klic] of [["#rBarvy", "barvy"], ["#rProlnuti", "prolnuti"], ["#rTitulkyZap", "titulky"], ["#rZvyrazneni", "zvyrazneni"], ["#rLogoZap", "logo"], ["#rOutro", "outro"]]) {
+  for (const [id, klic] of [["#rStrihStyl", "strih"], ["#rBarvy", "barvy"], ["#rProlnuti", "prolnuti"], ["#rTitulkyZap", "titulky"], ["#rZvyrazneni", "zvyrazneni"], ["#rLogoZap", "logo"], ["#rOutro", "outro"]]) {
     $(id).addEventListener("change", (e) => { if (!p) return; p.vzhled[klic] = e.target.type === "checkbox" ? e.target.checked : e.target.value; ulozPozdeji(); obnovNahled(+$("#rPosuv").value); });
   }
   $("#rHlasId").addEventListener("change", (e) => { p.hlas.hlasId = e.target.value; ulozPozdeji(); });

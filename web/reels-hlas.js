@@ -116,7 +116,7 @@ async function elUlozNavrh({ generatedId, nazev, popis, klic = elKlic() }) {
 
 // [tagy] emocí umí jen v3; ostatní modely by je přečetly nahlas.
 function textProEleven(text, model) {
-  let t = String(text || "").replace(/\*/g, "")
+  let t = ceskaCisla(text).replace(/\*/g, "")
     .replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu, "");
   if (!/^eleven_v3/.test(model)) t = t.replace(/\[[^\]]{1,40}\]/g, " ");
   return t.replace(/\s+/g, " ").trim();
@@ -171,8 +171,96 @@ async function knihovnaTTS() {
 }
 
 // Text pro syntézu: bez značek *zvýraznění*, bez emoji, sjednocené mezery.
+// ---------------------------------------------------- čísla → česká slova --
+// Hlas (ElevenLabs i Piper) pak čte „1998“ jako „devatenáct set devadesát osm“, „5:3“ jako „pět ku třem“ atd.
+const JEDN = ["nula", "jedna", "dva", "tři", "čtyři", "pět", "šest", "sedm", "osm", "devět", "deset", "jedenáct", "dvanáct", "třináct", "čtrnáct", "patnáct", "šestnáct", "sedmnáct", "osmnáct", "devatenáct"];
+const DES = ["", "", "dvacet", "třicet", "čtyřicet", "padesát", "šedesát", "sedmdesát", "osmdesát", "devadesát"];
+const STA = ["", "sto", "dvě stě", "tři sta", "čtyři sta", "pět set", "šest set", "sedm set", "osm set", "devět set"];
+function podTisic(n) {
+  const out = [];
+  if (n >= 100) { out.push(STA[Math.floor(n / 100)]); n %= 100; }
+  if (n >= 20) { out.push(DES[Math.floor(n / 10)]); n %= 10; if (n) out.push(JEDN[n]); } else if (n) out.push(JEDN[n]);
+  return out.join(" ");
+}
+function cisloSlovy(n) {
+  n = Math.floor(Math.abs(n));
+  if (n === 0) return "nula";
+  const out = [];
+  const mil = Math.floor(n / 1e6), tis = Math.floor((n % 1e6) / 1000), zb = n % 1000;
+  if (mil) out.push(mil === 1 ? "milion" : `${mil < 5 ? podTisic(mil).replace(/^dva$/, "dva") : podTisic(mil)} ${mil >= 2 && mil <= 4 ? "miliony" : "milionů"}`);
+  if (tis) out.push(tis === 1 ? "tisíc" : `${podTisic(tis)} ${tis >= 2 && tis <= 4 ? "tisíce" : "tisíc"}`);
+  if (zb) out.push(podTisic(zb));
+  return out.join(" ");
+}
+function rokSlovy(r) {
+  if (r >= 1100 && r < 2000) return `${JEDN[Math.floor(r / 100)]} set${r % 100 ? ` ${podTisic(r % 100)}` : ""}`;
+  return cisloSlovy(r);
+}
+const DATIV = ["nule", "jedné", "dvěma", "třem", "čtyřem", "pěti", "šesti", "sedmi", "osmi", "devíti", "deseti", "jedenácti", "dvanácti", "třinácti", "čtrnácti", "patnácti"];
+const RAD_KMEN = ["", "prv", "druh", "třet", "čtvrt", "pát", "šest", "sedm", "osm", "devát", "desát", "jedenáct", "dvanáct", "třináct", "čtrnáct", "patnáct", "šestnáct", "sedmnáct", "osmnáct", "devatenáct"];
+const RAD_DES = ["", "", "dvacát", "třicát", "čtyřicát", "padesát", "šedesát", "sedmdesát", "osmdesát", "devadesát"];
+const MEKKE = new Set([1, 3]); // první, třetí – měkké, nemění se
+function radovaSlovy(n, konc) {
+  const mekka = { "ého": "ího", "ém": "ím", "ých": "ích", "ými": "ími" }[konc] || "í";
+  const cast = (k) => (MEKKE.has(k) ? (k === 1 ? "prvn" : "třet") + mekka : RAD_KMEN[k] + konc);
+  if (n < 20) return cast(n);
+  if (n < 100) return `${RAD_DES[Math.floor(n / 10)]}${konc}${n % 10 ? ` ${cast(n % 10)}` : ""}`;
+  if (n === 100) return `st${konc}`;
+  return cisloSlovy(n);
+}
+const RAD_GEN = (n) => radovaSlovy(n, "ého");
+const MESICE = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
+const MASK_NEUT_LOK = /^(místě|kole|zápase|zápasu|utkání|finále|ročníku|draftu|kolu|týmu|klubu|roce|století|desetiletí|období|kanadském|světě)$/i;
+function koncovkaRadove(slovo) {
+  const s = slovo.toLowerCase();
+  if (MASK_NEUT_LOK.test(s)) return "ém";
+  if (/(ech|ích|ách)$/.test(s)) return "ých";
+  if (/ě$/.test(s)) return "é";
+  if (/a$/.test(s)) return "á";
+  if (/(o|í|é)$/.test(s)) return "é";
+  if (/ou$/.test(s)) return "ou";
+  if (/(u|e)$/.test(s)) return "ém";
+  return "ý";
+}
+const POCITANE = /^(gól|bod|zápas|utkání|divák|fanouš|minut|sekund|sezón|let|rok|hráč|titul|medail|asistenc|výhr|proher|kilometr|km|kč|korun|dolar|euro|tým|klub|krát)/i;
+
+function ceskaCisla(text) {
+  let t = String(text || "");
+  // oddělovače tisíců: 18 000 / 18 000 / 18.000
+  t = t.replace(/\b(\d{1,3})(?:[   ](\d{3}))(?:[   ](\d{3}))?\b(?![,.]\d)/g, (m, a, b, c) => a + b + (c || ""));
+  t = t.replace(/\b(\d{1,3})\.(\d{3})(?:\.(\d{3}))?\b(?!\.\d)/g, (m, a, b, c) => a + b + (c || ""));
+  // čísla dresů
+  t = t.replace(/(^|[^\p{L}])(se?)\s+(?:č\.\s?|#|číslem\s)(\d{1,3})\b/gu, (m, pred, pr, n) => `${pred}${pr} číslem ${cisloSlovy(+n)}`);
+  t = t.replace(/(^|[^\p{L}])(?:č\.\s?|#)(\d{1,3})\b/gu, (m, pred, n) => `${pred}číslo ${cisloSlovy(+n)}`);
+  // data: 1. 9. 2011 / 1. září 2011
+  t = t.replace(/\b(\d{1,2})\.\s?(\d{1,2})\.\s?(\d{4})\b/g, (m, d, mes, r) => (+mes >= 1 && +mes <= 12 && +d >= 1 && +d <= 31 ? `${RAD_GEN(+d)} ${MESICE[+mes - 1]} ${rokSlovy(+r)}` : m));
+  t = t.replace(new RegExp(`\\b(\\d{1,2})\\.\\s?(${MESICE.join("|")})`, "gi"), (m, d, mes) => `${RAD_GEN(+d)} ${mes}`);
+  // rozsahy let: 1990–1995 / 1990-95
+  t = t.replace(/\b(1[89]\d{2}|20\d{2})\s?[–—-]\s?(1[89]\d{2}|20\d{2})\b/g, (m, a, b) => `${rokSlovy(+a)} až ${rokSlovy(+b)}`);
+  // skóre 5:3
+  t = t.replace(/\b(\d{1,2})\s?:\s?(\d{1,2})\b(?!\s?(?:h|hod|min))/g, (m, a, b) => `${cisloSlovy(+a)} ku ${DATIV[+b] || cisloSlovy(+b)}`);
+  // procenta a desetinná čísla
+  t = t.replace(/\b(\d+),(\d+)\s?(%|procent\w*)/g, (m, a, b) => `${cisloSlovy(+a)} celá ${cisloSlovy(+b)} procenta`.replace(/^jedna celá/, "jedna celá"));
+  t = t.replace(/\b(\d+)\s?(%|procent\w*)/g, (m, a) => `${cisloSlovy(+a)} ${+a === 1 ? "procento" : +a >= 2 && +a <= 4 ? "procenta" : "procent"}`);
+  t = t.replace(/\b(\d+),(\d+)\b/g, (m, a, b) => `${cisloSlovy(+a)} ${+a === 1 ? "celá" : +a >= 2 && +a <= 4 ? "celé" : "celých"} ${cisloSlovy(+b)}`);
+  // 3× / 3x
+  t = t.replace(/\b(\d{1,3})\s?[×x](?![\p{L}\d])/gu, (m, a) => (+a === 1 ? "jednou" : `${cisloSlovy(+a).replace(/ /g, "")}krát`));
+  // řadové číslovky: 68. minutě, 1. třetina, 70. léta
+  t = t.replace(/\b(\d{1,3})\.(\s+)([a-záčďéěíňóřšťúůýž]+)/g, (m, n, mez, slovo) => `${radovaSlovy(+n, koncovkaRadove(slovo))}${mez}${slovo}`);
+  // roky (a ostatní čísla)
+  t = t.replace(/\b(\d+)\b(\s*)([^\s\d]*)/g, (m, n, mez, dalsi) => {
+    const x = +n;
+    const jeRok = n.length === 4 && x >= 1100 && x <= 2099 && !POCITANE.test(dalsi);
+    let slovy = jeRok ? rokSlovy(x) : cisloSlovy(x);
+    if (!jeRok && x === 1 && /^[a-záčďéěíňóřšťúůýž]/i.test(dalsi)) slovy = /a$/i.test(dalsi) ? "jedna" : /(o|í|e)$/i.test(dalsi) ? "jedno" : "jeden";
+    if (!jeRok && x === 2 && /^(sezón|minut|medail|třetin|asistenc|výhr|branky|hvězd|ligy|řady)/i.test(dalsi)) slovy = "dvě";
+    return `${slovy}${mez}${dalsi}`;
+  });
+  return t;
+}
+
 function textProHlas(text) {
-  return String(text || "")
+  return ceskaCisla(text)
     .replace(/\*/g, "")
     .replace(/(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:️|‍\p{Extended_Pictographic})*/gu, "")
     .replace(/\s+/g, " ")
@@ -541,5 +629,5 @@ function initNastaveni() {
 }
 initNastaveni();
 
-window.DHReelsHlas = { elNavrhniHlasy, elUlozNavrh, najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
+window.DHReelsHlas = { ceskaCisla, cisloSlovy, elNavrhniHlasy, elUlozNavrh, najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
 })();

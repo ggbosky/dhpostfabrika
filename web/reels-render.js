@@ -29,10 +29,32 @@ function casovaOsa(p) {
   return { segmenty, celkem: t };
 }
 
+// Záběry scény: hlavní + další (rychlé střihy). Délka scény se mezi ně rozdělí rovným dílem.
+function zaberySceny(s) { return [s.klip, ...(s.extra || [])].filter((z) => z && z.klipId); }
+function aktivniZaber(seg, t) {
+  const z = zaberySceny(seg.scena);
+  if (!z.length) return null;
+  const lokal = Math.max(0, t - seg.od);
+  const delka = seg.delka / z.length;
+  const idx = Math.min(z.length - 1, Math.floor(lokal / delka));
+  const vZaberu = lokal - idx * delka;
+  return { zaber: z[idx], idx, lokal: vZaberu, delka, cas: (z[idx].start || 0) + vZaberu };
+}
+async function nastavVideo(el, a) {
+  if (el?.tagName === "VIDEO") await seekTo(el, Math.min(a.cas, Math.max(0, el.duration - 0.05)));
+}
+
 // Titulky scény: krátké kousky (max ~30 znaků), časované podle délky hlasu.
 function autoTitulky(text, hlasDelka) {
   const s = slova(String(text || "").replace(/\s+/g, " "));
-  const zdroj = String(text || "").split(/\s+/).filter(Boolean); // se značkami *
+  const zdroj = String(text || "").split(/\s+/).filter(Boolean) // se značkami *
+    // „18 000“, „č. 68“, „1. září“ nesmí skončit každé v jiném titulku
+    .reduce((acc, w) => {
+      const pred = acc[acc.length - 1];
+      if (pred && /^\*?(\d{1,3}|č\.|#|\d{1,2}\.)$/.test(pred) && /^\*?\d|^[a-záčďéěíňóřšťúůýž]+[.,!?]?\*?$/.test(w) && (/^\*?\d/.test(w) || /\d\.$/.test(pred))) acc[acc.length - 1] = `${pred}\u00a0${w}`;
+      else acc.push(w);
+      return acc;
+    }, []);
   const kusy = [];
   let kus = [];
   const delkaKusu = (k) => k.join(" ").replace(/\*/g, "").length;
@@ -134,7 +156,7 @@ function nactiAvatar() {
   return avatar;
 }
 
-function kresliKlip(ctx, el, nastaveni, filtr) {
+function kresliKlip(ctx, el, nastaveni, filtr, pohyb = { z: 1, px: 0, py: 0 }) {
   const sw = el.videoWidth || el.naturalWidth || el.width, sh = el.videoHeight || el.naturalHeight || el.height;
   if (!sw || !sh) return;
   ctx.save();
@@ -143,14 +165,14 @@ function kresliKlip(ctx, el, nastaveni, filtr) {
     const m = Math.max(W / sw, H / sh) * 1.08;
     ctx.filter = "blur(36px) brightness(0.5)";
     ctx.drawImage(el, (W - sw * m) / 2, (H - sh * m) / 2, sw * m, sh * m);
-    const m2 = Math.min(W / sw, (H * 0.62) / sh) * (nastaveni.zoom || 1);
+    const m2 = Math.min(W / sw, (H * 0.62) / sh) * (nastaveni.zoom || 1) * pohyb.z;
     ctx.filter = FILTRY[filtr] || "none";
     ctx.drawImage(el, (W - sw * m2) / 2, (H - sh * m2) / 2 - 40, sw * m2, sh * m2);
   } else {
-    const m = Math.max(W / sw, H / sh) * (nastaveni.zoom || 1);
+    const m = Math.max(W / sw, H / sh) * (nastaveni.zoom || 1) * pohyb.z;
     const vw = W / m, vh = H / m;
-    const sx = Math.min(Math.max((nastaveni.fokus ?? 0.5) * sw - vw / 2, 0), sw - vw);
-    const sy = Math.min(Math.max(0.5 * sh - vh / 2, 0), sh - vh);
+    const sx = Math.min(Math.max(((nastaveni.fokus ?? 0.5) + pohyb.px) * sw - vw / 2, 0), sw - vw);
+    const sy = Math.min(Math.max((0.5 + pohyb.py) * sh - vh / 2, 0), sh - vh);
     ctx.filter = FILTRY[filtr] || "none";
     ctx.drawImage(el, sx, sy, vw, vh, 0, 0, W, H);
   }
@@ -159,8 +181,10 @@ function kresliKlip(ctx, el, nastaveni, filtr) {
 
 function zalomBohaty(ctx, text, max) { return G().zalomBohaty(ctx, text, max); }
 
-function kresliTitulky(ctx, text, zvyraznit) {
+function kresliTitulky(ctx, text, zvyraznit, pop = 1) {
   const t = zvyraznit ? text : text.replace(/\*/g, "");
+  ctx.save();
+  if (pop !== 1) { ctx.translate(W / 2, 1360); ctx.scale(pop, pop); ctx.translate(-W / 2, -1360); }
   let v = 62, radky;
   for (; v >= 44; v -= 2) {
     ctx.font = `800 ${v}px ${PISMO_T}`;
@@ -188,6 +212,7 @@ function kresliTitulky(ctx, text, zvyraznit) {
     }
     y += rozestup;
   }
+  ctx.restore();
 }
 
 function kresliNadpisSceny(ctx, text, alfa) {
@@ -249,9 +274,20 @@ async function kresliSnimek(ctx, p, osa, t, elementy) {
   const seg = osa.segmenty.find((s) => t >= s.od && t < s.do) || osa.segmenty[osa.segmenty.length - 1];
   if (!seg) { ctx.restore(); return; }
   const s = seg.scena;
-  const el = s.klip && elementy.get(s.klip.klipId);
-  if (el) kresliKlip(ctx, el, s.klip, vz.barvy || "prirozene");
-  else {
+  const fire = (vz.strih || "fire") === "fire";
+  const a = aktivniZaber(seg, t);
+  const el = a && elementy.get(a.zaber.klipId);
+  if (el) {
+    // pohyb kamery: fotky Ken Burns (střídavě přiblížení / oddálení), video jemný nájezd; ve fire stylu „punch“ na střihu
+    const prog = Math.min(1, a.lokal / a.delka);
+    const jeFoto = el.tagName !== "VIDEO";
+    const smer = (seg.i + a.idx) % 2 ? -1 : 1;
+    const sila = fire ? 1 : 0.5;
+    let z = jeFoto ? 1.03 + 0.15 * sila * (smer > 0 ? prog : 1 - prog) : 1 + (fire ? 0.06 : 0) * prog;
+    const px = jeFoto ? smer * 0.04 * sila * (prog - 0.5) : 0;
+    if (fire && (seg.i > 0 || a.idx > 0)) { const k = Math.max(0, 1 - a.lokal / 0.22); z *= 1 + 0.12 * k * k; }
+    kresliKlip(ctx, el, a.zaber, vz.barvy || "prirozene", { z, px, py: 0 });
+  } else {
     ctx.fillStyle = "#140607"; ctx.fillRect(0, 0, W, H);
     ctx.font = `800 44px ${PISMO_T}`; ctx.fillStyle = "#ff8d92"; ctx.textAlign = "center";
     ctx.fillText("CHYBÍ ZÁBĚR", W / 2, H / 2 - 30);
@@ -274,10 +310,26 @@ async function kresliSnimek(ctx, p, osa, t, elementy) {
   }
   if (vz.titulky !== false) {
     const kus = (s.titulky || []).find((k) => lokal >= k.od && lokal < k.do);
-    if (kus) kresliTitulky(ctx, kus.text, vz.zvyrazneni !== false);
+    if (kus) kresliTitulky(ctx, kus.text, vz.zvyrazneni !== false, fire ? 1 + 0.1 * Math.max(0, 1 - (lokal - kus.od) / 0.12) : 1);
   }
-  // střih přes černou (velmi krátký)
-  if (vz.prolnuti !== false) {
+  if (fire) {
+    // viněta + krátký záblesk na každém střihu
+    const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.32, W / 2, H / 2, H * 0.72);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.42)");
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    let zablesk = 0;
+    for (const sg of osa.segmenty) {
+      const n = Math.max(1, zaberySceny(sg.scena).length);
+      for (let j = 0; j < n; j++) {
+        const zacatek = sg.od + (sg.delka / n) * j;
+        if (zacatek <= 0.01) continue;
+        const d = t - zacatek;
+        if (d >= 0 && d < 0.08) zablesk = Math.max(zablesk, 0.5 * (1 - d / 0.08));
+      }
+    }
+    if (zablesk > 0) { ctx.fillStyle = `rgba(255,255,255,${zablesk})`; ctx.fillRect(0, 0, W, H); }
+  } else if (vz.prolnuti !== false) {
+    // střih přes černou (velmi krátký)
     let a = 0;
     for (const sg of osa.segmenty) {
       if (sg.i === 0) continue;
@@ -310,7 +362,7 @@ async function smichejProjekt(p, osa, pokrok = () => {}) {
       try {
         const buf = await A().dekoduj(`klip-${klip.id}`, async () => (klip.souborId ? U().souborBlob(klip.souborId) : (await fetch(klip.url)).blob()));
         const hlasitost = s.klip.zvuk * (s.hlas ? 0.35 : 1); // pod hlasem se původní zvuk ztlumí
-        stopy.push({ buffer: buf, od: seg.od, offset: s.klip.start || 0, delka: seg.delka, hlasitost, prolnuti: 0.12 });
+        stopy.push({ buffer: buf, od: seg.od, offset: s.klip.start || 0, delka: seg.delka / Math.max(1, zaberySceny(s).length), hlasitost, prolnuti: 0.12 });
       } catch { /* video bez zvukové stopy */ }
     }
     pokrok(seg.i / osa.segmenty.length);
@@ -336,9 +388,11 @@ class Nahled {
     this.osa = casovaOsa(p);
     this.el = new Map();
     for (const s of p.sceny) {
-      const k = s.klip && p.klipy[s.klip.klipId];
-      if (k && !this.el.has(k.id)) {
-        try { this.el.set(k.id, (await pripravMedium(k)).el); } catch (e) { priStavu(e.message); }
+      for (const z of zaberySceny(s)) {
+        const k = p.klipy[z.klipId];
+        if (k && !this.el.has(k.id)) {
+          try { this.el.set(k.id, (await pripravMedium(k)).el); } catch (e) { priStavu(e.message); }
+        }
       }
     }
     return this.osa;
@@ -346,10 +400,8 @@ class Nahled {
   async snimek(t) {
     if (!this.p) return;
     const seg = this.osa.segmenty.find((s) => t >= s.od && t < s.do);
-    if (seg?.scena.klip) {
-      const el = this.el.get(seg.scena.klip.klipId);
-      if (el?.tagName === "VIDEO") await seekTo(el, Math.min((seg.scena.klip.start || 0) + (t - seg.od), Math.max(0, el.duration - 0.05)));
-    }
+    const a = seg && aktivniZaber(seg, t);
+    if (a) await nastavVideo(this.el.get(a.zaber.klipId), a);
     await kresliSnimek(this.ctx, this.p, this.osa, t, this.el);
   }
   async prehraj(p, odCasu = 0, priCase = () => {}) {
@@ -364,16 +416,17 @@ class Nahled {
       const t = this.zvuk.cas();
       if (t >= this.osa.celkem) { this.zastav(); priCase(this.osa.celkem, true); return; }
       const seg = this.osa.segmenty.find((s) => t >= s.od && t < s.do);
-      if (seg) {
-        const el = seg.scena.klip && this.el.get(seg.scena.klip.klipId);
+      const a = seg && aktivniZaber(seg, t);
+      if (a) {
+        const klic = `${seg.i}:${a.idx}`;
+        const el = this.el.get(a.zaber.klipId);
         if (el?.tagName === "VIDEO") {
-          const cil = (seg.scena.klip.start || 0) + (t - seg.od);
-          if (seg.i !== posledniSeg || Math.abs(el.currentTime - cil) > 0.3) { el.currentTime = cil; }
+          if (klic !== posledniSeg || Math.abs(el.currentTime - a.cas) > 0.3) { el.currentTime = a.cas; }
           if (el.paused) el.play().catch(() => {});
         }
-        if (seg.i !== posledniSeg) {
+        if (klic !== posledniSeg) {
           this.el.forEach((v) => { if (v !== el && v.tagName === "VIDEO" && !v.paused) v.pause(); });
-          posledniSeg = seg.i;
+          posledniSeg = klic;
         }
       }
       await kresliSnimek(this.ctx, this.p, this.osa, t, this.el);
@@ -448,8 +501,10 @@ async function render(p, { pokrok = () => {}, zruseno = () => false } = {}) {
   pokrok(0.02, "Načítám záběry…");
   const el = new Map();
   for (const s of p.sceny) {
-    const k = s.klip && p.klipy[s.klip.klipId];
-    if (k && !el.has(k.id)) el.set(k.id, (await pripravMedium(k)).el);
+    for (const z of zaberySceny(s)) {
+      const k = p.klipy[z.klipId];
+      if (k && !el.has(k.id)) el.set(k.id, (await pripravMedium(k)).el);
+    }
   }
 
   const muxer = new Mp4Muxer.Muxer({
@@ -487,8 +542,8 @@ async function render(p, { pokrok = () => {}, zruseno = () => false } = {}) {
     if (chyba) throw chyba;
     const t = n / FPS;
     const seg = osa.segmenty.find((s) => t >= s.od && t < s.do) || osa.segmenty[osa.segmenty.length - 1];
-    const v = seg.scena.klip && el.get(seg.scena.klip.klipId);
-    if (v?.tagName === "VIDEO") await seekTo(v, Math.min((seg.scena.klip.start || 0) + (t - seg.od), Math.max(0, v.duration - 0.05)));
+    const a = aktivniZaber(seg, t);
+    if (a) await nastavVideo(el.get(a.zaber.klipId), a);
     await kresliSnimek(ctx, p, osa, t, el);
     const frame = new VideoFrame(platno, { timestamp: Math.round(t * 1e6), duration: Math.round(1e6 / FPS) });
     venc.encode(frame, { keyFrame: n % (FPS * 2) === 0 });
@@ -518,29 +573,32 @@ async function kontrola(p) {
   // 1) pohyblivé video
   let video = 0;
   for (const seg of osa.segmenty) {
-    const k = seg.scena.klip && p.klipy[seg.scena.klip.klipId];
-    if (k?.typ === "video") video += seg.delka;
+    const z = zaberySceny(seg.scena);
+    for (const x of z) if (p.klipy[x.klipId]?.typ === "video") video += seg.delka / z.length;
   }
   const podil = video / osa.celkem;
-  const bez = osa.segmenty.filter((s) => !s.scena.klip).map((s) => s.i + 1);
-  if (podil >= 0.85) pridej("ok", `Skutečné pohyblivé video tvoří ${Math.round(podil * 100)} % délky.`);
-  else pridej("chyba", `Pohyblivé video tvoří jen ${Math.round(podil * 100)} % (minimum 85 %).${bez.length ? ` Chybí záběr ve scénách ${bez.join(", ")}.` : " Nahraď fotky videem."}`);
+  const bez = osa.segmenty.filter((s) => !zaberySceny(s.scena).length).map((s) => s.i + 1);
+  if (bez.length) pridej("chyba", `Chybí záběr nebo fotka ve scénách ${bez.join(", ")}.`);
+  else if (podil >= 0.6) pridej("ok", `Skutečné pohyblivé video tvoří ${Math.round(podil * 100)} % délky, zbytek jsou fotky s pohybem kamery.`);
+  else pridej("varovani", `Pohyblivé video tvoří ${Math.round(podil * 100)} % délky, zbytek jsou fotky (s pohybem kamery). Víc skutečného videa = víc „fire“.`);
 
   // 2) počet různých segmentů a opakování
   const pouziti = [];
   for (const seg of osa.segmenty) {
-    const k = seg.scena.klip;
-    if (!k) continue;
-    pouziti.push({ klip: k.klipId, od: k.start || 0, do: (k.start || 0) + seg.delka, scena: seg.i + 1 });
+    const z = zaberySceny(seg.scena);
+    for (const k of z) {
+      const foto = p.klipy[k.klipId]?.typ === "foto";
+      pouziti.push({ klip: k.klipId, od: foto ? 0 : k.start || 0, do: foto ? 0 : (k.start || 0) + seg.delka / z.length, scena: seg.i + 1, foto });
+    }
   }
   const minimum = MIN_SEGMENTU[p.delka] || 6;
   if (pouziti.length >= minimum) pridej("ok", `${pouziti.length} záběrů (minimum pro ${p.delka} s je ${minimum}).`);
   else pridej("chyba", `Jen ${pouziti.length} záběrů – pro ${p.delka} s je potřeba aspoň ${minimum} různých video segmentů.`);
   const opakovani = [];
   for (let i = 0; i < pouziti.length; i++) for (let j = i + 1; j < pouziti.length; j++) {
-    if (pouziti[i].klip === pouziti[j].klip && prekryv(pouziti[i], pouziti[j])) opakovani.push(`${pouziti[i].scena} a ${pouziti[j].scena}`);
+    if (pouziti[i].klip === pouziti[j].klip && (pouziti[i].foto ? true : prekryv(pouziti[i], pouziti[j]))) opakovani.push(`${pouziti[i].scena} a ${pouziti[j].scena}`);
   }
-  if (opakovani.length) pridej("chyba", `Stejný úsek videa se opakuje ve scénách ${opakovani.join("; ")}. Posuň začátek nebo vyber jiný záběr.`);
+  if (opakovani.length) pridej("chyba", `Stejný úsek videa nebo stejná fotka se opakuje ve scénách ${opakovani.join("; ")}. Posuň začátek nebo vyber jiný záběr.`);
   else if (pouziti.length) pridej("ok", "Žádný úsek videa se neopakuje.");
 
   // 3) práva
@@ -606,5 +664,5 @@ function hashTextu(t) {
   return String(h);
 }
 
-window.DHReelsRender = { W, H, FPS, casovaOsa, autoTitulky, srt, odhadDelky, pripravMedium, zapomenMedium, kresliSnimek, Nahled, render, kontrola, zjistiFormat, hashTextu, smichejProjekt, MIN_SEGMENTU };
+window.DHReelsRender = { zaberySceny, aktivniZaber, W, H, FPS, casovaOsa, autoTitulky, srt, odhadDelky, pripravMedium, zapomenMedium, kresliSnimek, Nahled, render, kontrola, zjistiFormat, hashTextu, smichejProjekt, MIN_SEGMENTU };
 })();

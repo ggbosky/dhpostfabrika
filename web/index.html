@@ -652,6 +652,10 @@
   .barva-vzor.on { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
   .c-barvy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 14px; font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
   .c-barvy input[type=color] { width: 44px; height: 32px; padding: 2px; }
+  .r-strihy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; }
+  .r-strih-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 3px; border: 1px solid var(--line, #2a2a2a); border-radius: 999px; }
+  .r-strih-chip img { width: 34px; height: 22px; object-fit: cover; border-radius: 999px; }
+  .r-strih-chip .ikona { width: 22px; height: 22px; font-size: 11px; }
   .el-navrhy { display: grid; gap: 10px; margin-top: 10px; }
   .el-navrh-polozka { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line, #2a2a2a); border-radius: 12px; }
   .el-navrh-polozka audio { height: 36px; flex: 1 1 220px; }
@@ -1231,9 +1235,10 @@
           <div class="card">
             <h2>Záběry <span class="muted" id="rYtStav"></span></h2>
             <div class="akce" style="margin-top:0">
-              <button type="button" class="btn" id="rHledatVse">🔎 Hledat záběry pro všechny scény</button>
+              <button type="button" class="btn" id="rFire">🔥 Najít záběry a fotky a poskládat</button>
+              <button type="button" class="btn ghost" id="rHledatVse">🔎 Jen hledat</button>
               <button type="button" class="btn ghost" id="rHledatWeb">🌐 Hledat na webu (AI)</button>
-              <button type="button" class="btn ghost" id="rPriradit">⚡ Automaticky přiřadit</button></div>
+              <button type="button" class="btn ghost" id="rPriradit">⚡ Poskládat z výsledků</button></div>
             <div class="zprava" id="rZaberyZprava" hidden></div>
             <p class="muted" style="font-size:13px">Štítky: 👁 lze sledovat · ⬇ lze načíst do střihu · ✅ licence k použití. Veřejně dostupné video ještě neznamená, že ho smíš použít – aplikace nic nestahuje tam, kde to zdroj nedovoluje.</p>
           </div>
@@ -1249,9 +1254,10 @@
           <div class="card">
             <h2>Střih <span class="muted" id="rStrihStat"></span></h2>
             <div class="filtry tri">
+              <label>Styl střihu<select id="rStrihStyl"><option value="fire">🔥 Fire – pohyb, rychlé střihy, záblesky</option><option value="klidny">Klidný dokument</option></select></label>
               <label>Barvy<select id="rBarvy"><option value="prirozene">Přirozené</option><option value="archiv">Archivní</option><option value="dramaticke">Dramatické</option><option value="zadne">Bez úprav</option></select></label>
               <label class="check"><input type="checkbox" id="rProlnuti"> Krátký střih přes černou</label>
-              <label class="check"><input type="checkbox" id="rLogoZap"> Logo Deníku hokeje</label>
+              <label class="check"><input type="checkbox" id="rLogoZap"> Vodoznak (logo v rohu)</label>
               <label class="check"><input type="checkbox" id="rTitulkyZap"> Titulky</label>
               <label class="check"><input type="checkbox" id="rZvyrazneni"> Zvýraznit klíčová slova</label>
               <label class="check"><input type="checkbox" id="rOutro"> Outro s logem</label>
@@ -1519,27 +1525,27 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261115e"></script>
-<script src="grafika.js?v=20261115e"></script>
-<script src="koncepty.js?v=20261115e"></script>
-<script src="ai.js?v=20261115e"></script>
-<script src="app.js?v=20261115e"></script>
-<script src="carousel.js?v=20261115e"></script>
-<script src="vyroci.js?v=20261115e"></script>
-<script src="zpravy.js?v=20261115e"></script>
-<script src="reels-ulozeni.js?v=20261115e"></script>
-<script src="reels-hlas.js?v=20261115e"></script>
-<script src="reels-render.js?v=20261115e"></script>
-<script src="reels-zabery.js?v=20261115e"></script>
-<script src="reels.js?v=20261115e"></script>
-<script src="plan.js?v=20261115e"></script>
-<script src="stats.js?v=20261115e"></script>
-<script src="prehled.js?v=20261115e"></script>
-<script src="yt-ulozeni.js?v=20261115e"></script>
-<script src="miniatury.js?v=20261115e"></script>
-<script src="yt-api.js?v=20261115e"></script>
-<script src="yt-studio.js?v=20261115e"></script>
-<script src="yt-analytics.js?v=20261115e"></script>
-<script src="shell.js?v=20261115e"></script>
+<script src="sablony.js?v=20261115g"></script>
+<script src="grafika.js?v=20261115g"></script>
+<script src="koncepty.js?v=20261115g"></script>
+<script src="ai.js?v=20261115g"></script>
+<script src="app.js?v=20261115g"></script>
+<script src="carousel.js?v=20261115g"></script>
+<script src="vyroci.js?v=20261115g"></script>
+<script src="zpravy.js?v=20261115g"></script>
+<script src="reels-ulozeni.js?v=20261115g"></script>
+<script src="reels-hlas.js?v=20261115g"></script>
+<script src="reels-render.js?v=20261115g"></script>
+<script src="reels-zabery.js?v=20261115g"></script>
+<script src="reels.js?v=20261115g"></script>
+<script src="plan.js?v=20261115g"></script>
+<script src="stats.js?v=20261115g"></script>
+<script src="prehled.js?v=20261115g"></script>
+<script src="yt-ulozeni.js?v=20261115g"></script>
+<script src="miniatury.js?v=20261115g"></script>
+<script src="yt-api.js?v=20261115g"></script>
+<script src="yt-studio.js?v=20261115g"></script>
+<script src="yt-analytics.js?v=20261115g"></script>
+<script src="shell.js?v=20261115g"></script>
 </body>
 </html>

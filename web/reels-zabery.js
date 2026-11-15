@@ -213,6 +213,25 @@ Odpověz POUZE řádky JSON Lines, jedno video na řádek:
   return { vysledky: out, zdroje: r.zdroje };
 }
 
+// ----------------------------------------------------------------- fotky --
+// Fotky z Wikimedia Commons / Openverse (volné licence s autorem). Ve střihu dostanou pohyb kamery.
+async function hledejFotkyReels(dotaz, pocet = 8) {
+  const AI = window.DHAI;
+  if (!AI?.hledejFotky || !dotaz) return [];
+  const fotky = await AI.hledejFotky(dotaz, pocet);
+  return fotky.map((f) => ({
+    zdroj: "foto", typ: "foto", platforma: `📷 ${f.zdroj}`,
+    id: `foto:${f.url}`,
+    nazev: f.nazev || dotaz,
+    popis: "",
+    url: f.url, stranka: f.stranka, nahled: f.nahled || f.url,
+    delka: null, jazyk: "", rok: (String(f.nazev || "").match(/\b(18|19|20)\d{2}\b/) || [""])[0],
+    licence: { stav: jeVolnaLicence(f.licence) ? "volna" : "neovereno", nazev: f.licence, autor: f.autor, odkaz: f.stranka },
+    lze: { sledovat: true, stahnout: true, pouzit: jeVolnaLicence(f.licence) },
+    casy: [],
+  }));
+}
+
 // ---------------------------------------------------------------- skóre --
 
 function relevance(v, scena, projekt) {
@@ -226,6 +245,7 @@ function relevance(v, scena, projekt) {
   if (roky.some((r) => text.includes(r) || v.rok === r)) skore += 20;
   if (/hockey|hokej|хоккей|ishockey|jääkiekko|eishockey|nhl|iihf/.test(text)) skore += 10;
   if (v.lze?.pouzit) skore += 5;
+  if (v.typ !== "foto") skore += 4; // skutečné video má přednost před fotkou
   return Math.max(1, Math.min(100, Math.round(skore)));
 }
 
@@ -234,9 +254,11 @@ async function hledejProScenu(projekt, scena, jazyky, priZdroji = () => {}) {
   const dotazy = jazyky.map((j) => [j, scena.dotazy?.[j]]).filter(([, q]) => q);
   if (!dotazy.length) dotazy.push(["en", scena.zaber || projekt.tema]);
   const en = scena.dotazy?.en || dotazy[0][1];
+  const kratky = en.split(" ").slice(0, 4).join(" ");
   const ulohy = [
     ["Wikimedia Commons", hledejCommons(`${en}`).then((a) => a.length ? a : hledejCommons(`${en.split(" ").slice(0, 3).join(" ")} hockey`))],
     ["Internet Archive", hledejArchiv(`${en} hockey`)],
+    ["Fotky", hledejFotkyReels(en, 8).then((a) => (a.length >= 3 ? a : hledejFotkyReels(kratky, 8).then((b) => [...a, ...b])))],
   ];
   if (ytKlic()) {
     for (const [j, q] of dotazy.slice(0, 3)) ulohy.push([`YouTube (${j})`, hledejYouTube(q, j, 6)]);
@@ -312,11 +334,20 @@ async function pridejZVysledku(projekt, v) {
   const existuje = Object.values(projekt.klipy).find((k) => k.vysledekId === v.id);
   if (existuje) return existuje;
   if (!v.lze.stahnout || v.lze.stahnout === "rucne" || !v.url) throw new Error("Tenhle zdroj nejde načíst přímo – otevři ho, stáhni (pokud to licence dovoluje) a importuj soubor.");
+  const id = U().noveId("k");
+  if (v.typ === "foto") {
+    const img = await window.DHAI.nactiWebFoto(v.url);
+    projekt.klipy[id] = {
+      id, typ: "foto", zdroj: "foto", vysledekId: v.id, nazev: v.nazev, url: v.url,
+      nahled: v.nahled, delka: null, sirka: img.naturalWidth, vyska: img.naturalHeight,
+      licence: { ...v.licence }, puvod: v.stranka,
+    };
+    return projekt.klipy[id];
+  }
   let url = v.url;
   let meta = await metaVidea(url);
   if (!meta.prehratelne && v.zalozniUrl && v.zalozniUrl !== url) { url = v.zalozniUrl; meta = await metaVidea(url); }
   if (!meta.prehratelne) throw new Error("Video se nepodařilo načíst (formát, nebo zdroj teď omezuje počet stažení). Zkus to za chvíli nebo jiný výsledek.");
-  const id = U().noveId("k");
   projekt.klipy[id] = {
     id, typ: "video", zdroj: v.zdroj, vysledekId: v.id, nazev: v.nazev, url,
     nahled: v.nahled || meta.nahled, delka: meta.delka || v.delka, sirka: meta.sirka, vyska: meta.vyska,
@@ -325,5 +356,5 @@ async function pridejZVysledku(projekt, v) {
   return projekt.klipy[id];
 }
 
-window.DHReelsZabery = { JAZYKY, hledejCommons, hledejArchiv, hledejYouTube, hledejWebAI, hledejProScenu, relevance, importujSoubor, pridejZVysledku, metaVidea, ytKlic, casyZPopisu, isoDelka };
+window.DHReelsZabery = { hledejFotkyReels, JAZYKY, hledejCommons, hledejArchiv, hledejYouTube, hledejWebAI, hledejProScenu, relevance, importujSoubor, pridejZVysledku, metaVidea, ytKlic, casyZPopisu, isoDelka };
 })();
