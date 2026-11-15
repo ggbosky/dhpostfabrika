@@ -37,8 +37,13 @@ function elUloz(klic, nastaveni) {
 }
 
 async function elChyba(r) {
-  let detail = "";
-  try { const j = await r.json(); detail = j?.detail?.message || j?.detail?.status || (typeof j?.detail === "string" ? j.detail : JSON.stringify(j?.detail || j)); } catch { /* nic */ }
+  let detail = "", stav = "";
+  try { const j = await r.json(); stav = j?.detail?.status || ""; detail = j?.detail?.message || stav || (typeof j?.detail === "string" ? j.detail : JSON.stringify(j?.detail || j)); } catch { /* nic */ }
+  if (stav === "missing_permissions" || /missing the permission/i.test(detail)) {
+    const pravo = (detail.match(/permission (\w+)/) || [])[1] || "";
+    const popis = { voices_read: "Voices → Read (čtení hlasů)", text_to_speech: "Text to Speech → Access", user_read: "User → Read", models_read: "Models → Read" }[pravo] || pravo;
+    return new Error(`Klíč nemá zapnuté oprávnění „${popis}“. V ElevenLabs → Developers → API Keys vytvoř nový klíč a zapni u něj „Text to Speech“ a „Voices: Read“ (nebo hlas zadej ručně přes Voice ID v Můj styl → Hlas pro reels).`);
+  }
   if (r.status === 401) return new Error(/quota|credit/i.test(detail) ? "Na ElevenLabs účtu došly kredity (znaky) – dobij je nebo počkej na další měsíc." : "Neplatný ElevenLabs klíč – zkontroluj ho v Můj styl → Hlas pro reels.");
   if (r.status === 402 || /quota/i.test(detail)) return new Error("Na ElevenLabs účtu došly kredity (znaky) – dobij je nebo počkej na další měsíc.");
   if (r.status === 404) return new Error("Hlas na ElevenLabs nenašel – přidej si ho do „My Voices“ a vyber ho znovu v Můj styl → Hlas pro reels.");
@@ -389,7 +394,17 @@ function initNastaveni() {
     if (!v && !elKlic()) { zprava("Vlož ElevenLabs API klíč.", "chyba"); return; }
     if (v) elUloz(v);
     $("#elKlic").value = "";
+    vykresli();
     try { await nactiHlasy(); } catch (e) { zprava(esc(e.message), "chyba"); }
+  });
+  // Voice ID ručně – pro klíče bez oprávnění číst seznam hlasů
+  $("#elVoiceId")?.addEventListener("change", (e) => {
+    const id = e.target.value.trim();
+    if (!id) return;
+    if (!/^[A-Za-z0-9]{10,40}$/.test(id)) { zprava("Voice ID vypadá jinak – v ElevenLabs u hlasu klikni na ⋯ → Copy voice ID.", "chyba"); return; }
+    elUloz(undefined, { voiceId: id, voiceName: `Hlas ${id.slice(0, 6)}…` });
+    vykresli();
+    zprava("Voice ID uložené ✓ Klikni na ▶ Vyzkoušet hlas.");
   });
   $("#elSmazat").addEventListener("click", () => { elUloz(""); vykresli(); zprava("Klíč je smazaný z tohoto prohlížeče. Reels teď namlouvá Jirka (zdarma)."); });
   $("#elHlas").addEventListener("change", (e) => {
