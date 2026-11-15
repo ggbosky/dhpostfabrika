@@ -44,8 +44,22 @@ async function elChyba(r) {
     const popis = { voices_read: "Voices → Read (čtení hlasů)", text_to_speech: "Text to Speech → Access", user_read: "User → Read", models_read: "Models → Read" }[pravo] || pravo;
     return new Error(`Klíč nemá zapnuté oprávnění „${popis}“. V ElevenLabs → Developers → API Keys vytvoř nový klíč a zapni u něj „Text to Speech“ a „Voices: Read“ (nebo hlas zadej ručně přes Voice ID v Můj styl → Hlas pro reels).`);
   }
-  if (r.status === 401) return new Error(/quota|credit/i.test(detail) ? "Na ElevenLabs účtu došly kredity (znaky) – dobij je nebo počkej na další měsíc." : "Neplatný ElevenLabs klíč – zkontroluj ho v Můj styl → Hlas pro reels.");
-  if (r.status === 402 || /quota/i.test(detail)) return new Error("Na ElevenLabs účtu došly kredity (znaky) – dobij je nebo počkej na další měsíc.");
+  // Vždy připojit původní hlášku ElevenLabs, ať je jasné, co přesně vadí.
+  const puvodni = detail ? ` (ElevenLabs: „${String(detail).slice(0, 220)}“)` : "";
+  if (/library voice|free users|paid_plan|payment_required|upgrade your subscription/i.test(`${stav} ${detail}`)) {
+    return new Error(`Tenhle hlas je z Voice Library a přes API ho ElevenLabs na bezplatném plánu nepovolí – na webu ElevenLabs ale jde. Řešení: v Reels použij „📋 Zkopírovat text pro ElevenLabs“ → vygeneruj na webu → „Nahrát celé audio“ (kredity se čerpají stejně), nebo přejdi na placený plán (Starter).${puvodni}`);
+  }
+  if (/unusual_activity|unusual activity/i.test(`${stav} ${detail}`)) {
+    return new Error(`ElevenLabs zablokoval bezplatné použití přes API kvůli „neobvyklé aktivitě“ (často VPN nebo víc účtů). Vypni VPN, nebo použij generování na webu a nahraj MP3.${puvodni}`);
+  }
+  if (stav === "quota_exceeded" || /exceeds your quota|credits remaining|quota/i.test(detail)) {
+    const zbyva = (detail.match(/have (\d+) credits remaining/i) || [])[1];
+    const treba = (detail.match(/(\d+) credits are required/i) || [])[1];
+    if (zbyva && treba && Number(zbyva) >= Number(treba)) return new Error(`Kredity na účtu jsou, ale tenhle API klíč má nastavený vlastní limit kreditů. V ElevenLabs → Developers → API Keys u klíče zvyš nebo vypni „Credit limit“.${puvodni}`);
+    return new Error(`ElevenLabs odmítl požadavek kvůli kreditům – buď došly, nebo má API klíč nastavený nízký „Credit limit“ (Developers → API Keys → upravit klíč).${puvodni}`);
+  }
+  if (r.status === 401) return new Error(`ElevenLabs klíč nefunguje – zkontroluj ho v Můj styl → Hlas pro reels.${puvodni}`);
+  if (r.status === 402) return new Error(`ElevenLabs vyžaduje placený plán pro tuhle akci.${puvodni}`);
   if (r.status === 404) return new Error("Hlas na ElevenLabs nenašel – přidej si ho do „My Voices“ a vyber ho znovu v Můj styl → Hlas pro reels.");
   if (r.status === 429) return new Error("ElevenLabs: moc požadavků najednou, zkus to za chvíli.");
   return new Error(`ElevenLabs chyba ${r.status}: ${String(detail).slice(0, 200)}`);
