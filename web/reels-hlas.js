@@ -69,7 +69,11 @@ async function elHlasy(klic = elKlic()) {
   const r = await fetch(`${EL_API}/v1/voices`, { headers: { "xi-api-key": klic } });
   if (!r.ok) throw await elChyba(r);
   const j = await r.json();
-  return (j.voices || []).map((v) => ({ id: v.voice_id, nazev: v.name, druh: v.category || "" }));
+  // Na bezplatném plánu jdou přes API výchozí hlasy ElevenLabs (premade) a hlasy, které jsi sám vytvořil.
+  return (j.voices || []).map((v) => {
+    const zdarma = v.category === "premade" || v.is_owner === true ? true : v.is_owner === false ? false : null;
+    return { id: v.voice_id, nazev: v.name, druh: v.category || "", zdarma };
+  }).sort((a, b) => (b.zdarma === true) - (a.zdarma === true));
 }
 
 // Voice Design: vlastní hlas podle popisu (bez napodobování konkrétního člověka).
@@ -437,7 +441,7 @@ function initNastaveni() {
     $("#elKlic").placeholder = elKlic() ? "•••••••• (klíč je uložený)" : "sk_…";
     if (hlasy) {
       $("#elHlas").innerHTML = hlasy.length
-        ? hlasy.map((v) => `<option value="${esc(v.id)}" ${v.id === n.voiceId ? "selected" : ""}>${esc(v.nazev)}${v.druh ? ` · ${esc(v.druh)}` : ""}</option>`).join("")
+        ? hlasy.map((v) => `<option value="${esc(v.id)}" ${v.id === n.voiceId ? "selected" : ""}>${esc(v.nazev)}${v.zdarma === true ? " · ✓ jde i na free plánu" : v.zdarma === false ? " · jen placený plán" : v.druh ? ` · ${esc(v.druh)}` : ""}</option>`).join("")
         : `<option value="">Na účtu nejsou žádné hlasy</option>`;
     } else if (n.voiceId) {
       $("#elHlas").innerHTML = `<option value="${esc(n.voiceId)}">${esc(n.voiceName || n.voiceId)}</option>`;
