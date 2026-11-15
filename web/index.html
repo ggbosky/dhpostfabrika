@@ -652,6 +652,20 @@
   .barva-vzor.on { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
   .c-barvy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 14px; font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
   .c-barvy input[type=color] { width: 44px; height: 32px; padding: 2px; }
+  .pr-mrizka { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 20px; align-items: start; }
+  .pr-mrizka > div > .card + .card { margin-top: 20px; }
+  .pr-nahled-karta { position: sticky; top: 16px; }
+  .pr-platno { width: 100%; height: auto; border-radius: 14px; display: block; background: #000; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  .pr-sablony { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .pr-sablona { display: grid; gap: 4px; padding: 8px; border-radius: 12px; border: 2px solid var(--line, #2a2a2a); background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+  .pr-sablona canvas { width: 100%; height: auto; border-radius: 8px; background: #000; }
+  .pr-sablona small { color: var(--muted, #9a9a9a); font-size: 11.5px; }
+  .pr-sablona.on { border-color: var(--cervena, #e01e26); box-shadow: 0 0 0 3px rgba(224,30,38,.25); }
+  .pr-staty { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .pr-stat { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 6px; }
+  .pr-h3 { margin: 16px 0 8px; font-size: 14px; }
+  @media (max-width: 980px) { .pr-mrizka { grid-template-columns: 1fr; } .pr-nahled-karta { position: static; } }
+  @media (max-width: 560px) { .pr-staty { grid-template-columns: 1fr; } }
   .r-strihy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; }
   .r-strih-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 3px; border: 1px solid var(--line, #2a2a2a); border-radius: 999px; }
   .r-strih-chip img { width: 34px; height: 22px; object-fit: cover; border-radius: 999px; }
@@ -839,6 +853,7 @@
   <symbol id="i-post" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></symbol>
   <symbol id="i-carousel" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M2 7v10M22 7v10"/></symbol>
   <symbol id="i-vyroci" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13.5v4M10.5 14.5 12 13.5"/></symbol>
+  <symbol id="i-promo" viewBox="0 0 24 24"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.6 1.2 2.6 2.3 3C10.6 9 11.4 5.8 12 3z"/></symbol>
   <symbol id="i-reels" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 8h18M8 3l3 5M14 3l3 5"/><path d="m10.5 12 4 2.5-4 2.5z"/></symbol>
   <symbol id="i-plan" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></symbol>
   <symbol id="i-koncepty" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
@@ -875,6 +890,7 @@
     <button type="button" class="tab" data-tab="carousel"><svg class="ik"><use href="#i-carousel"/></svg><span class="tab-txt"><span>Carousel</span><em>Carousel</em><small>více slidů, swipe</small></span></button>
     <button type="button" class="tab" data-tab="vyroci"><svg class="ik"><use href="#i-vyroci"/></svg><span class="tab-txt"><span>Dnes před lety</span><em>Výročí</em><small>šablona výročí</small></span></button>
     <button type="button" class="tab" data-tab="reels"><svg class="ik"><use href="#i-reels"/></svg><span class="tab-txt"><span>Reels</span><em>Reels</em><small>video 9:16 s hlasem</small></span></button>
+    <button type="button" class="tab" data-tab="promo"><svg class="ik"><use href="#i-promo"/></svg><span class="tab-txt"><span>Promo hráče</span><em>Promo</em><small>fire grafika na reposty</small></span></button>
     <div class="skupina">YouTube</div>
     <button type="button" class="tab" data-tab="miniatury"><svg class="ik"><use href="#i-miniatura"/></svg><span class="tab-txt"><span>Thumbnail Factory</span><em>Miniatury</em><small>miniatury 1280×720</small></span></button>
     <button type="button" class="tab" data-tab="youtube"><svg class="ik"><use href="#i-youtube"/></svg><span class="tab-txt"><span>YouTube Studio</span><em>Studio</em><small>nahrát, SEO, playlisty</small></span></button>
@@ -902,6 +918,7 @@
   <section id="zalozkaPrehled" hidden data-zalozka="prehled"><div id="prehledObsah"></div></section>
   <section id="zalozkaPlan" hidden data-zalozka="plan"><div id="planObsah"></div></section>
   <section id="zalozkaStatistiky" hidden data-zalozka="statistiky"><div id="statistikyObsah"></div></section>
+  <section id="zalozkaPromo" hidden data-zalozka="promo"><div id="promoObsah"></div></section>
   <section id="zalozkaMiniatury" hidden data-zalozka="miniatury"><div id="miniaturyObsah"></div></section>
   <section id="zalozkaYoutube" hidden data-zalozka="youtube"><div id="youtubeObsah"></div></section>
   <section id="zalozkaYtstats" hidden data-zalozka="ytstats"><div id="ytstatsObsah"></div></section>
@@ -1478,6 +1495,7 @@
     <div class="list-formaty" id="listFormaty"></div>
     <div class="list-odkazy">
       <button type="button" class="list-odkaz" data-jdi="temata"><svg class="ik"><use href="#i-temata"/></svg>Najít téma s AI</button>
+      <button type="button" class="list-odkaz" data-jdi="promo"><svg class="ik"><use href="#i-promo"/></svg>Promo hráče (fire grafika)</button>
       <button type="button" class="list-odkaz" data-jdi="miniatury"><svg class="ik"><use href="#i-miniatura"/></svg>YouTube miniatura (Thumbnail Factory)</button>
       <button type="button" class="list-odkaz" data-jdi="youtube"><svg class="ik"><use href="#i-youtube"/></svg>YouTube Studio – nahrát a publikovat</button>
       <button type="button" class="list-odkaz" data-jdi="ytstats"><svg class="ik"><use href="#i-ytstats"/></svg>YouTube Analytics</button>
@@ -1525,27 +1543,28 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261115g"></script>
-<script src="grafika.js?v=20261115g"></script>
-<script src="koncepty.js?v=20261115g"></script>
-<script src="ai.js?v=20261115g"></script>
-<script src="app.js?v=20261115g"></script>
-<script src="carousel.js?v=20261115g"></script>
-<script src="vyroci.js?v=20261115g"></script>
-<script src="zpravy.js?v=20261115g"></script>
-<script src="reels-ulozeni.js?v=20261115g"></script>
-<script src="reels-hlas.js?v=20261115g"></script>
-<script src="reels-render.js?v=20261115g"></script>
-<script src="reels-zabery.js?v=20261115g"></script>
-<script src="reels.js?v=20261115g"></script>
-<script src="plan.js?v=20261115g"></script>
-<script src="stats.js?v=20261115g"></script>
-<script src="prehled.js?v=20261115g"></script>
-<script src="yt-ulozeni.js?v=20261115g"></script>
-<script src="miniatury.js?v=20261115g"></script>
-<script src="yt-api.js?v=20261115g"></script>
-<script src="yt-studio.js?v=20261115g"></script>
-<script src="yt-analytics.js?v=20261115g"></script>
-<script src="shell.js?v=20261115g"></script>
+<script src="sablony.js?v=20261115h"></script>
+<script src="grafika.js?v=20261115h"></script>
+<script src="koncepty.js?v=20261115h"></script>
+<script src="ai.js?v=20261115h"></script>
+<script src="app.js?v=20261115h"></script>
+<script src="carousel.js?v=20261115h"></script>
+<script src="vyroci.js?v=20261115h"></script>
+<script src="zpravy.js?v=20261115h"></script>
+<script src="reels-ulozeni.js?v=20261115h"></script>
+<script src="reels-hlas.js?v=20261115h"></script>
+<script src="reels-render.js?v=20261115h"></script>
+<script src="reels-zabery.js?v=20261115h"></script>
+<script src="reels.js?v=20261115h"></script>
+<script src="plan.js?v=20261115h"></script>
+<script src="stats.js?v=20261115h"></script>
+<script src="prehled.js?v=20261115h"></script>
+<script src="yt-ulozeni.js?v=20261115h"></script>
+<script src="promo.js?v=20261115h"></script>
+<script src="miniatury.js?v=20261115h"></script>
+<script src="yt-api.js?v=20261115h"></script>
+<script src="yt-studio.js?v=20261115h"></script>
+<script src="yt-analytics.js?v=20261115h"></script>
+<script src="shell.js?v=20261115h"></script>
 </body>
 </html>
