@@ -77,16 +77,32 @@ async function elevenTTS(text, { predchozi = "", dalsi = "", nastaveni = elNasta
     language_code: nastaveni.model === "eleven_multilingual_v2" ? undefined : "cs",
     voice_settings: { stability: nastaveni.stability, similarity_boost: nastaveni.similarity, style: nastaveni.style, speed: nastaveni.speed, use_speaker_boost: true },
   };
-  if (predchozi) telo.previous_text = textProEleven(predchozi, nastaveni.model);
-  if (dalsi) telo.next_text = textProEleven(dalsi, nastaveni.model);
+  // v3 navazující text (previous/next_text) nepodporuje
+  const bezKontextu = /^eleven_v3/.test(nastaveni.model);
+  if (predchozi && !bezKontextu) telo.previous_text = textProEleven(predchozi, nastaveni.model);
+  if (dalsi && !bezKontextu) telo.next_text = textProEleven(dalsi, nastaveni.model);
   let r;
-  try {
-    r = await fetch(`${EL_API}/v1/text-to-speech/${encodeURIComponent(nastaveni.voiceId)}?output_format=mp3_44100_128`, {
-      method: "POST",
-      headers: { "xi-api-key": klic, "Content-Type": "application/json", Accept: "audio/mpeg" },
-      body: JSON.stringify(telo),
-    });
-  } catch { throw new Error("ElevenLabs je nedostupný (síť). Zkus to znovu."); }
+  // Když model nějaké pole nepodporuje (API se mění), zkusí se to znovu bez něj.
+  for (let pokus = 0; pokus < 4; pokus++) {
+    try {
+      r = await fetch(`${EL_API}/v1/text-to-speech/${encodeURIComponent(nastaveni.voiceId)}?output_format=mp3_44100_128`, {
+        method: "POST",
+        headers: { "xi-api-key": klic, "Content-Type": "application/json", Accept: "audio/mpeg" },
+        body: JSON.stringify(telo),
+      });
+    } catch { throw new Error("ElevenLabs je nedostupný (síť). Zkus to znovu."); }
+    if (r.ok || r.status !== 400) break;
+    const zprava = await r.clone().text().catch(() => "");
+    if (/previous_text|next_text/i.test(zprava) && (telo.previous_text || telo.next_text)) { delete telo.previous_text; delete telo.next_text; continue; }
+    if (/language_code/i.test(zprava) && telo.language_code) { delete telo.language_code; continue; }
+    if (/stability/i.test(zprava) && ![0, 0.5, 1].includes(telo.voice_settings.stability)) {
+      const st = telo.voice_settings.stability;
+      telo.voice_settings.stability = st < 0.25 ? 0 : st > 0.75 ? 1 : 0.5;
+      continue;
+    }
+    if (/speed|style|speaker_boost/i.test(zprava) && (telo.voice_settings.speed !== 1 || telo.voice_settings.style)) { telo.voice_settings = { stability: telo.voice_settings.stability, similarity_boost: telo.voice_settings.similarity_boost }; continue; }
+    break;
+  }
   if (!r.ok) throw await elChyba(r);
   return new Blob([await r.arrayBuffer()], { type: "audio/mpeg" });
 }
