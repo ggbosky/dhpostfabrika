@@ -41,13 +41,13 @@ async function elChyba(r) {
   try { const j = await r.json(); stav = j?.detail?.status || ""; detail = j?.detail?.message || stav || (typeof j?.detail === "string" ? j.detail : JSON.stringify(j?.detail || j)); } catch { /* nic */ }
   if (stav === "missing_permissions" || /missing the permission/i.test(detail)) {
     const pravo = (detail.match(/permission (\w+)/) || [])[1] || "";
-    const popis = { voices_read: "Voices → Read (čtení hlasů)", text_to_speech: "Text to Speech → Access", user_read: "User → Read", models_read: "Models → Read" }[pravo] || pravo;
+    const popis = { voices_write: "Voices → Write (ukládání hlasů)", text_to_voice: "Text to Voice → Access", voices_read: "Voices → Read (čtení hlasů)", text_to_speech: "Text to Speech → Access", user_read: "User → Read", models_read: "Models → Read" }[pravo] || pravo;
     return new Error(`Klíč nemá zapnuté oprávnění „${popis}“. V ElevenLabs → Developers → API Keys vytvoř nový klíč a zapni u něj „Text to Speech“ a „Voices: Read“ (nebo hlas zadej ručně přes Voice ID v Můj styl → Hlas pro reels).`);
   }
   // Vždy připojit původní hlášku ElevenLabs, ať je jasné, co přesně vadí.
   const puvodni = detail ? ` (ElevenLabs: „${String(detail).slice(0, 220)}“)` : "";
   if (/library voice|free users|paid_plan|payment_required|upgrade your subscription/i.test(`${stav} ${detail}`)) {
-    return new Error(`Tenhle hlas je z Voice Library a přes API ho ElevenLabs na bezplatném plánu nepovolí – na webu ElevenLabs ale jde. Řešení: v Reels použij „📋 Zkopírovat text pro ElevenLabs“ → vygeneruj na webu → „Nahrát celé audio“ (kredity se čerpají stejně), nebo přejdi na placený plán (Starter).${puvodni}`);
+    return new Error(`Tenhle hlas je z Voice Library a přes API ho ElevenLabs na bezplatném plánu nepovolí. Řešení přímo v aplikaci: v Můj styl → ElevenLabs → „🎨 Vlastní hlas pro bezplatný plán“ si navrhni vlastní hlas (ten jde i zdarma), nebo přejdi na placený plán Starter – pak Kuba funguje rovnou.${puvodni}`);
   }
   if (/unusual_activity|unusual activity/i.test(`${stav} ${detail}`)) {
     return new Error(`ElevenLabs zablokoval bezplatné použití přes API kvůli „neobvyklé aktivitě“ (často VPN nebo víc účtů). Vypni VPN, nebo použij generování na webu a nahraj MP3.${puvodni}`);
@@ -70,6 +70,44 @@ async function elHlasy(klic = elKlic()) {
   if (!r.ok) throw await elChyba(r);
   const j = await r.json();
   return (j.voices || []).map((v) => ({ id: v.voice_id, nazev: v.name, druh: v.category || "" }));
+}
+
+// Voice Design: vlastní hlas podle popisu (bez napodobování konkrétního člověka).
+async function elNavrhniHlasy({ popis, text, klic = elKlic() }) {
+  if (!klic) throw new Error("Chybí ElevenLabs klíč – vlož ho výš a ulož.");
+  const zkus = async (model_id) => {
+    let r;
+    try {
+      r = await fetch(`${EL_API}/v1/text-to-voice/design?output_format=mp3_44100_128`, {
+        method: "POST",
+        headers: { "xi-api-key": klic, "Content-Type": "application/json" },
+        body: JSON.stringify({ voice_description: popis, text, model_id }),
+      });
+    } catch { throw new Error("ElevenLabs je nedostupný (síť). Zkus to znovu."); }
+    return r;
+  };
+  let r = await zkus("eleven_ttv_v3");
+  if (r.status === 400 || r.status === 422) {
+    const t = await r.clone().text().catch(() => "");
+    if (/model/i.test(t)) r = await zkus("eleven_multilingual_ttv_v2");
+  }
+  if (!r.ok) throw await elChyba(r);
+  const j = await r.json();
+  return (j.previews || []).map((p) => ({ id: p.generated_voice_id, audio: `data:${p.media_type || "audio/mpeg"};base64,${p.audio_base_64}`, delka: p.duration_secs }));
+}
+
+async function elUlozNavrh({ generatedId, nazev, popis, klic = elKlic() }) {
+  let r;
+  try {
+    r = await fetch(`${EL_API}/v1/text-to-voice`, {
+      method: "POST",
+      headers: { "xi-api-key": klic, "Content-Type": "application/json" },
+      body: JSON.stringify({ voice_name: nazev, voice_description: popis, generated_voice_id: generatedId }),
+    });
+  } catch { throw new Error("ElevenLabs je nedostupný (síť). Zkus to znovu."); }
+  if (!r.ok) throw await elChyba(r);
+  const j = await r.json();
+  return { id: j.voice_id, nazev: j.name || nazev };
 }
 
 // [tagy] emocí umí jen v3; ostatní modely by je přečetly nahlas.
@@ -445,6 +483,36 @@ function initNastaveni() {
   for (const [sel, k, h, f] of posuvniky) {
     $(sel).addEventListener("input", (e) => { const v = Number(e.target.value); elUloz(undefined, { [k]: v }); $(h).textContent = f(v); });
   }
+  $("#elNavrhni")?.addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    const popis = $("#elNavrhPopis").value.trim();
+    const text = $("#elNavrhText").value.trim();
+    if (popis.length < 20) { zprava("Popiš hlas aspoň jednou větou.", "chyba"); return; }
+    if (text.length < 100 || text.length > 1000) { zprava(`Ukázkový text musí mít 100–1000 znaků (teď ${text.length}).`, "chyba"); return; }
+    b.disabled = true;
+    zprava("Navrhuji hlasy… obvykle 10–30 s", "");
+    try {
+      const navrhy = await elNavrhniHlasy({ popis, text });
+      if (!navrhy.length) throw new Error("ElevenLabs nevrátil žádný návrh – uprav popis a zkus to znovu.");
+      $("#elNavrhy").innerHTML = navrhy.map((n, i) => `<div class="el-navrh-polozka"><b>Návrh ${i + 1}</b><audio controls preload="auto" src="${n.audio}"></audio>
+        <button type="button" class="btn small" data-el-pouzij="${esc(n.id)}">✓ Použít tento hlas</button></div>`).join("");
+      zprava("Poslechni si návrhy a vyber jeden. Nesedí? Uprav popis (např. „hlubší“, „rychlejší“, „víc vzrušený“) a navrhni znovu.");
+    } catch (err) { zprava(esc(err.message), "chyba"); }
+    finally { b.disabled = false; }
+  });
+  $("#elNavrhy")?.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-el-pouzij]");
+    if (!b) return;
+    b.disabled = true;
+    zprava("Ukládám hlas do My Voices…", "");
+    try {
+      const hlas = await elUlozNavrh({ generatedId: b.dataset.elPouzij, nazev: `Deník hokeje – vypravěč ${new Date().toLocaleDateString("cs-CZ")}`, popis: $("#elNavrhPopis").value.trim() });
+      elUloz(undefined, { voiceId: hlas.id, voiceName: hlas.nazev });
+      vykresli();
+      $("#elNavrhy").innerHTML = "";
+      zprava(`Hotovo ✓ Reels teď namlouvá <b>${esc(hlas.nazev)}</b> – i na bezplatném plánu. Klikni na ▶ Vyzkoušet hlas.`);
+    } catch (err) { zprava(esc(err.message), "chyba"); b.disabled = false; }
+  });
   let prehravac = null;
   $("#elZkusit").addEventListener("click", async (e) => {
     const b = e.currentTarget;
@@ -469,5 +537,5 @@ function initNastaveni() {
 }
 initNastaveni();
 
-window.DHReelsHlas = { najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
+window.DHReelsHlas = { elNavrhniHlasy, elUlozNavrh, najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
 })();

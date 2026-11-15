@@ -652,6 +652,9 @@
   .barva-vzor.on { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; }
   .c-barvy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: -4px 0 14px; font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; }
   .c-barvy input[type=color] { width: 44px; height: 32px; padding: 2px; }
+  .el-navrhy { display: grid; gap: 10px; margin-top: 10px; }
+  .el-navrh-polozka { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line, #2a2a2a); border-radius: 12px; }
+  .el-navrh-polozka audio { height: 36px; flex: 1 1 220px; }
   .c-barvy-slidu { display: flex; flex-wrap: wrap; gap: 8px 14px; }
   .c-barvy-titulek { flex-basis: 100%; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted, #9a9a9a); }
   .c-barva { display: flex; align-items: center; gap: 6px; font: 700 11.5px var(--uzke); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -1391,6 +1394,14 @@
             <button type="button" class="btn ghost" id="elZkusit">▶ Vyzkoušet hlas</button>
           </div>
           <div class="zprava" id="elZprava" hidden></div>
+          <div class="el-navrh" id="elNavrh">
+            <h3 style="margin:18px 0 6px">🎨 Vlastní hlas pro bezplatný plán</h3>
+            <p class="muted" style="margin:0 0 10px;font-size:13.5px">Hlasy z Voice Library (třeba Kuba) jdou přes API jen na placeném plánu. Hlas, který si tu <b>navrhneš podle popisu</b> (ElevenLabs Voice Design), je tvůj vlastní – uloží se do My Voices a aplikace s ním pak namlouvá i na free plánu. Návrh stojí trochu kreditů. Klíč potřebuje navíc oprávnění <b>Voices: Write</b>.</p>
+            <label>Popis hlasu (anglicky funguje nejlíp)<textarea id="elNavrhPopis" rows="3">Energetic Czech male narrator in his late twenties, warm and slightly deep voice, native Czech pronunciation, dynamic social-media storytelling delivery with dramatic pauses and building tension, clear and confident, studio quality recording.</textarea></label>
+            <label>Ukázkový text (100–1000 znaků)<textarea id="elNavrhText" rows="3">Nagano, rok devatenáct set devadesát osm. Celý národ nespal. Pět nejlepších střelců světa stálo proti jednomu brankáři. A pak přišla chvíle, na kterou nikdo z nás nikdy nezapomene. Tohle je Deník hokeje – příběhy, které se nevešly do učebnic.</textarea></label>
+            <div class="akce"><button type="button" class="btn small" id="elNavrhni">🎨 Navrhnout 3 hlasy</button></div>
+            <div id="elNavrhy" class="el-navrhy"></div>
+          </div>
           <p class="muted" style="font-size:13px;margin:12px 0 0">Výchozí nastavení odpovídá tvé ukázce (model v4, stabilita 50 %, podobnost 75 %). Každé namluvení stojí znaky z tvého ElevenLabs plánu – 45s reel je zhruba 600–900 znaků. Klíč zůstává jen v tomhle prohlížeči.</p>
         </details>
 
@@ -1508,27 +1519,27 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261115c"></script>
-<script src="grafika.js?v=20261115c"></script>
-<script src="koncepty.js?v=20261115c"></script>
-<script src="ai.js?v=20261115c"></script>
-<script src="app.js?v=20261115c"></script>
-<script src="carousel.js?v=20261115c"></script>
-<script src="vyroci.js?v=20261115c"></script>
-<script src="zpravy.js?v=20261115c"></script>
-<script src="reels-ulozeni.js?v=20261115c"></script>
-<script src="reels-hlas.js?v=20261115c"></script>
-<script src="reels-render.js?v=20261115c"></script>
-<script src="reels-zabery.js?v=20261115c"></script>
-<script src="reels.js?v=20261115c"></script>
-<script src="plan.js?v=20261115c"></script>
-<script src="stats.js?v=20261115c"></script>
-<script src="prehled.js?v=20261115c"></script>
-<script src="yt-ulozeni.js?v=20261115c"></script>
-<script src="miniatury.js?v=20261115c"></script>
-<script src="yt-api.js?v=20261115c"></script>
-<script src="yt-studio.js?v=20261115c"></script>
-<script src="yt-analytics.js?v=20261115c"></script>
-<script src="shell.js?v=20261115c"></script>
+<script src="sablony.js?v=20261115d"></script>
+<script src="grafika.js?v=20261115d"></script>
+<script src="koncepty.js?v=20261115d"></script>
+<script src="ai.js?v=20261115d"></script>
+<script src="app.js?v=20261115d"></script>
+<script src="carousel.js?v=20261115d"></script>
+<script src="vyroci.js?v=20261115d"></script>
+<script src="zpravy.js?v=20261115d"></script>
+<script src="reels-ulozeni.js?v=20261115d"></script>
+<script src="reels-hlas.js?v=20261115d"></script>
+<script src="reels-render.js?v=20261115d"></script>
+<script src="reels-zabery.js?v=20261115d"></script>
+<script src="reels.js?v=20261115d"></script>
+<script src="plan.js?v=20261115d"></script>
+<script src="stats.js?v=20261115d"></script>
+<script src="prehled.js?v=20261115d"></script>
+<script src="yt-ulozeni.js?v=20261115d"></script>
+<script src="miniatury.js?v=20261115d"></script>
+<script src="yt-api.js?v=20261115d"></script>
+<script src="yt-studio.js?v=20261115d"></script>
+<script src="yt-analytics.js?v=20261115d"></script>
+<script src="shell.js?v=20261115d"></script>
 </body>
 </html>
