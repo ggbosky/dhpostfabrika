@@ -369,8 +369,11 @@ const SCHEMA_KONCEPTY = {
   required: ["analyza", "koncepty"],
 };
 
-function systemReditel(maFotkuHrace) {
-  return `Jsi zkušený kreativní ředitel YouTube miniatur pro sportovní dokumenty (úroveň velkých sportovních dokumentárních kanálů).
+function systemReditel(maFotkuHrace, bezFotek = false) {
+  return `${bezFotek ? `UŽIVATEL NECHCE FOTKY HRÁČŮ: všechny koncepty v režimu "ai-scena" – žádní rozpoznatelní lidé. Sílu miniatury postav na
+dramatické scéně (aréna, led, výstroj, dres bez jména, puk, symbolický předmět, siluety zezadu), barvách, světle a velké úderné typografii.
+
+` : ""}Jsi zkušený kreativní ředitel YouTube miniatur pro sportovní dokumenty (úroveň velkých sportovních dokumentárních kanálů).
 Kanál: Deník hokeje – česká hokejová historie, legendy, rekordy, příběhy. Publikum: čeští a slovenští fanoušci hokeje 18–55 let.
 
 Postup: nejdřív analyzuj téma (publikum, nejsilnější emoce, nejzajímavější historický detail, čím je příběh unikátní, jaký vizuál ho sdělí okamžitě),
@@ -397,7 +400,8 @@ TEXT: 0–2 vrstvy, dohromady max. 4 silná slova, bezchybná čeština, verzál
 Někdy je nejsilnější miniatura bez textu – pak texty prázdné. Text nesmí opakovat název videa doslova a nesmí být zavádějící.
 Příklady: NEUVĚŘITELNÝ PŘÍBĚH · TOHLE NIKDO NEČEKAL · ZMĚNIL CELÝ HOKEJ · ZAPOMENUTÁ LEGENDA · NEJVĚTŠÍ ZRADA? · TAKHLE TO SKONČILO
 
-Reference od uživatele (pokud jsou přiložené): rozeber kompozici, světlo, paletu, typografii, umístění subjektu, hloubku, kontrast a hierarchii
+Reference od uživatele (pokud jsou přiložené) jsou VZORY STYLU: lidé, tváře, texty ani motivy z nich se NIKDY nesmí objevit v návrhu
+(jsou to cizí miniatury o jiných tématech). Vezmi jen principy. Rozeber kompozici, světlo, paletu, typografii, umístění subjektu, hloubku, kontrast a hierarchii
 a použij PRINCIPY – nikdy je nekopíruj. Shrň to do poznatky_z_referenci (jinak napiš „bez referencí“).`;
 }
 
@@ -414,7 +418,7 @@ async function navrhniKoncepty(jedenIndex = null) {
   const v = p.vstup;
   if (!v.tema.trim() && !v.titulek.trim()) { zprava("Napiš aspoň téma nebo název videa.", "chyba"); return; }
   if (!AI().maKlic()) { zprava('Kreativní ředitel potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit</a>', "chyba"); return; }
-  const maFotkuHrace = p.reference.some((r) => r.typ === "hrac" || r.typ === "historicka");
+  const maFotkuHrace = !v.bezFotek && p.reference.some((r) => r.typ === "hrac" || r.typ === "historicka");
   zprava(jedenIndex === null ? "🎬 Kreativní ředitel analyzuje téma a reference… (obvykle 15–40 s)" : `Přepisuji koncept ${jedenIndex + 1}…`);
   try {
     const obrazky = await referenceProAI(null, 6);
@@ -426,10 +430,10 @@ POPIS / SCÉNÁŘ: ${(v.popis || "(není)").slice(0, 6000)}
 POZNÁMKA: ${v.poznamka || "-"}
 PŘILOŽENÉ REFERENCE: ${obrazky.length ? obrazky.map((o, i) => `${i + 1}. ${REF_TYPY[o.typ]}`).join(", ") : "žádné"}
 ${jedenIndex !== null ? `\nVRAŤ PŘESNĚ 1 NOVÝ KONCEPT, který nahradí koncept „${p.koncepty[jedenIndex]?.nazev}“ – jiná kompozice než ostatní: ${p.koncepty.map((k) => k.nazev).join(", ")}.` : "\nNavrhni 4 koncepty (minimálně 3, nejvýš 5)."}`;
-    const r = await AI().gemini({ system: systemReditel(maFotkuHrace), zadani, schema: SCHEMA_KONCEPTY, obrazky: obrazky.map(({ mime, data }) => ({ mime, data })) });
+    const r = await AI().gemini({ system: systemReditel(maFotkuHrace, !!v.bezFotek), zadani, schema: SCHEMA_KONCEPTY, obrazky: obrazky.map(({ mime, data }) => ({ mime, data })) });
     const nove = (r.koncepty || []).map((k) => ({
       id: U().noveId("k"), ...k,
-      rezim: !maFotkuHrace && k.rezim === "ai-foto" ? "foto" : k.rezim,
+      rezim: v.bezFotek ? "ai-scena" : !maFotkuHrace && k.rezim === "ai-foto" ? "vyrez" : k.rezim,
       varianty: [], vybranaVarianta: null, skore: null,
     }));
     nove.forEach((k) => { k.editor = vychoziEditor(k); });
@@ -470,6 +474,7 @@ async function fotkyProKoncept(k) {
 async function vytvorPozadi(i, rezim = null) {
   const k = p.koncepty[i];
   rezim = rezim || k.rezim;
+  if (p.vstup.bezFotek && rezim !== "ai-scena") rezim = "ai-scena";
   const karta = $(`.mt-koncept[data-i="${i}"]`);
   const stav = (t) => { const el = karta?.querySelector(".mt-stav"); if (el) el.innerHTML = t; };
   const tlacitka = karta ? $$("button", karta) : [];
@@ -479,13 +484,13 @@ async function vytvorPozadi(i, rezim = null) {
     if (rezim === "vyrez") {
       stav("Hledám fotku hráče…");
       const fotky = await fotkyProKoncept(k);
-      if (!fotky.length) throw new Error("Nenašel jsem fotku hráče – nahraj ji v kroku Zadání (Fotka hráče).");
+      if (!fotky.length) throw new Error("Nenašel jsem fotku hráče – v kroku Zadání ji najdi přes 🔍 nebo nahraj tlačítkem 📷 Nahrát fotku hráče (případně zaškrtni „Bez fotek hráčů“).");
       blob = await slozVyrez(k, fotky, stav);
       zdroj = "vyrez";
     } else if (rezim === "foto") {
       stav("Skládám ze skutečných fotek…");
       const fotky = await fotkyProKoncept(k);
-      if (!fotky.length) throw new Error("Nenašel jsem vhodnou skutečnou fotku – nahraj ji v kroku Zadání (Fotka hráče).");
+      if (!fotky.length) throw new Error("Nenašel jsem vhodnou skutečnou fotku – v kroku Zadání ji najdi přes 🔍 nebo nahraj tlačítkem 📷 Nahrát fotku hráče (případně zaškrtni „Bez fotek hráčů“).");
       blob = await slozZFotek(k, fotky);
       zdroj = "foto";
     } else if (AI().obrZdarma()) {
@@ -495,11 +500,11 @@ async function vytvorPozadi(i, rezim = null) {
       let fotky = [];
       if (bezLidi) {
         fotky = await fotkyProKoncept(k);
-        if (!fotky.length) throw new Error("Režim AI kompozice ze skutečné fotky potřebuje fotku hráče – nahraj ji v kroku Zadání (Fotka hráče).");
+        if (!fotky.length) throw new Error("Režim AI kompozice ze skutečné fotky potřebuje fotku hráče – v kroku Zadání ji najdi přes 🔍 nebo nahraj tlačítkem 📷 Nahrát fotku hráče (případně zaškrtni „Bez fotek hráčů“).");
       }
       const scena = String(k.prompt_en || "").split(/(?<=[.!?])\s+/).filter((v) => !bezLidi || !/reference|person|player|face|he |his |him /i.test(v)).join(" ") || "Dark atmospheric empty ice hockey arena, spotlight on the ice.";
       const prompt = `${bezLidi ? "Empty background plate only, absolutely no people, no players, no faces, no silhouettes. " : ""}${scena}
-${STYLY[k.styl]?.en || ""}. Cinematic documentary photograph, 16:9 YouTube thumbnail background, dramatic lighting, strong contrast, clean empty space on the ${bezLidi ? (strana === "right" ? "right" : "left") : strana} side.
+${STYLY[k.styl]?.en || ""}${p.analyza?.poznatky_z_referenci && !/bez referencí/i.test(p.analyza.poznatky_z_referenci) ? `. Style notes: ${String(p.analyza.poznatky_z_referenci).slice(0, 300)}` : ""}. Cinematic documentary photograph, 16:9 YouTube thumbnail background, dramatic lighting, strong contrast, clean empty space on the ${bezLidi ? (strana === "right" ? "right" : "left") : strana} side.
 No text, no letters, no numbers, no logos, no watermark, no recognizable real people.`;
       const r = await AI().generujObrazek({ prompt, onStav: stav });
       if (bezLidi) {
@@ -515,14 +520,14 @@ No text, no letters, no numbers, no logos, no watermark, no recognizable real pe
         if (!hraci.length) throw new Error("Režim AI kompozice ze skutečné fotky potřebuje nahranou fotku hráče (krok Zadání).");
         obrazky.push(...hraci);
       }
-      const styl = await referenceProAI(["styl", "nase", "konkurence"], 2);
-      obrazky.push(...styl);
+      // vzory stylu do generátoru NEPOSÍLÁME (model by z nich kopíroval lidi) – styl je v textovém rozboru
+      const styl = [];
       stav(`Generuji obrázek (${esc(AI().OBR_MODELY[AI().obrModel()]?.nazev.split(" – ")[0] || "Gemini")})… obvykle 20–60 s`);
       const prompt = `${k.prompt_en}
 
 Composition: 16:9 YouTube thumbnail, 1280x720, strong single focal point, readable at small size, leave clean negative space on the ${{ vlevo: "left", vpravo: "right", stred: "center", dole: "bottom", nahore: "top" }[k.text_pozice] || "left"} side for a headline that will be added later.
 Style: ${STYLY[k.styl]?.popis || ""}. Photorealistic, authentic, documentary photography, natural skin texture and pores, correct hockey equipment of the era, believable lighting.
-${styl.length ? `The last ${styl.length} image(s) are STYLE references only (composition, lighting, color) – do not copy them, do not copy any person or text from them.` : ""}
+${p.analyza?.poznatky_z_referenci && !/bez referencí/i.test(p.analyza.poznatky_z_referenci) ? `Style notes (apply the principles only): ${p.analyza.poznatky_z_referenci}` : ""}
 Strictly: no text, no letters, no numbers, no logos, no watermarks, no team trademarks, no plastic AI look, no extra fingers, no distorted faces.`;
       const r = await AI().generujObrazek({ prompt, obrazky: obrazky.map(({ mime, data }) => ({ mime, data })) });
       blob = r.blob; zdroj = rezim; cena = r.cena;
@@ -713,8 +718,13 @@ async function vykresliZadani() {
       </div>
       <div class="card">
         <h2>Reference <span class="muted">${p.reference.length} obrázků</span></h2>
-        <p class="muted" style="margin-top:0;font-size:13.5px">Skutečné fotky hráče = základ realistické miniatury (tvář se nemění). Vzory stylu a cizí miniatury AI jen rozebere – nekopíruje je.</p>
-        <label class="r-drop" id="mtDrop">📥 Přetáhni obrázky sem nebo klikni<input type="file" id="mtSoubory" accept="image/*" multiple></label>
+        <p class="muted" style="margin-top:0;font-size:13.5px"><b>Vzory miniatur</b> (cizí i naše) AI jen rozebere – vezme z nich styl a nápad, nikdy je nedá do obrázku.
+          Do miniatury jdou jen <b>fotky hráče</b>: najdi je níž (Wikimedia) nebo nahraj tlačítkem 📷.</p>
+        <label class="r-drop" id="mtDrop">🎨 Vzory stylu – přetáhni miniatury sem nebo klikni<input type="file" id="mtSoubory" accept="image/*" multiple></label>
+        <div class="radek" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+          <label class="btn small ghost">📷 Nahrát fotku hráče<input type="file" id="mtFotkyHrace" accept="image/*" multiple></label>
+          <label class="check" style="margin:0"><input type="checkbox" data-mt-v="bezFotek" ${v.bezFotek ? "checked" : ""}> Bez fotek hráčů (jen scéna a typografie)</label>
+        </div>
         <div class="radek" style="margin-top:10px;gap:8px">
           <input id="mtHledej" placeholder="Najít skutečnou fotku (Wikimedia), např. Igor Larionov" style="flex:1;min-width:200px">
           <button type="button" class="btn small ghost" data-mt="hledej">🔍 Najít fotku</button>
@@ -742,7 +752,9 @@ async function pridejReference(soubory, typ = null) {
     if (!f.type.startsWith("image/")) continue;
     const id = await U().ulozObrazek(f, { nazev: f.name });
     const n = f.name.toLowerCase();
-    p.reference.push({ id, nazev: f.name, typ: typ || (/thumb|miniat|yt|youtube/.test(n) ? "styl" : "hrac") });
+    // Nahraný obrázek je VŽDY jen vzor stylu, pokud ho uživatel výslovně neoznačí jako fotku hráče.
+    void n;
+    p.reference.push({ id, nazev: f.name, typ: typ || "styl", rucne: !!typ });
   }
   ulozPozdeji();
   vykresliZadani();
@@ -1000,6 +1012,13 @@ async function otevri(id) {
   const z = id ? await U().nacti("miniatury", id) : null;
   p = z || novyProjekt();
   p.ab = p.ab || []; p.youtube = p.youtube || {};
+  // dřív se nahrané obrázky automaticky braly jako „fotka hráče“ → vzory cizích miniatur končily v obrázku
+  if (!p.migraceRef) {
+    let n = 0;
+    for (const r of p.reference) if (r.typ === "hrac" && !r.kredit && !r.rucne) { r.typ = "styl"; n++; }
+    p.migraceRef = 1;
+    if (n) { ulozPozdeji(); toast(`${n} nahraných obrázků je teď jen vzor stylu. Fotku hráče označ v Referencích, nebo ji najdi přes 🔍.`, "info"); }
+  }
   aktivni = null; vybranaVrstva = 0;
   krok = z ? (p.koncepty.length ? "koncepty" : "zadani") : "zadani";
   vykresliVse();
@@ -1069,7 +1088,7 @@ function init() {
   });
   el.addEventListener("input", (e) => {
     const t = e.target, d = t.dataset;
-    if (d.mtV) { p.vstup[d.mtV] = t.value; ulozPozdeji(); return; }
+    if (d.mtV) { p.vstup[d.mtV] = t.type === "checkbox" ? t.checked : t.value; ulozPozdeji(); return; }
     if (aktivni === null) return;
     const k = p.koncepty[aktivni];
     if (d.mtEd) {
@@ -1087,7 +1106,8 @@ function init() {
   el.addEventListener("change", async (e) => {
     const t = e.target, d = t.dataset;
     if (t.id === "mtSoubory") { await pridejReference([...t.files]); return; }
-    if (d.mtReftyp !== undefined) { p.reference[+d.mtReftyp].typ = t.value; ulozPozdeji(); return; }
+    if (t.id === "mtFotkyHrace") { await pridejReference([...t.files], "hrac"); return; }
+    if (d.mtReftyp !== undefined) { p.reference[+d.mtReftyp].typ = t.value; p.reference[+d.mtReftyp].rucne = true; ulozPozdeji(); return; }
     if (d.mtRezim !== undefined) { p.koncepty[+d.mtRezim].rezim = t.value; ulozPozdeji(); return; }
     if (t.id === "mtKoncept") { aktivni = +t.value; vybranaVrstva = 0; vykresliEditor(); return; }
     if (d.mtEd || d.mtVr) vykresliEditor();
