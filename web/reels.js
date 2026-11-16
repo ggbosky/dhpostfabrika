@@ -622,8 +622,10 @@ function vetyHlasu(s, buf) {
 function prepocitejTitulky(s) {
   if (!s || s.titulkyRucne) return;
   const r = p.hlas?.rychlost || 1;
-  const vety = s.hlas?.vety && s.hlas.vetyHash === R.hashTextu(s.text) ? s.hlas.vety.map((v) => ({ od: v.od / r, do: v.do / r })) : null;
-  s.titulky = R.autoTitulky(s.text, s.hlas?.delka ? s.hlas.delka / r : null, vety);
+  const h = R.hashTextu(s.text);
+  const slova = s.hlas?.slova?.length && s.hlas.slovaHash === h ? s.hlas.slova.map((w) => ({ text: w.text, od: w.od / r, do: w.do / r })) : null;
+  const vety = !slova && s.hlas?.vety && s.hlas.vetyHash === h ? s.hlas.vety.map((v) => ({ od: v.od / r, do: v.do / r })) : null;
+  s.titulky = R.autoTitulky(s.text, s.hlas?.delka ? s.hlas.delka / r : null, { vety, slova, posun: s.hlas?.souvisly ? 0 : 0.2 });
 }
 
 let mluvaSelhala = 0;
@@ -667,9 +669,53 @@ async function hlasScenu(i, tiche = false) {
   prepocitejTitulky(s);
 }
 
+// ElevenLabs: celý voiceover jedním vcelku (plynulá intonace, žádné mezery mezi scénami) + přesné časy slov pro titulky.
+async function hlasNajednou() {
+  const nast = A.elNastaveni();
+  const casti = p.sceny.map((s) => A.textProEleven(mluvenyText(s), nast.model));
+  const full = casti.join(" ");
+  if (full.length > 2800) return false; // dlouhý text → po scénách
+  const hotovo = p.hlas.souvisly && p.sceny.every((s) => s.hlas?.souvisly && s.hlas.textHash === R.hashTextu(s.text) && s.hlas.hlasId === "eleven" && s.hlas.model === nast.model && s.hlas.voiceId === nast.voiceId);
+  if (hotovo) return true;
+  zprava("#rHlasZprava", `Namlouvám celý text najednou – plynulý hlas bez sekání (${full.length} znaků)…`);
+  const r = await A.elevenTTS(full, { sCasy: true });
+  const buf = await A.dekoduj(`celek-${Date.now()}`, async () => r.blob);
+  const z = r.zarovnani;
+  const sedi = z?.characters && z.characters.join("") === r.text && r.text === full;
+  let pos = 0;
+  const rozsahy = casti.map((c) => { const x = [pos, pos + c.length]; pos += c.length + 1; return x; });
+  let casy;
+  if (sedi) {
+    casy = rozsahy.map(([a, b]) => ({ od: z.character_start_times_seconds[a] ?? 0, do: z.character_end_times_seconds[Math.max(a, b - 1)] ?? buf.duration }));
+  } else {
+    casy = A.rozdelNaSceny(buf, p.sceny.map((s) => s.text));
+  }
+  const rezy = casy.map((c, i) => (i ? (casy[i - 1].do + c.od) / 2 : 0));
+  rezy.push(buf.duration);
+  for (let i = 0; i < p.sceny.length; i++) {
+    const od = rezy[i], doS = rezy[i + 1];
+    const slova = sedi ? A.slovaZeZarovnani(z, rozsahy[i][0], rozsahy[i][1]).map((w) => ({ text: w.text, od: +(w.od - od).toFixed(3), do: +(w.do - od).toFixed(3) })) : null;
+    await ulozHlasSceny(i, A.vyrizni(buf, od, doS), "elevenlabs", `hlas-${i + 1}.wav`,
+      { souvisly: true, hlasId: "eleven", model: nast.model, voiceId: nast.voiceId, ...(slova ? { slova } : {}) });
+  }
+  p.hlas.souvisly = true;
+  return true;
+}
+
 async function hlasVse() {
   const b = $("#rGenHlas"); b.disabled = true;
   try {
+    if (p.hlas.hlasId === "eleven" && A.maEleven()) {
+      if (p.sceny.some((s) => /\d/.test(s.text))) { zprava("#rHlasZprava", "Připravuji čísla pro hlas (roky, skóre, data)…"); await pripravMluvu(p.sceny.map((_, i) => i)); }
+      let vcelku = false;
+      try { vcelku = await hlasNajednou(); } catch (e) { if (!e.nelzeCasy) throw e; }
+      if (vcelku) {
+        ulozPozdeji(); vykresliHlas(); vykresliStrih(); obnovNahled();
+        zprava("#rHlasZprava", `Hlas je hotový – namluvený vcelku, titulky jsou časované na slova ✓ Délka reelu ${R.casovaOsa(p).celkem.toFixed(1)} s.`, "ok");
+        return;
+      }
+    }
+    p.hlas.souvisly = false;
     if (p.sceny.some((s) => /\d/.test(s.text))) {
       zprava("#rHlasZprava", "Připravuji čísla pro hlas (roky, skóre, data)…");
       await pripravMluvu(p.sceny.map((_, i) => i));
@@ -704,14 +750,15 @@ async function kopirujProEleven() {
   }
 }
 
-async function ulozHlasSceny(i, buf, zdroj, nazev) {
+async function ulozHlasSceny(i, buf, zdroj, nazev, extra = {}) {
   const blob = A.naWav(buf);
   const souborId = await U.ulozSoubor(blob, { nazev });
   A.zapomen(souborId);
   const dek = await A.dekoduj(souborId, async () => blob);
   const s = p.sceny[i];
-  s.hlas = { souborId, delka: dek.duration, zdroj, hlasId: zdroj, textHash: R.hashTextu(s.text) };
-  vetyHlasu(s, dek);
+  s.hlas = { souborId, delka: dek.duration, zdroj, hlasId: zdroj, textHash: R.hashTextu(s.text), ...extra };
+  if (extra.slova) s.hlas.slovaHash = R.hashTextu(s.text);
+  else vetyHlasu(s, dek);
   prepocitejTitulky(s);
 }
 
@@ -722,9 +769,13 @@ async function importCelehoAudia(soubor) {
   try {
     const buf = await A.dekoduj(`import-${Date.now()}`, async () => soubor);
     const useky = A.rozdelNaSceny(buf, p.sceny.map((s) => s.text));
+    // střihy na sebe navazují (nic se nezahodí) → po složení zní hlas stejně plynule jako původní nahrávka
     for (let i = 0; i < useky.length; i++) {
-      await ulozHlasSceny(i, A.vyrizni(buf, useky[i].od, useky[i].do), "import", `voiceover-${i + 1}.wav`);
+      const od = i ? (useky[i - 1].do + useky[i].od) / 2 : 0;
+      const doS = i < useky.length - 1 ? (useky[i].do + useky[i + 1].od) / 2 : buf.duration;
+      await ulozHlasSceny(i, A.vyrizni(buf, od, doS), "import", `voiceover-${i + 1}.wav`, { souvisly: true });
     }
+    p.hlas.souvisly = true;
     vykresliHlas(); vykresliStrih(); ulozPozdeji(); obnovNahled();
     zprava("#rHlasZprava", `Audio (${buf.duration.toFixed(1)} s) je rozdělené do ${useky.length} scén ✓ Proklikej ▶ u scén – kdyby střih seděl špatně, nahraj audio ke konkrétní scéně tlačítkem 📥 Soubor.`, "ok");
   } catch (e) { zprava("#rHlasZprava", esc(e.message), "chyba"); }
@@ -1162,7 +1213,7 @@ ${premiera ? `PREMIÉRA: ${premiera.datum}` : "Video už je venku."}`,
     const s = {
       id: U.noveId("s"), text: x.text, titulek: "", zaber: `záběr z videa v ${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")}`,
       dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
-      klip: { klipId: k.id, start: +start.toFixed(1), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 0.25 },
+      klip: { klipId: k.id, start: +start.toFixed(1), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 0 },
       extra: [], hlas: null, titulky: [], titulkyRucne: false,
     };
     // ve fire stylu druhý rychlý střih o kus dál ve stejném videu

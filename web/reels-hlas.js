@@ -122,7 +122,8 @@ function textProEleven(text, model) {
   return t.replace(/\s+/g, " ").trim();
 }
 
-async function elevenTTS(text, { predchozi = "", dalsi = "", nastaveni = elNastaveni(), klic = elKlic() } = {}) {
+// sCasy: vrátí { blob, zarovnani: { characters, character_start_times_seconds, character_end_times_seconds }, text }
+async function elevenTTS(text, { predchozi = "", dalsi = "", nastaveni = elNastaveni(), klic = elKlic(), sCasy = false } = {}) {
   if (!klic) throw new Error("Chybí ElevenLabs klíč – vlož ho v Můj styl → Hlas pro reels.");
   if (!nastaveni.voiceId) throw new Error("Není vybraný hlas – vyber ho v Můj styl → Hlas pro reels.");
   const cisty = textProEleven(text, nastaveni.model);
@@ -141,9 +142,9 @@ async function elevenTTS(text, { predchozi = "", dalsi = "", nastaveni = elNasta
   // Když model nějaké pole nepodporuje (API se mění), zkusí se to znovu bez něj.
   for (let pokus = 0; pokus < 4; pokus++) {
     try {
-      r = await fetch(`${EL_API}/v1/text-to-speech/${encodeURIComponent(nastaveni.voiceId)}?output_format=mp3_44100_128`, {
+      r = await fetch(`${EL_API}/v1/text-to-speech/${encodeURIComponent(nastaveni.voiceId)}${sCasy ? "/with-timestamps" : ""}?output_format=mp3_44100_128`, {
         method: "POST",
-        headers: { "xi-api-key": klic, "Content-Type": "application/json", Accept: "audio/mpeg" },
+        headers: { "xi-api-key": klic, "Content-Type": "application/json", Accept: sCasy ? "application/json" : "audio/mpeg" },
         body: JSON.stringify(telo),
       });
     } catch { throw new Error("ElevenLabs je nedostupný (síť). Zkus to znovu."); }
@@ -160,7 +161,28 @@ async function elevenTTS(text, { predchozi = "", dalsi = "", nastaveni = elNasta
     break;
   }
   if (!r.ok) throw await elChyba(r);
+  if (sCasy) {
+    let j;
+    try { j = await r.json(); } catch { j = null; }
+    if (!j?.audio_base64) throw Object.assign(new Error("ElevenLabs nevrátil časy slov."), { nelzeCasy: true });
+    const bin = Uint8Array.from(atob(j.audio_base64), (c) => c.charCodeAt(0));
+    return { blob: new Blob([bin], { type: "audio/mpeg" }), zarovnani: j.alignment || j.normalized_alignment || null, text: telo.text };
+  }
   return new Blob([await r.arrayBuffer()], { type: "audio/mpeg" });
+}
+
+// Slova s časy ze zarovnání ElevenLabs (znak po znaku) pro úsek textu [od, do).
+function slovaZeZarovnani(z, od, doZn) {
+  const ch = z.characters, st = z.character_start_times_seconds, en = z.character_end_times_seconds;
+  const slova = [];
+  let w = null;
+  for (let i = od; i < Math.min(doZn, ch.length); i++) {
+    if (/\s/.test(ch[i])) { if (w) { slova.push(w); w = null; } continue; }
+    if (!w) w = { text: "", od: st[i], do: en[i], zn: i };
+    w.text += ch[i]; w.do = en[i];
+  }
+  if (w) slova.push(w);
+  return slova;
 }
 const VITS_URL = "https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm";
 
@@ -660,5 +682,5 @@ function initNastaveni() {
 }
 initNastaveni();
 
-window.DHReelsHlas = { vetyZPauz, ceskaCisla, cisloSlovy, elNavrhniHlasy, elUlozNavrh, najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
+window.DHReelsHlas = { slovaZeZarovnani, textProEleven, vetyZPauz, ceskaCisla, cisloSlovy, elNavrhniHlasy, elUlozNavrh, najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
 })();

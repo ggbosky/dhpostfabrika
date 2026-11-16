@@ -193,15 +193,16 @@ async function upoutavka(id) {
   $("#ysUpSoubor")?.addEventListener("change", (e) => { soubor = e.target.files[0] || null; $("#ysUpSouborInfo").textContent = soubor ? `✓ ${soubor.name} (${(soubor.size / 1048576).toFixed(0)} MB)` : ""; });
   $("#ysUpZavri").addEventListener("click", () => dlg.close());
   $("#ysUpVytvor").addEventListener("click", async (e) => {
+    const tl = e.currentTarget;
     const zdroj = render ? new File([render.blob], `${render.nazev || "video"}.mp4`, { type: "video/mp4" }) : soubor;
     const z = $("#ysUpZprava");
     if (!zdroj) { z.hidden = false; z.className = "zprava chyba"; z.textContent = "Vyber soubor videa."; return; }
-    e.currentTarget.disabled = true;
+    tl.disabled = true;
     z.hidden = false; z.className = "zprava"; z.textContent = "Připravuji upoutávku… (AI scénář ~10–30 s)";
     try {
       await window.DHReels.zUpoutavky({ video: v, soubor: zdroj, delka: +$("#ysUpDelka").value });
       dlg.close();
-    } catch (er) { z.className = "zprava chyba"; z.textContent = er.message; e.currentTarget.disabled = false; }
+    } catch (er) { z.className = "zprava chyba"; z.textContent = er.message; tl.disabled = false; }
   });
   dlg.showModal();
 }

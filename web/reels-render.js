@@ -19,10 +19,12 @@ function odhadDelky(text) { return slova(text).length / SLOV_ZA_SEKUNDU; }
 function casovaOsa(p) {
   const rychlost = p.hlas?.rychlost || 1;
   let t = 0;
+  // souvislý hlas (namluvený najednou / nahraný celý): scény na sebe navazují bez mezer – audio je plynulé
+  const souvisly = !!p.hlas?.souvisly && p.sceny.every((s) => s.hlas?.souborId && s.hlas.souvisly);
   const segmenty = p.sceny.map((s, i) => {
     const hlasDelka = s.hlas?.delka ? s.hlas.delka / rychlost : odhadDelky(s.text);
-    const delka = Math.max(2.5, hlasDelka + 0.5);
-    const seg = { i, scena: s, od: t, do: t + delka, delka, hlasOd: t + 0.2, hlasDelka };
+    const delka = souvisly ? hlasDelka + (i === p.sceny.length - 1 ? 0.8 : 0) : Math.max(2.5, hlasDelka + 0.5);
+    const seg = { i, scena: s, od: t, do: t + delka, delka, hlasOd: souvisly ? t : t + 0.2, hlasDelka };
     t += delka;
     return seg;
   });
@@ -67,7 +69,8 @@ function vetyTextu(text) {
 
 // Titulky scény: krátké kousky (max ~24 znaků, nikdy přes konec věty). Když známe časy vět v nahrávce (vety),
 // kousky se rozloží uvnitř každé věty – titulek pak ukazuje přesně to, co hlas právě říká.
-function autoTitulky(text, hlasDelka, vety = null) {
+function autoTitulky(text, hlasDelka, volby = null) {
+  const { vety = null, slova: casySlov = null, posun = 0.2 } = Array.isArray(volby) ? { vety: volby } : (volby || {});
   const s = slova(String(text || "").replace(/\s+/g, " "));
   const zdroj = slovaTitulku(text);
   const kusy = [];  // {text, veta}
@@ -83,6 +86,34 @@ function autoTitulky(text, hlasDelka, vety = null) {
   kusy.forEach((k) => { if ((k.text.match(/\*/g) || []).length % 2) k.text = k.text.replace(/\*/g, ""); });
   const delka = (k) => k.text.replace(/\*/g, "").length + 2;
   const pocetVet = new Set(kusy.map((k) => k.veta)).size;
+  // 1) přesné časy slov (ElevenLabs): kousek titulku začíná přesně se slovem, které se v tu chvíli říká
+  if (casySlov?.length) {
+    const sv = []; let akt = [];
+    casySlov.forEach((w, i) => { akt.push(w); if (konecVety(w.text) || i === casySlov.length - 1) { sv.push(akt); akt = []; } });
+    const skupiny = sv.length === pocetVet ? sv : [casySlov];
+    const kusySk = sv.length === pocetVet ? (v) => kusy.filter((k) => k.veta === v) : () => kusy;
+    const out = [];
+    skupiny.forEach((sw, v) => {
+      const ks = kusySk(v);
+      const zn = ks.reduce((a, k) => a + delka(k), 0) || 1;
+      const spZn = sw.reduce((a, w) => a + w.text.length + 1, 0) || 1;
+      // čas pro podíl f (0–1) mluveného textu věty = začátek slova, na které f připadne
+      const cas = (f) => {
+        let kum = 0;
+        for (const w of sw) { if (kum / spZn >= f - 1e-6) return w.od; kum += w.text.length + 1; }
+        return sw[sw.length - 1].do;
+      };
+      let kumD = 0;
+      ks.forEach((k, j) => {
+        const t0 = cas(kumD / zn);
+        kumD += delka(k);
+        const t1 = j === ks.length - 1 ? (skupiny[v + 1]?.[0]?.od ?? sw[sw.length - 1].do + 0.3) : cas(kumD / zn);
+        out.push({ text: k.text, od: +(t0 + posun).toFixed(2), do: +(Math.max(t1, t0 + 0.25) + posun).toFixed(2) });
+      });
+    });
+    return out;
+  }
+  // 2) časy vět podle pauz v nahrávce
   if (vety && vety.length === pocetVet) {
     const out = [];
     for (let v = 0; v < pocetVet; v++) {
@@ -94,14 +125,14 @@ function autoTitulky(text, hlasDelka, vety = null) {
         const d = (delka(k) / zn) * rozsah;
         // drží až do začátku další věty (žádné blikání v pauze)
         const doKonce = j === ve.length - 1 ? (vety[v + 1]?.od ?? t + d) : t + d;
-        out.push({ text: k.text, od: +(t + 0.2).toFixed(2), do: +(Math.max(t + d, doKonce) + 0.2).toFixed(2) });
+        out.push({ text: k.text, od: +(t + posun).toFixed(2), do: +(Math.max(t + d, doKonce) + posun).toFixed(2) });
         t += d;
       });
     }
     return out;
   }
   const znaku = kusy.reduce((a, k) => a + delka(k), 0) || 1;
-  let t = 0.2;
+  let t = posun;
   const celkem = Math.max(0.5, hlasDelka || s.length / SLOV_ZA_SEKUNDU);
   return kusy.map((k) => {
     const d = (delka(k) / znaku) * celkem;
