@@ -18,9 +18,10 @@ function uloz(klic, hodnota) {
   try { localStorage.setItem(klic, JSON.stringify(hodnota)); } catch { /* soukromé okno apod. */ }
 }
 
-const VYCHOZI_NASTAVENI = { barva: "#ab0707", logo: "auto", titulekZap: true };
+const VYCHOZI_NASTAVENI = { barva: "#ab0707", logo: "auto", titulekZap: true, styl: "vyroci", zvyrazneni: "#ffc000" };
 let nastaveni = { ...VYCHOZI_NASTAVENI, ...nacti("dhpf_nastaveni", {}) };
 if (!["auto", "bila", "cerna", "vypnuto"].includes(nastaveni.logo)) nastaveni.logo = "auto";
+if (!nastaveni.stylZvolen) { nastaveni.styl = "vyroci"; nastaveni.stylZvolen = true; } // dřívější „Oswald s proužkem“ už není výchozí
 let profil = nacti("dhpf_profil", null);
 let historie = nacti("dhpf_historie", []);
 let typ = "vysledek";
@@ -193,45 +194,96 @@ function kresli() {
     ctx.drawImage(foto, sx, sy, sw, sh, 0, 0, W, H);
   } else {
     const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, nastaveni.barva);
-    g.addColorStop(0.55, "#111827");
-    g.addColorStop(1, "#05070d");
+    g.addColorStop(0, "#4a0a0e");
+    g.addColorStop(0.55, "#160607");
+    g.addColorStop(1, "#050505");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
 
   const titulek = $("#titulek").value.trim().toUpperCase();
-  const okraj = 72;
   if (nastaveni.titulekZap && titulek) {
-    if (foto) {
-      const g = ctx.createLinearGradient(0, H * 0.42, 0, H);
-      g.addColorStop(0, "rgba(0,0,0,0)");
-      g.addColorStop(0.55, "rgba(0,0,0,0.62)");
-      g.addColorStop(1, "rgba(0,0,0,0.9)");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, H * 0.42, W, H * 0.58);
-    }
-    let velikost = foto ? 104 : 132, radky;
-    const maxRadku = foto ? 4 : 6;
-    for (;;) {
-      ctx.font = `700 ${velikost}px ${PISMO}`;
-      radky = zalom(titulek, W - 2 * okraj);
-      if ((radky.length <= maxRadku && radky.every((r) => ctx.measureText(r).width <= W - 2 * okraj)) || velikost <= 48) break;
-      velikost -= 4;
-    }
-    const vyskaRadku = Math.round(velikost * 1.08);
-    let y = H - 92 - vyskaRadku * (radky.length - 1);
-    ctx.fillStyle = nastaveni.barva;
-    ctx.fillRect(okraj, y - velikost - 34, 120, 12);
-    ctx.fillStyle = "#fff";
-    ctx.textBaseline = "alphabetic";
-    ctx.shadowColor = "rgba(0,0,0,0.35)";
-    ctx.shadowBlur = 12;
-    for (const r of radky) { ctx.fillText(r, okraj, y); y += vyskaRadku; }
-    ctx.shadowBlur = 0;
+    if (nastaveni.styl === "obalka") kresliObalku(titulek);
+    else if (nastaveni.styl === "klasik") kresliKlasik(titulek);
+    else kresliVyroci(titulek);
   }
-
   window.DHG.kresliLogo(ctx, nastaveni.logo);
+}
+
+// Styl „Dnes před lety“: Anton vlevo dole, *slova* v barvě zvýraznění, plynulé ztmavení.
+const ANTON = '"Anton", "Impact", "Arial Narrow", sans-serif';
+const MONT = '"Montserrat", "Arial Black", Impact, sans-serif';
+function kresliVyroci(titulek) {
+  const G = window.DHG;
+  const sirka = W - 2 * 40 - 20;
+  let v = 118, radky = [];
+  for (; v >= 52; v -= 2) {
+    ctx.font = `400 ${v}px ${ANTON}`;
+    ctx.letterSpacing = `${(0.02 * v).toFixed(1)}px`;
+    radky = G.zalomBohaty(ctx, titulek, sirka);
+    if (radky.length <= 3 && radky.every((r) => G.sirkaRadku(ctx, r) <= sirka)) break;
+  }
+  const rozestup = Math.round(v * 1.1);
+  const posledni = H - 110;
+  const prvni = posledni - (radky.length - 1) * rozestup;
+  const horni = prvni - v * 0.86;
+  G.ztmaveni(ctx, horni - 520, horni + 200, W, H);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.font = `400 ${v}px ${ANTON}`;
+  ctx.letterSpacing = `${(0.02 * v).toFixed(1)}px`;
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 10;
+  radky.forEach((r, i) => G.kresliBohatyRadek(ctx, r, 40, prvni + i * rozestup, nastaveni.zvyrazneni));
+  ctx.shadowBlur = 0; ctx.letterSpacing = "0px";
+}
+
+// Styl „Obálka carouselu“: dva řádky na střed – horní v barvě (velký), dolní bílý.
+function kresliObalku(titulek) {
+  const G = window.DHG;
+  let [horni, dolni] = titulek.includes("/") || titulek.includes("\n") ? titulek.split(/\s*[/\n]\s*/) : [titulek, ""];
+  if (!dolni) {
+    const slova = horni.split(/\s+/);
+    if (slova.length > 1) { const pul = Math.ceil(slova.length / 2); horni = slova.slice(0, pul).join(" "); dolni = slova.slice(pul).join(" "); }
+  }
+  const sirka = W - 120;
+  const velikost = (t) => { let v = 170; for (; v > 40; v -= 4) { ctx.font = `900 ${v}px ${MONT}`; if (ctx.measureText(t.replace(/\*/g, "")).width <= sirka) break; } return v; };
+  const vD = dolni ? velikost(dolni) : 0, vH = horni ? velikost(horni) : 0;
+  const yD = H - 100, yH = dolni ? yD - vD * 0.72 - 75 : H - 110;
+  G.ztmaveni(ctx, (horni ? yH - vH * 0.72 : yD - vD * 0.72) - 600, (horni ? yH - vH * 0.72 : yD) + 150, W, H);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  const radek = (t, v, y, barva) => {
+    ctx.font = `900 ${v}px ${MONT}`;
+    const r = G.zalomBohaty(ctx, t, 99999)[0] || [];
+    G.kresliBohatyRadek(ctx, r, (W - G.sirkaRadku(ctx, r)) / 2, y, nastaveni.zvyrazneni, barva);
+  };
+  if (horni) radek(horni, vH, yH, nastaveni.barva);
+  if (dolni) radek(dolni, vD, yD, "#ffffff");
+}
+
+// Původní styl (Oswald s proužkem) – zůstává jako volba.
+function kresliKlasik(titulek) {
+  titulek = titulek.replace(/\*/g, "");
+  const okraj = 72;
+  if (foto) {
+    const g = ctx.createLinearGradient(0, H * 0.42, 0, H);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.55, "rgba(0,0,0,0.62)"); g.addColorStop(1, "rgba(0,0,0,0.9)");
+    ctx.fillStyle = g; ctx.fillRect(0, H * 0.42, W, H * 0.58);
+  }
+  let velikost = foto ? 104 : 132, radky;
+  const maxRadku = foto ? 4 : 6;
+  for (;;) {
+    ctx.font = `700 ${velikost}px ${PISMO}`;
+    radky = zalom(titulek, W - 2 * okraj);
+    if ((radky.length <= maxRadku && radky.every((r) => ctx.measureText(r).width <= W - 2 * okraj)) || velikost <= 48) break;
+    velikost -= 4;
+  }
+  const vyskaRadku = Math.round(velikost * 1.08);
+  let y = H - 92 - vyskaRadku * (radky.length - 1);
+  ctx.fillStyle = nastaveni.barva;
+  ctx.fillRect(okraj, y - velikost - 34, 120, 12);
+  ctx.fillStyle = "#fff"; ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 12;
+  for (const r of radky) { ctx.fillText(r, okraj, y); y += vyskaRadku; }
+  ctx.shadowBlur = 0;
 }
 
 function pouzijFoto(img) {
@@ -276,7 +328,7 @@ const SCHEMA_POST = {
     telo: { type: "string", description: "max 3 krátké odstavce (1–2 věty) oddělené prázdným řádkem, celkem max 320 znaků" },
     cta: { type: "string", description: "jedna krátká otázka pro fanoušky" },
     hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
-    titulek: { type: "string", description: "titulek do obrázku: 2–5 úderných slov, bez emoji, neopakuje hook doslova" },
+    titulek: { type: "string", description: "titulek do obrázku: 2–5 úderných slov, bez emoji, neopakuje hook doslova; jedno klíčové slovo dej do *hvězdiček* (zvýrazní se barvou)" },
     foto_dotazy: { type: "array", items: { type: "string" }, description: "2–3 dotazy pro Wikimedia Commons" },
     k_overeni: { type: "array", items: { type: "string" } },
   },
@@ -572,7 +624,7 @@ window.DHKoncepty?.registruj("post", {
     return {
       nazev: $("#titulek").value.trim() || text.split("\n")[0].trim() || "Post",
       data: { typ, hodnoty: hodnotyFormulare, text, titulek: $("#titulek").value, pohled,
-        nastaveni: { barva: nastaveni.barva, logo: nastaveni.logo, titulekZap: nastaveni.titulekZap } },
+        nastaveni: { barva: nastaveni.barva, logo: nastaveni.logo, titulekZap: nastaveni.titulekZap, styl: nastaveni.styl, zvyrazneni: nastaveni.zvyrazneni } },
       obrazky: { foto },
       platno,
     };
@@ -589,6 +641,8 @@ window.DHKoncepty?.registruj("post", {
     $("#barva").value = nastaveni.barva;
     $("#logo").value = nastaveni.logo;
     $("#titulekZap").checked = nastaveni.titulekZap;
+    $("#stylPostu").value = nastaveni.styl || "vyroci";
+    $("#zvyrazneniPostu").value = nastaveni.zvyrazneni || "#ffc000";
     if (obrazky.foto) { pouzijFoto(obrazky.foto); pohled = d.pohled || pohled; $("#zoom").value = pohled.zoom; }
     else { foto = null; $("#fotoOvl").hidden = true; $("#fotoMalo").hidden = true; }
     $("#vysledek").hidden = false;
@@ -639,6 +693,8 @@ function init() {
   nastav("#barva", "barva");
   nastav("#logo", "logo");
   nastav("#titulekZap", "titulekZap", "checked");
+  nastav("#stylPostu", "styl");
+  nastav("#zvyrazneniPostu", "zvyrazneni");
 
   $("#naucit").addEventListener("click", naucStyl);
   $("#smazHistorii").addEventListener("click", () => { historie = []; uloz("dhpf_historie", historie); vykresliHistorii(); });
@@ -651,7 +707,7 @@ function init() {
 
   nastavTahani();
   kresli();
-  if (document.fonts) document.fonts.load(`700 80px Oswald`).then(kresli).catch(() => {});
+  if (document.fonts) Promise.all([document.fonts.load(`400 80px Anton`), document.fonts.load(`900 80px Montserrat`), document.fonts.load(`700 80px Oswald`)]).then(kresli).catch(() => {});
 }
 
 init();

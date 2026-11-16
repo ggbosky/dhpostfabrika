@@ -994,12 +994,14 @@
           </div>
         </div>
         <div class="cela upozorneni" id="fotoMalo" hidden>Fotka má nízké rozlišení, na Instagramu může být rozmazaná.</div>
-        <label class="cela">Titulek do obrázku<input id="titulek" placeholder="Vytvoří se sám, můžeš ho přepsat"></label>
+        <label class="cela">Titulek do obrázku <span class="muted" style="font-weight:400">– *slovo* = barva, „/“ = nový řádek u obálky</span><input id="titulek" placeholder="Vytvoří se sám, můžeš ho přepsat"></label>
+        <label>Styl<select id="stylPostu"><option value="vyroci">Jako „Dnes před lety“</option><option value="obalka">Jako obálka carouselu</option><option value="klasik">Původní (proužek)</option></select></label>
         <label class="check"><input type="checkbox" id="titulekZap"> Zobrazit titulek</label>
         <label>Logo vlevo nahoře<select id="logo">
           <option value="auto">Automaticky (podle fotky)</option><option value="bila">Bílé</option>
           <option value="cerna">Černé</option><option value="vypnuto">Bez loga</option></select></label>
-        <label>Barva proužku / pozadí<input type="color" id="barva"></label>
+        <label>Barva horního řádku / proužku<input type="color" id="barva"></label>
+        <label>Barva zvýraznění *slov*<input type="color" id="zvyrazneniPostu"></label>
       </div>
       <div class="akce"><button type="button" class="btn" id="stahni">⬇️ Stáhnout obrázek</button>
         <button type="button" class="btn ghost" data-uloz-koncept="post">💾 Uložit koncept</button></div>
@@ -1547,28 +1549,28 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261116c"></script>
-<script src="grafika.js?v=20261116c"></script>
-<script src="koncepty.js?v=20261116c"></script>
-<script src="ai.js?v=20261116c"></script>
-<script src="app.js?v=20261116c"></script>
-<script src="carousel.js?v=20261116c"></script>
-<script src="vyroci.js?v=20261116c"></script>
-<script src="zpravy.js?v=20261116c"></script>
-<script src="reels-ulozeni.js?v=20261116c"></script>
-<script src="reels-hlas.js?v=20261116c"></script>
-<script src="reels-render.js?v=20261116c"></script>
-<script src="reels-zabery.js?v=20261116c"></script>
-<script src="reels.js?v=20261116c"></script>
-<script src="plan.js?v=20261116c"></script>
-<script src="stats.js?v=20261116c"></script>
-<script src="prehled.js?v=20261116c"></script>
-<script src="yt-ulozeni.js?v=20261116c"></script>
-<script src="promo.js?v=20261116c"></script>
-<script src="miniatury.js?v=20261116c"></script>
-<script src="yt-api.js?v=20261116c"></script>
-<script src="yt-studio.js?v=20261116c"></script>
-<script src="yt-analytics.js?v=20261116c"></script>
-<script src="shell.js?v=20261116c"></script>
+<script src="sablony.js?v=20261116d"></script>
+<script src="grafika.js?v=20261116d"></script>
+<script src="koncepty.js?v=20261116d"></script>
+<script src="ai.js?v=20261116d"></script>
+<script src="app.js?v=20261116d"></script>
+<script src="carousel.js?v=20261116d"></script>
+<script src="vyroci.js?v=20261116d"></script>
+<script src="zpravy.js?v=20261116d"></script>
+<script src="reels-ulozeni.js?v=20261116d"></script>
+<script src="reels-hlas.js?v=20261116d"></script>
+<script src="reels-render.js?v=20261116d"></script>
+<script src="reels-zabery.js?v=20261116d"></script>
+<script src="reels.js?v=20261116d"></script>
+<script src="plan.js?v=20261116d"></script>
+<script src="stats.js?v=20261116d"></script>
+<script src="prehled.js?v=20261116d"></script>
+<script src="yt-ulozeni.js?v=20261116d"></script>
+<script src="promo.js?v=20261116d"></script>
+<script src="miniatury.js?v=20261116d"></script>
+<script src="yt-api.js?v=20261116d"></script>
+<script src="yt-studio.js?v=20261116d"></script>
+<script src="yt-analytics.js?v=20261116d"></script>
+<script src="shell.js?v=20261116d"></script>
 </body>
 </html>
