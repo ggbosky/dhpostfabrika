@@ -565,7 +565,9 @@ function vykresliStrih() {
   $("#rStrihStyl").value = vz.strih || "fire";
   $("#rBarvy").value = vz.barvy; $("#rProlnuti").checked = vz.prolnuti; $("#rTitulkyZap").checked = vz.titulky;
   $("#rZvyrazneni").checked = vz.zvyrazneni; $("#rLogoZap").checked = vz.logo; $("#rOutro").checked = vz.outro;
-  $("#rStrih").innerHTML = osa.segmenty.map((seg) => {
+  const zpresnit = p.bezHlasu ? `<div class="r-strih-scena" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button type="button" class="btn small" data-r-zpresnit>🎯 Zpřesnit titulky podle zvuku</button>
+    <span class="muted" style="font-size:13px">Znovu poslechne každý úsek a titulky srovná přesně se slovy, která v něm zazní (poprvé stáhne model ~220 MB).</span></div>` : "";
+  $("#rStrih").innerHTML = zpresnit + osa.segmenty.map((seg) => {
     const s = seg.scena, si = seg.i;
     const k = s.klip && p.klipy[s.klip.klipId];
     const maxStart = k?.delka ? Math.max(0, k.delka - seg.delka) : 60;
@@ -1012,6 +1014,7 @@ function init() {
     }
     if (d.rHledat !== undefined) { t.disabled = true; try { await hledatScenu(+d.rHledat); } catch (er) { zprava("#rZaberyZprava", esc(er.message), "chyba"); } t.disabled = false; return; }
     if (d.rPouzit !== undefined) return pouzitVysledek(+d.rPouzit);
+    if (d.rZpresnit !== undefined) return zpresniTitulky(t);
     if (d.rDalsi !== undefined) return pouzitVysledek(+d.rDalsi, true);
     if (d.rBezstrihu !== undefined) { p.sceny[+d.rBezstrihu].extra = []; vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled(); return; }
     if (d.rSmazstrih) { const [si, j] = d.rSmazstrih.split(":").map(Number); p.sceny[si].extra.splice(j, 1); vykresliZabery(); vykresliStrih(); ulozPozdeji(); obnovNahled(R.casovaOsa(p).segmenty[si]?.od + 0.3); return; }
@@ -1205,6 +1208,38 @@ const SCHEMA_VYBER = {
   required: ["useky", "popisek", "hashtagy"],
 };
 
+// Starší upoutávka: titulky každého úseku znovu zarovnat podle toho, co v něm skutečně zazní (Whisper).
+async function zpresniTitulky(tl) {
+  if (!p?.bezHlasu || !window.DHPrepis) return;
+  tl.disabled = true;
+  const stav = (t) => window.DHToast?.(t, "info");
+  let ok = 0;
+  try {
+    for (const [i, s] of p.sceny.entries()) {
+      const k = s.klip && p.klipy[s.klip.klipId];
+      if (!k) continue;
+      const buf = await A.dekoduj(`klip-${k.id}`, async () => (k.souborId ? U.souborBlob(k.souborId) : (await fetch(k.url)).blob()));
+      tl.textContent = `🎯 Poslouchám úsek ${i + 1} / ${p.sceny.length}…`;
+      const od = s.klip.start || 0, doS = od + (s.trvani || 4);
+      const rec = (await window.DHPrepis.slovaWhisper(buf, Math.max(0, od - 0.3), Math.min(buf.duration, doS + 0.3), (t) => { tl.textContent = t; }))
+        .filter((w) => w.do > od && w.od < doS);
+      if (!rec.length) continue;
+      const nase = s.text.split(/\s+/).filter(Boolean);
+      const z = nase.length ? window.DHPrepis.zarovnej(nase, rec) : null;
+      const slova = z && z.kvalita >= 0.45 ? z.slova : rec;
+      s.text = slova.map((w) => w.text).join(" ");
+      s.prepis = slova.map((w) => ({ text: w.text, od: +(w.od - od).toFixed(2), do: +(w.do - od).toFixed(2) }));
+      s.titulkyRucne = false;
+      prepocitejTitulky(s);
+      ok++;
+    }
+    ulozPozdeji(); vykresliScenar(); vykresliStrih(); obnovNahled(+$("#rPosuv").value || 0);
+    window.DHToast?.(ok ? `Titulky zpřesněné ✓ (${ok} úseků)` : "V úsecích jsem nenašel řeč.", ok ? "ok" : "info");
+  } catch (e) { window.DHToast?.(`Zpřesnění se nepovedlo: ${e.message}`, "chyba"); }
+  finally { tl.disabled = false; tl.textContent = "🎯 Zpřesnit titulky podle zvuku"; }
+  void stav;
+}
+
 // Upoutávka = vystříhané nejzajímavější části videa s PŮVODNÍM zvukem + titulky toho, co v nich zazní. Žádné namlouvání.
 async function zUpoutavky({ video, soubor, delka = 30, stav = () => {} }) {
   const premiera = kdyPremiera(video.naplanovano);
@@ -1222,10 +1257,10 @@ async function zUpoutavky({ video, soubor, delka = 30, stav = () => {} }) {
   const delkaVidea = k.delka || video.delka || 600;
 
   // 1) přepis řeči
-  let slova = null;
+  let slova = null, buf = null;
   try {
     stav("Načítám zvuk videa…");
-    const buf = await A.dekoduj(`klip-${k.id}`, async () => U.souborBlob(k.souborId));
+    buf = await A.dekoduj(`klip-${k.id}`, async () => U.souborBlob(k.souborId));
     slova = await prepisVidea(buf, stav);
   } catch (e) { console.warn("Přepis se nepovedl:", e); slova = null; }
   const vety = slova?.length ? vetyZeSlov(slova) : [];
@@ -1257,25 +1292,54 @@ Z přepisu vyber 2–5 úseků (každý = souvislý rozsah vět od_veta–do_vet
 
   // 3) scény: úsek videa s původním zvukem + titulky ze slov
   const hrana = (x) => Math.max(0, Math.min(x, delkaVidea - 0.2));
+  const novaScena = (start, konec, slovaAbs) => {
+    const sl = (slovaAbs || []).map((w) => ({ text: w.text, od: +(w.od - start).toFixed(2), do: +(w.do - start).toFixed(2) }));
+    const text = sl.map((w) => w.text).join(" ");
+    const sc = { id: U.noveId("s"), text, titulek: "", zaber: `úsek videa ${cas(start)}–${cas(konec)}`, dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
+      klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "vyplnit", zoom: 1, zvuk: 1 }, extra: [], hlas: null,
+      trvani: +(konec - start).toFixed(2), prepis: sl, prepisHash: R.hashTextu(text), titulky: [], titulkyRucne: false };
+    sc.titulky = text ? R.autoTitulky(text, sc.trvani, { slova: sl, posun: 0 }) : [];
+    return sc;
+  };
+  let presne = 0;
   if (useky.length) {
-    p.sceny = useky.map(([a, b]) => {
-      const start = hrana(vety[a].od - 0.15), konec = hrana(vety[b].do + 0.35);
-      const sl = vety.slice(a, b + 1).flatMap((v) => v.slova).map((w) => ({ text: w.text, od: +(w.od - start).toFixed(2), do: +(w.do - start).toFixed(2) }));
-      const text = sl.map((w) => w.text).join(" ");
-      const sc = { id: U.noveId("s"), text, titulek: "", zaber: `úsek videa ${cas(start)}–${cas(konec)}`, dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
-        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "vyplnit", zoom: 1, zvuk: 1 }, extra: [], hlas: null,
-        trvani: +(konec - start).toFixed(2), prepis: sl, prepisHash: R.hashTextu(text), titulky: [], titulkyRucne: false };
-      sc.titulky = R.autoTitulky(text, sc.trvani, { slova: sl, posun: 0 });
-      return sc;
-    });
+    p.sceny = [];
+    for (const [ui, [a, b]] of useky.entries()) {
+      let slovaUseku = vety.slice(a, b + 1).flatMap((v) => v.slova);
+      let start = vety[a].od - 0.15, konec = vety[b].do + 0.35;
+      // 🎯 Gemini dává jen přibližné časy → přesné časy slov z Whisperu v okolí úseku (text zůstává z Gemini)
+      if (buf && window.DHPrepis) {
+        try {
+          stav(`🎯 Zpřesňuji časy titulků podle zvuku… úsek ${ui + 1} / ${useky.length}`);
+          const okno = [Math.max(0, vety[a].od - 6), Math.min(buf.duration, vety[b].do + 6)];
+          const rec = await window.DHPrepis.slovaWhisper(buf, okno[0], okno[1], stav);
+          const z = window.DHPrepis.zarovnej(slovaUseku.map((w) => w.text), rec);
+          if (z && z.kvalita >= 0.45) {
+            slovaUseku = z.slova;
+            start = z.slova[0].od - 0.12;
+            konec = z.slova[z.slova.length - 1].do + 0.3;
+            if (z.konecDalsi != null && z.konecDalsi > z.slova[z.slova.length - 1].do) konec = Math.min(konec, z.konecDalsi - 0.04);
+            presne++;
+          } else {
+            const vUseku = rec.filter((w) => w.do > vety[a].od - 0.5 && w.od < vety[b].do + 0.5);
+            if (vUseku.length >= 2) { slovaUseku = vUseku; start = vUseku[0].od - 0.12; konec = vUseku[vUseku.length - 1].do + 0.3; presne++; }
+          }
+        } catch (e) { console.warn("Whisper:", e); }
+      }
+      p.sceny.push(novaScena(hrana(start), hrana(konec), slovaUseku));
+    }
   } else {
-    // bez přepisu (chybí Gemini klíč / ve videu není řeč): úseky rozložené po videu, bez titulků
+    // bez přepisu Gemini: úseky rozložené po videu; titulky z Whisperu (když jde načíst)
     const n = Math.max(3, Math.round(delka / 8)), d = delka / n;
-    p.sceny = [...Array(n)].map((_, i) => {
+    p.sceny = [];
+    for (let i = 0; i < n; i++) {
       const start = hrana(((i + 0.5) / n) * Math.max(0, delkaVidea - d));
-      return { id: U.noveId("s"), text: "", titulek: "", zaber: `úsek videa ${cas(start)}`, dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
-        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "vyplnit", zoom: 1, zvuk: 1 }, extra: [], hlas: null, trvani: +d.toFixed(2), titulky: [], titulkyRucne: false };
-    });
+      let sl = [];
+      if (buf && window.DHPrepis) {
+        try { stav(`🎯 Přepisuji řeč v úsecích… ${i + 1} / ${n}`); sl = await window.DHPrepis.slovaWhisper(buf, start, start + d, stav); presne++; } catch (e) { console.warn("Whisper:", e); }
+      }
+      p.sceny.push(novaScena(start, start + d, sl));
+    }
   }
   p.scenar = { hooky: [{ text: p.sceny[0].text, sila: 0 }], hook: 0, cta: "",
     popisek: vyber?.popisek || `${video.nazev}\n\n🎬 ${premiera ? `Celé video ${premiera.text} na YouTube` : "Celé video na YouTube"} – odkaz v bio`,
@@ -1286,8 +1350,8 @@ Z přepisu vyber 2–5 úseků (každý = souvislý rozsah vět od_veta–do_vet
   prepniKrok("strih");
   obnovNahled();
   const celkem = R.casovaOsa(p).celkem;
-  window.DHToast?.(slova?.length
-    ? `Upoutávka hotová ✓ ${p.sceny.length} úseků z videa (${celkem.toFixed(0)} s) s původním zvukem a titulky. Zkontroluj náhled a dej Export.`
+  window.DHToast?.(slova?.length || presne
+    ? `Upoutávka hotová ✓ ${p.sceny.length} úseků z videa (${celkem.toFixed(0)} s) s původním zvukem a titulky${presne ? " (časy slov podle zvuku)" : ""}. Zkontroluj náhled a dej Export.`
     : `Upoutávka hotová – ${p.sceny.length} úseků s původním zvukem, ale BEZ titulků (${AI()?.maGemini?.() ? "ve videu jsem nenašel řeč" : "přepis řeči potřebuje Gemini klíč"}).`, slova?.length ? "ok" : "info");
   return p;
 }
