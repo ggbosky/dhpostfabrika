@@ -67,6 +67,10 @@ async function otevri(id) {
   // vodoznak v rohu je nově vypnutý; starší projekty ho měly zapnutý automaticky
   if (!p.vzhled.logoVolba) { p.vzhled.logo = false; p.vzhled.logoVolba = true; }
   if (!p.vzhled.strih) p.vzhled.strih = "fire";
+  if (p.bezHlasu && !p.verzeUpoutavky) {
+    p.sceny.forEach((s) => { if (s.klip) s.klip.rezim = "vyplnit"; prepocitejTitulky(s); });
+    p.verzeUpoutavky = 2; ulozPozdeji();
+  }
   vykresliVse();
   prepniKrok(p.sceny.length ? "strih" : p.vyzkum.fakta.length ? "scenar" : "vyzkum");
   obnovNahled();
@@ -1165,7 +1169,7 @@ async function prepisVidea(buf, stav = () => {}) {
     const wav = A.naWav(kus);
     const b64 = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.readAsDataURL(wav); });
     const r = await AI().geminiPrimo({
-      system: "Jsi přesný přepisovač řeči. Přepisuješ česky (případně slovensky) mluvené slovo z nahrávky přesně tak, jak zazní – slovo od slova, s interpunkcí. Hudbu, ruchy a potlesk vynech. Nic si nevymýšlej; když řeč není, vrať prázdný seznam.",
+      system: "Jsi přesný přepisovač řeči. Přepisuješ česky (případně slovensky) mluvené slovo z nahrávky přesně tak, jak zazní – slovo od slova, s interpunkcí. Hudbu, ruchy a potlesk vynech. Nic si nevymýšlej; když řeč není, vrať prázdný seznam. V každém úseku obal 1 nejdůležitější slovo (jméno, číslo, silné slovo) *hvězdičkami* – nic jiného neměň.",
       zadani: `Přepiš řeč v nahrávce (délka ${(doK - od).toFixed(1)} s). Rozděl ji na krátké úseky (jedna věta nebo její část, max 12 slov) a ke každému uveď čas začátku a konce v sekundách od začátku TÉTO nahrávky.`,
       schema: SCHEMA_PREPIS, teplota: 0, obrazky: [{ mime: "audio/wav", data: b64 }], limitPokusu: 120000, limitCelkem: 240000,
     });
@@ -1186,7 +1190,7 @@ function vetyZeSlov(slova) {
   slova.forEach((w, i) => {
     v.push(w);
     const dalsi = slova[i + 1];
-    if (/[.!?…]$/.test(w.text) || !dalsi || dalsi.od - w.do > 1.2) { out.push({ od: v[0].od, do: v[v.length - 1].do, slova: v, text: v.map((x) => x.text).join(" ") }); v = []; }
+    if (/[.!?…]$/.test(w.text.replace(/\*/g, "")) || !dalsi || dalsi.od - w.do > 1.2) { out.push({ od: v[0].od, do: v[v.length - 1].do, slova: v, text: v.map((x) => x.text).join(" ") }); v = []; }
   });
   return out;
 }
@@ -1259,7 +1263,7 @@ Z přepisu vyber 2–5 úseků (každý = souvislý rozsah vět od_veta–do_vet
       const sl = vety.slice(a, b + 1).flatMap((v) => v.slova).map((w) => ({ text: w.text, od: +(w.od - start).toFixed(2), do: +(w.do - start).toFixed(2) }));
       const text = sl.map((w) => w.text).join(" ");
       const sc = { id: U.noveId("s"), text, titulek: "", zaber: `úsek videa ${cas(start)}–${cas(konec)}`, dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
-        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 1 }, extra: [], hlas: null,
+        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "vyplnit", zoom: 1, zvuk: 1 }, extra: [], hlas: null,
         trvani: +(konec - start).toFixed(2), prepis: sl, prepisHash: R.hashTextu(text), titulky: [], titulkyRucne: false };
       sc.titulky = R.autoTitulky(text, sc.trvani, { slova: sl, posun: 0 });
       return sc;
@@ -1270,7 +1274,7 @@ Z přepisu vyber 2–5 úseků (každý = souvislý rozsah vět od_veta–do_vet
     p.sceny = [...Array(n)].map((_, i) => {
       const start = hrana(((i + 0.5) / n) * Math.max(0, delkaVidea - d));
       return { id: U.noveId("s"), text: "", titulek: "", zaber: `úsek videa ${cas(start)}`, dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
-        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 1 }, extra: [], hlas: null, trvani: +d.toFixed(2), titulky: [], titulkyRucne: false };
+        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "vyplnit", zoom: 1, zvuk: 1 }, extra: [], hlas: null, trvani: +d.toFixed(2), titulky: [], titulkyRucne: false };
     });
   }
   p.scenar = { hooky: [{ text: p.sceny[0].text, sila: 0 }], hook: 0, cta: "",

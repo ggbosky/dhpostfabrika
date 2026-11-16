@@ -74,19 +74,31 @@ function autoTitulky(text, hlasDelka, volby = null) {
   const { vety = null, slova: casySlov = null, posun = 0.2 } = Array.isArray(volby) ? { vety: volby } : (volby || {});
   const s = slova(String(text || "").replace(/\s+/g, " "));
   const zdroj = slovaTitulku(text);
-  const kusy = [];  // {text, veta}
+  const kusy = [];  // {text, veta, n}
   let kus = [], iVety = 0;
   const delkaKusu = (k) => k.join(" ").replace(/\*/g, "").length;
   zdroj.forEach((w, i) => {
     kus.push(w);
-    const kv = konecVety(w), carka = /[:;]$/.test(w.replace(/\*/g, ""));
-    if (delkaKusu(kus) >= 24 || kv || carka || kus.length >= 5 || i === zdroj.length - 1) { kusy.push({ text: kus.join(" "), veta: iVety }); kus = []; }
+    const kv = konecVety(w), carka = /[:;,]$/.test(w.replace(/\*/g, ""));
+    // krátké úderné kousky (max ~3–4 slova) – moderní titulky na Reels/Shorts
+    if (delkaKusu(kus) >= 18 || kv || (carka && kus.length >= 2) || kus.length >= 4 || i === zdroj.length - 1) { kusy.push({ text: kus.join(" "), veta: iVety, n: kus.length }); kus = []; }
     if (kv) iVety++;
   });
   // Neuzavřené *zvýraznění* přes hranici kusu doplníme.
   kusy.forEach((k) => { if ((k.text.match(/\*/g) || []).length % 2) k.text = k.text.replace(/\*/g, ""); });
   const delka = (k) => k.text.replace(/\*/g, "").length + 2;
   const pocetVet = new Set(kusy.map((k) => k.veta)).size;
+  // 0) stejná slova jako v přepisu/zarovnání → každé slovo má svůj čas (zvýraznění právě vyslovovaného slova)
+  if (casySlov?.length && casySlov.length === zdroj.length) {
+    let idx = 0;
+    return kusy.map((k, j) => {
+      const sl = casySlov.slice(idx, idx + k.n); idx += k.n;
+      const dalsi = casySlov[idx];
+      const konec = dalsi ? Math.min(dalsi.od, sl[sl.length - 1].do + 0.6) : sl[sl.length - 1].do + 0.4;
+      return { text: k.text, od: +(sl[0].od + posun).toFixed(2), do: +(Math.max(konec, sl[0].od + 0.25) + posun).toFixed(2),
+        slova: sl.map((w) => ({ od: +(w.od + posun).toFixed(2), do: +(w.do + posun).toFixed(2) })) };
+    });
+  }
   // 1) přesné časy slov (ElevenLabs): kousek titulku začíná přesně se slovem, které se v tu chvíli říká
   if (casySlov?.length) {
     const sv = []; let akt = [];
@@ -248,34 +260,64 @@ function kresliKlip(ctx, el, nastaveni, filtr, pohyb = { z: 1, px: 0, py: 0 }) {
 
 function zalomBohaty(ctx, text, max) { return G().zalomBohaty(ctx, text, max); }
 
-function kresliTitulky(ctx, text, zvyraznit, pop = 1) {
-  const t = zvyraznit ? text : text.replace(/\*/g, "");
+// Titulky ve stylu Reels/Shorts: tučné verzálky s černým obrysem, právě vyslovované slovo svítí žlutě a „poskočí“,
+// *klíčová slova* jsou červená. kus = { text, od, do, slova?: [{od, do}] }, lokal = čas ve scéně.
+const TIT_AKTIVNI = "#ffd400", TIT_KLIC = "#ff3b3b";
+function kresliTitulky(ctx, kus, lokal, zvyraznit, pop = 1) {
+  const t = (zvyraznit ? kus.text : kus.text.replace(/\*/g, "")).toUpperCase();
   ctx.save();
-  if (pop !== 1) { ctx.translate(W / 2, 1360); ctx.scale(pop, pop); ctx.translate(-W / 2, -1360); }
-  let v = 62, radky;
-  for (; v >= 44; v -= 2) {
-    ctx.font = `800 ${v}px ${PISMO_T}`;
-    radky = zalomBohaty(ctx, t, 860);
-    if (radky.length <= 2) break;
+  if (pop !== 1) { ctx.translate(W / 2, 1400); ctx.scale(pop, pop); ctx.translate(-W / 2, -1400); }
+  let v = 84, radky;
+  for (; v >= 56; v -= 2) {
+    ctx.font = `900 ${v}px ${PISMO_T}`;
+    radky = zalomBohaty(ctx, t, 900);
+    if (radky.length <= 2 && radky.every((r) => G().sirkaRadku(ctx, r) <= 900)) break;
   }
-  const rozestup = v * 1.18;
-  let y = 1385 - (radky.length - 1) * rozestup;
+  // které slovo se právě říká
+  const slov = radky.reduce((a, r) => a + r.length, 0);
+  let aktivni = -1;
+  if (kus.slova?.length === slov) aktivni = kus.slova.findIndex((w, i) => lokal >= w.od && lokal < (kus.slova[i + 1]?.od ?? kus.do));
+  else if (slov) {
+    const zn = radky.flat().map((s) => s.reduce((a, u) => a + u.t.length, 0) + 1);
+    const celk = zn.reduce((a, b) => a + b, 0);
+    const f = (lokal - kus.od) / Math.max(0.2, kus.do - kus.od);
+    let kum = 0;
+    aktivni = zn.findIndex((z) => { kum += z; return f * celk < kum; });
+  }
+  const startAkt = kus.slova?.[aktivni]?.od ?? lokal;
+  const rozestup = v * 1.12;
+  let y = 1400 - (radky.length - 1) * rozestup;
   ctx.lineJoin = "round";
   ctx.textBaseline = "alphabetic";
+  let iSlova = 0;
   for (const r of radky) {
     const sirka = G().sirkaRadku(ctx, r);
     let x = W / 2 - sirka / 2;
-    const mezera = ctx.measureText(" ").width;
+    const mezera = ctx.measureText(" ").width * 1.25;
+    x = W / 2 - (sirka + (r.length - 1) * ctx.measureText(" ").width * 0.25) / 2;
     for (const slovo of r) {
-      for (const u of slovo) {
-        ctx.lineWidth = v * 0.2;
-        ctx.strokeStyle = "rgba(0,0,0,0.92)";
-        ctx.strokeText(u.t, x, y);
-        ctx.fillStyle = u.a ? "#ffc000" : "#ffffff";
-        ctx.fillText(u.t, x, y);
-        x += ctx.measureText(u.t).width;
+      const jeAkt = iSlova === aktivni;
+      const sw = slovo.reduce((a, u) => a + ctx.measureText(u.t).width, 0);
+      ctx.save();
+      if (jeAkt) {
+        // krátké „poskočení“ při vyslovení slova (bez roztažení do sousedních slov)
+        const sk = 1 + 0.07 * Math.max(0, 1 - (lokal - startAkt) / 0.14);
+        ctx.translate(x + sw / 2, y - v * 0.35); ctx.scale(sk, sk); ctx.translate(-(x + sw / 2), -(y - v * 0.35));
       }
-      x += mezera;
+      let xx = x;
+      for (const u of slovo) {
+        ctx.lineWidth = v * 0.26;
+        ctx.strokeStyle = "#000";
+        ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 0; ctx.shadowOffsetY = v * 0.08;
+        ctx.strokeText(u.t, xx, y);
+        ctx.shadowColor = "transparent";
+        ctx.fillStyle = jeAkt ? TIT_AKTIVNI : u.a ? TIT_KLIC : "#ffffff";
+        ctx.fillText(u.t, xx, y);
+        xx += ctx.measureText(u.t).width;
+      }
+      ctx.restore();
+      x += sw + mezera;
+      iSlova++;
     }
     y += rozestup;
   }
@@ -414,7 +456,7 @@ async function kresliSnimek(ctx, p, osa, t, elementy) {
   }
   if (vz.titulky !== false) {
     const kus = (s.titulky || []).find((k) => lokal >= k.od && lokal < k.do);
-    if (kus) kresliTitulky(ctx, kus.text, vz.zvyrazneni !== false, fire ? 1 + 0.1 * Math.max(0, 1 - (lokal - kus.od) / 0.12) : 1);
+    if (kus) kresliTitulky(ctx, kus, lokal, vz.zvyrazneni !== false, 1 + 0.06 * Math.max(0, 1 - (lokal - kus.od) / 0.12));
   }
   if (fire) {
     // viněta + krátký záblesk na každém střihu
@@ -466,8 +508,14 @@ async function smichejProjekt(p, osa, pokrok = () => {}) {
       try {
         const buf = await A().dekoduj(`klip-${klip.id}`, async () => (klip.souborId ? U().souborBlob(klip.souborId) : (await fetch(klip.url)).blob()));
         const hlasitost = s.klip.zvuk * (s.hlas ? 0.35 : 1); // pod hlasem se původní zvuk ztlumí
-        const delkaZvuku = p.bezHlasu ? Math.min(seg.delka, s.trvani || seg.delka) : seg.delka / Math.max(1, zaberySceny(s).length);
-        stopy.push({ buffer: buf, od: seg.od, offset: s.klip.start || 0, delka: delkaZvuku, hlasitost, prolnuti: p.bezHlasu ? 0.06 : 0.12 });
+        if (p.bezHlasu) {
+          // úsek hraje o 0,35 s déle a plynule doznívá pod začátkem dalšího úseku (crossfade, žádné useknutí)
+          const posledni = seg.i === osa.segmenty.length - 1;
+          const presah = posledni ? 0.6 : 0.35;
+          stopy.push({ buffer: buf, od: seg.od, offset: s.klip.start || 0, delka: Math.min(seg.delka, s.trvani || seg.delka) + presah, hlasitost, nabeh: seg.i ? 0.25 : 0.05, dobeh: presah + 0.1 });
+        } else {
+          stopy.push({ buffer: buf, od: seg.od, offset: s.klip.start || 0, delka: seg.delka / Math.max(1, zaberySceny(s).length), hlasitost, prolnuti: 0.12 });
+        }
       } catch { /* video bez zvukové stopy */ }
     }
     pokrok(seg.i / osa.segmenty.length);

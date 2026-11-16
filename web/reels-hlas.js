@@ -352,10 +352,11 @@ async function smichej({ celkem, stopy = [], hudba = null }) {
     src.playbackRate.value = s.rychlost || 1;
     const g = ctx.createGain();
     const h = s.hlasitost ?? 1;
-    const p = Math.min(s.prolnuti ?? 0.08, s.delka / 3);
+    const pIn = Math.min(s.nabeh ?? s.prolnuti ?? 0.08, s.delka / 3);
+    const pOut = Math.min(s.dobeh ?? s.prolnuti ?? 0.08, s.delka / 3);
     g.gain.setValueAtTime(0, s.od);
-    g.gain.linearRampToValueAtTime(h, s.od + p);
-    g.gain.setValueAtTime(h, Math.max(s.od + p, s.od + s.delka - p));
+    g.gain.linearRampToValueAtTime(h, s.od + pIn);
+    g.gain.setValueAtTime(h, Math.max(s.od + pIn, s.od + s.delka - pOut));
     g.gain.linearRampToValueAtTime(0, s.od + s.delka);
     src.connect(g).connect(ctx.destination);
     src.start(s.od, s.offset || 0, s.delka * (s.rychlost || 1));
