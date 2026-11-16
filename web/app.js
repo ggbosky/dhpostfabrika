@@ -18,10 +18,10 @@ function uloz(klic, hodnota) {
   try { localStorage.setItem(klic, JSON.stringify(hodnota)); } catch { /* soukromé okno apod. */ }
 }
 
-const VYCHOZI_NASTAVENI = { barva: "#ab0707", logo: "auto", titulekZap: true, styl: "dh", zvyrazneni: "#ffc000", kategorie: "zajimavosti", cernobila: true };
+const VYCHOZI_NASTAVENI = { barva: "#ab0707", logo: "auto", titulekZap: true, styl: "dh", zvyrazneni: "#ffc000", kategorie: "zajimavosti", cernobila: false };
 let nastaveni = { ...VYCHOZI_NASTAVENI, ...nacti("dhpf_nastaveni", {}) };
 if (!["auto", "bila", "cerna", "vypnuto"].includes(nastaveni.logo)) nastaveni.logo = "auto";
-if (nastaveni.stylVerze !== 2) { nastaveni.styl = "dh"; nastaveni.stylVerze = 2; } // výchozí je šablona DH postů podle kategorií
+if (nastaveni.stylVerze !== 3) { nastaveni.styl = "dh"; nastaveni.cernobila = false; nastaveni.stylVerze = 3; } // výchozí je šablona DH postů podle kategorií
 let profil = nacti("dhpf_profil", null);
 let historie = nacti("dhpf_historie", []);
 let typ = "vysledek";
@@ -211,40 +211,42 @@ function kresli() {
   window.DHG.kresliLogo(ctx, nastaveni.logo);
 }
 
-// Šablona DH postů: kategorie (barva + ikona vpravo nahoře), barevný nádech fotky, velký štítek kategorie
-// a text verzálkami s *klíčovými slovy* v barvě kategorie. Ikony: Microsoft Fluent Emoji 3D (MIT), nebo vlastní.
+// Šablona DH postů: kategorie (barva + ikona vpravo nahoře), barevný nádech fotky, velký nadpis kategorie
+// a pod ním podtitulek verzálkami s *klíčovými slovy* v barvě kategorie.
+// Ikony: iOS emoji z odkazů (em-content.zobj.net) – načítají se přes images.weserv.nl, protože em-content
+// nepovoluje CORS a obrázek by pak nešel stáhnout. Záloha: Apple emoji z jsDelivr (64 px), pak Fluent Emoji.
 const FLUENT = "https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/";
 const KATEGORIE = {
-  zajimavosti: { nazev: "Zajímavosti", barva: "#0f3ccd", ikona: "Light%20bulb/3D/light_bulb_3d.png" },
-  rekordy: { nazev: "Rekordy", barva: "#bb0000", ikona: "Books/3D/books_3d.png" },
-  hraci: { nazev: "Hráči", barva: "#36c000", ikona: "Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png", obarvit: ["#a9c9ec", "#4d77a8"] },
-  historie: { nazev: "Historie", barva: "#ffc000", ikona: "Classical%20building/3D/classical_building_3d.png" },
-  tymy: { nazev: "Týmy", barva: "#9c00ff", ikona: "Shield/3D/shield_3d.png" },
+  zajimavosti: { nazev: "Zajímavosti", barva: "#0f3ccd", ios: "81/electric-light-bulb_1f4a1.png", kod: "1f4a1", ikona: "Light%20bulb/3D/light_bulb_3d.png" },
+  rekordy: { nazev: "Rekordy", barva: "#bb0000", ios: "354/books_1f4da.png", kod: "1f4da", ikona: "Books/3D/books_3d.png" },
+  hraci: { nazev: "Hráči", barva: "#36c000", ios: "81/busts-in-silhouette_1f465.png", kod: "1f465", ikona: "Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png" },
+  historie: { nazev: "Historie", barva: "#ffc000", ios: "118/classical-building_1f3db.png", kod: "1f3db-fe0f", ikona: "Classical%20building/3D/classical_building_3d.png" },
+  tymy: { nazev: "Týmy", barva: "#9c00ff", ios: "354/ice-hockey_1f3d2.png", kod: "1f3d2", ikona: "Ice%20hockey/3D/ice_hockey_3d.png" },
 };
+const zdrojeIkony = (k) => [
+  `https://images.weserv.nl/?url=em-content.zobj.net/source/apple/${KATEGORIE[k].ios}`,
+  `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/${KATEGORIE[k].kod}.png`,
+  FLUENT + KATEGORIE[k].ikona,
+];
 const ikonyCache = {};
 function ikonaKategorie(k) {
   const vlastni = (() => { try { return localStorage.getItem(`dhpf_ikona_${k}`) || ""; } catch { return ""; } })();
-  const url = vlastni || FLUENT + KATEGORIE[k].ikona;
+  const zdroje = vlastni ? [vlastni] : zdrojeIkony(k);
+  const klic = zdroje[0];
   const z = ikonyCache[k];
-  if (z && z.url === url) return z.img.complete && z.img.naturalWidth ? z.img : null;
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.onload = () => {
-    // tmavé siluety (Fluent) přebarvit do světle modré, ať jsou na fotce vidět
-    const ob = !vlastni && KATEGORIE[k].obarvit;
-    if (ob) {
-      const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
-      const x = c.getContext("2d"); x.drawImage(img, 0, 0);
-      x.globalCompositeOperation = "source-atop"; x.globalAlpha = 0.85;
-      const g = x.createLinearGradient(0, 0, 0, c.height); g.addColorStop(0, ob[0]); g.addColorStop(1, ob[1]);
-      x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
-      const o = new Image(); o.onload = () => { ikonyCache[k] = { url, img: o }; kresli(); }; o.src = c.toDataURL("image/png");
-      return;
-    }
-    kresli();
+  if (z && z.klic === klic) return z.hotovo ? z.img : null;
+  const zaznam = { klic, img: new Image(), hotovo: false };
+  ikonyCache[k] = zaznam;
+  let i = 0;
+  const zkus = () => {
+    if (i >= zdroje.length) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => { if (ikonyCache[k] !== zaznam) return; zaznam.img = img; zaznam.hotovo = true; kresli(); };
+    img.onerror = () => { i++; zkus(); };
+    img.src = zdroje[i];
   };
-  img.src = url;
-  ikonyCache[k] = { url, img };
+  zkus();
   return null;
 }
 const hexA = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
@@ -275,32 +277,32 @@ function kresliDH(text) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.restore();
 
-  // text: štítek kategorie + věta verzálkami
+  // nadpis kategorie + pod ním podtitulek (menší, ExtraBold)
   const okraj = 58, sirka = W - 2 * okraj;
-  let v = 64, radky = [];
+  let v = 56, radky = [];
   for (; v >= 40; v -= 2) {
-    ctx.font = `900 ${v}px ${MONT}`;
+    ctx.font = `800 ${v}px ${MONT}`;
     radky = text ? G.zalomBohaty(ctx, text, sirka) : [];
     if (radky.length <= 4 && radky.every((r) => G.sirkaRadku(ctx, r) <= sirka)) break;
   }
-  const rozestup = Math.round(v * 1.22);
-  const posledni = H - 70;
+  const rozestup = Math.round(v * 1.24);
+  const posledni = H - 74;
   const prvni = posledni - Math.max(0, radky.length - 1) * rozestup;
-  const vStitek = Math.round(v * 1.6);
-  const yStitek = radky.length ? prvni - v * 0.95 - 26 : posledni;
-  G.ztmaveni(ctx, yStitek - vStitek - 420, yStitek + 40, W, H);
+  const vNadpis = 104;
+  const yNadpis = radky.length ? prvni - v - 34 : posledni;
+  G.ztmaveni(ctx, yNadpis - vNadpis - 430, yNadpis + 30, W, H);
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   if (nastaveni.titulekZap) {
-    ctx.font = `900 ${vStitek}px ${MONT}`;
+    ctx.font = `900 ${vNadpis}px ${MONT}`;
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(kat.nazev.toUpperCase(), okraj - 4, yStitek);
+    ctx.fillText(kat.nazev.toUpperCase(), okraj - 4, yNadpis);
   }
-  ctx.font = `900 ${v}px ${MONT}`;
+  ctx.font = `800 ${v}px ${MONT}`;
   radky.forEach((r, i) => G.kresliBohatyRadek(ctx, r, okraj, prvni + i * rozestup, barva));
 
   // ikona vpravo nahoře
   const ik = ikonaKategorie(nastaveni.kategorie in KATEGORIE ? nastaveni.kategorie : "zajimavosti");
-  if (ik) { ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 14; ctx.drawImage(ik, W - 58 - 96, 42, 96, 96); ctx.restore(); }
+  if (ik) { ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 12; ctx.drawImage(ik, W - 50 - 84, 46, 84, 84); ctx.restore(); }
   window.DHG.kresliLogo(ctx, nastaveni.logo);
 }
 
@@ -430,7 +432,7 @@ const SCHEMA_POST = {
     telo: { type: "string", description: "max 3 krátké odstavce (1–2 věty) oddělené prázdným řádkem, celkem max 320 znaků" },
     cta: { type: "string", description: "jedna krátká otázka pro fanoušky" },
     hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
-    titulek: { type: "string", description: "text do obrázku: jedna úderná věta 6–14 slov (např. „Ten, kdo přinesl trend zahnuté čepele od Mikity do Evropy.“), bez emoji, neopakuje hook doslova; 2–4 klíčová slova dej do *hvězdiček* (zvýrazní se barvou kategorie)" },
+    titulek: { type: "string", description: "podtitulek do obrázku (pod velký nadpis kategorie): 1–2 krátké věty, celkem 8–16 slov (např. „Ten, kdo přinesl trend zahnuté čepele od Mikity do Evropy.“), bez emoji, neopakuje hook doslova; 2–4 klíčová slova dej do *hvězdiček* (zvýrazní se barvou kategorie)" },
     kategorie: { type: "string", enum: ["zajimavosti", "rekordy", "hraci", "historie", "tymy"], description: "kategorie postu: zajímavosti, rekordy, hráči, historie, týmy" },
     foto_dotazy: { type: "array", items: { type: "string" }, description: "2–3 dotazy pro Wikimedia Commons" },
     k_overeni: { type: "array", items: { type: "string" } },
