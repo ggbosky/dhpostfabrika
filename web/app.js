@@ -18,10 +18,10 @@ function uloz(klic, hodnota) {
   try { localStorage.setItem(klic, JSON.stringify(hodnota)); } catch { /* soukromé okno apod. */ }
 }
 
-const VYCHOZI_NASTAVENI = { barva: "#ab0707", logo: "auto", titulekZap: true, styl: "vyroci", zvyrazneni: "#ffc000" };
+const VYCHOZI_NASTAVENI = { barva: "#ab0707", logo: "auto", titulekZap: true, styl: "dh", zvyrazneni: "#ffc000", kategorie: "zajimavosti", cernobila: true };
 let nastaveni = { ...VYCHOZI_NASTAVENI, ...nacti("dhpf_nastaveni", {}) };
 if (!["auto", "bila", "cerna", "vypnuto"].includes(nastaveni.logo)) nastaveni.logo = "auto";
-if (!nastaveni.stylZvolen) { nastaveni.styl = "vyroci"; nastaveni.stylZvolen = true; } // dřívější „Oswald s proužkem“ už není výchozí
+if (nastaveni.stylVerze !== 2) { nastaveni.styl = "dh"; nastaveni.stylVerze = 2; } // výchozí je šablona DH postů podle kategorií
 let profil = nacti("dhpf_profil", null);
 let historie = nacti("dhpf_historie", []);
 let typ = "vysledek";
@@ -202,11 +202,105 @@ function kresli() {
   }
 
   const titulek = $("#titulek").value.trim().toUpperCase();
+  if (nastaveni.styl === "dh") { kresliDH(titulek); return; }
   if (nastaveni.titulekZap && titulek) {
     if (nastaveni.styl === "obalka") kresliObalku(titulek);
     else if (nastaveni.styl === "klasik") kresliKlasik(titulek);
     else kresliVyroci(titulek);
   }
+  window.DHG.kresliLogo(ctx, nastaveni.logo);
+}
+
+// Šablona DH postů: kategorie (barva + ikona vpravo nahoře), barevný nádech fotky, velký štítek kategorie
+// a text verzálkami s *klíčovými slovy* v barvě kategorie. Ikony: Microsoft Fluent Emoji 3D (MIT), nebo vlastní.
+const FLUENT = "https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/";
+const KATEGORIE = {
+  zajimavosti: { nazev: "Zajímavosti", barva: "#0f3ccd", ikona: "Light%20bulb/3D/light_bulb_3d.png" },
+  rekordy: { nazev: "Rekordy", barva: "#bb0000", ikona: "Books/3D/books_3d.png" },
+  hraci: { nazev: "Hráči", barva: "#36c000", ikona: "Busts%20in%20silhouette/3D/busts_in_silhouette_3d.png", obarvit: ["#a9c9ec", "#4d77a8"] },
+  historie: { nazev: "Historie", barva: "#ffc000", ikona: "Classical%20building/3D/classical_building_3d.png" },
+  tymy: { nazev: "Týmy", barva: "#9c00ff", ikona: "Shield/3D/shield_3d.png" },
+};
+const ikonyCache = {};
+function ikonaKategorie(k) {
+  const vlastni = (() => { try { return localStorage.getItem(`dhpf_ikona_${k}`) || ""; } catch { return ""; } })();
+  const url = vlastni || FLUENT + KATEGORIE[k].ikona;
+  const z = ikonyCache[k];
+  if (z && z.url === url) return z.img.complete && z.img.naturalWidth ? z.img : null;
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    // tmavé siluety (Fluent) přebarvit do světle modré, ať jsou na fotce vidět
+    const ob = !vlastni && KATEGORIE[k].obarvit;
+    if (ob) {
+      const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+      x.globalCompositeOperation = "source-atop"; x.globalAlpha = 0.85;
+      const g = x.createLinearGradient(0, 0, 0, c.height); g.addColorStop(0, ob[0]); g.addColorStop(1, ob[1]);
+      x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+      const o = new Image(); o.onload = () => { ikonyCache[k] = { url, img: o }; kresli(); }; o.src = c.toDataURL("image/png");
+      return;
+    }
+    kresli();
+  };
+  img.src = url;
+  ikonyCache[k] = { url, img };
+  return null;
+}
+const hexA = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+
+function kresliDH(text) {
+  const G = window.DHG;
+  const kat = KATEGORIE[nastaveni.kategorie] || KATEGORIE.zajimavosti;
+  const barva = kat.barva;
+  // fotka (černobílá) + barevný nádech zleva shora
+  ctx.clearRect(0, 0, W, H);
+  if (foto) {
+    const { sx, sy, sw, sh } = vyrez();
+    ctx.save(); if (nastaveni.cernobila) ctx.filter = "grayscale(1) contrast(1.05)";
+    ctx.drawImage(foto, sx, sy, sw, sh, 0, 0, W, H); ctx.restore();
+  } else {
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, "#2a2a2a"); g.addColorStop(1, "#050505");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  let g = ctx.createLinearGradient(0, 0, W * 0.78, H * 0.62);
+  g.addColorStop(0, hexA(barva, 1)); g.addColorStop(0.45, hexA(barva, 0.55)); g.addColorStop(1, hexA(barva, 0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.globalCompositeOperation = "source-over";
+  g = ctx.createLinearGradient(0, 0, W * 0.7, H * 0.55);
+  g.addColorStop(0, hexA(barva, 0.38)); g.addColorStop(1, hexA(barva, 0));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  // text: štítek kategorie + věta verzálkami
+  const okraj = 58, sirka = W - 2 * okraj;
+  let v = 64, radky = [];
+  for (; v >= 40; v -= 2) {
+    ctx.font = `900 ${v}px ${MONT}`;
+    radky = text ? G.zalomBohaty(ctx, text, sirka) : [];
+    if (radky.length <= 4 && radky.every((r) => G.sirkaRadku(ctx, r) <= sirka)) break;
+  }
+  const rozestup = Math.round(v * 1.22);
+  const posledni = H - 70;
+  const prvni = posledni - Math.max(0, radky.length - 1) * rozestup;
+  const vStitek = Math.round(v * 1.6);
+  const yStitek = radky.length ? prvni - v * 0.95 - 26 : posledni;
+  G.ztmaveni(ctx, yStitek - vStitek - 420, yStitek + 40, W, H);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  if (nastaveni.titulekZap) {
+    ctx.font = `900 ${vStitek}px ${MONT}`;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(kat.nazev.toUpperCase(), okraj - 4, yStitek);
+  }
+  ctx.font = `900 ${v}px ${MONT}`;
+  radky.forEach((r, i) => G.kresliBohatyRadek(ctx, r, okraj, prvni + i * rozestup, barva));
+
+  // ikona vpravo nahoře
+  const ik = ikonaKategorie(nastaveni.kategorie in KATEGORIE ? nastaveni.kategorie : "zajimavosti");
+  if (ik) { ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 14; ctx.drawImage(ik, W - 58 - 96, 42, 96, 96); ctx.restore(); }
   window.DHG.kresliLogo(ctx, nastaveni.logo);
 }
 
@@ -286,6 +380,14 @@ function kresliKlasik(titulek) {
   ctx.shadowBlur = 0;
 }
 
+function vykresliKategorie() {
+  const dh = nastaveni.styl === "dh";
+  $$(".jen-dh").forEach((el) => { el.hidden = !dh; });
+  $$(".mimo-dh").forEach((el) => { el.hidden = dh; });
+  const vlastni = (() => { try { return !!localStorage.getItem(`dhpf_ikona_${nastaveni.kategorie}`); } catch { return false; } })();
+  const b = $("#ikonaReset"); if (b) b.hidden = !vlastni;
+}
+
 function pouzijFoto(img) {
   foto = img;
   pohled = { zoom: 1, cx: 0.5, cy: 0.4 };
@@ -328,11 +430,12 @@ const SCHEMA_POST = {
     telo: { type: "string", description: "max 3 krátké odstavce (1–2 věty) oddělené prázdným řádkem, celkem max 320 znaků" },
     cta: { type: "string", description: "jedna krátká otázka pro fanoušky" },
     hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
-    titulek: { type: "string", description: "titulek do obrázku: 2–5 úderných slov, bez emoji, neopakuje hook doslova; jedno klíčové slovo dej do *hvězdiček* (zvýrazní se barvou)" },
+    titulek: { type: "string", description: "text do obrázku: jedna úderná věta 6–14 slov (např. „Ten, kdo přinesl trend zahnuté čepele od Mikity do Evropy.“), bez emoji, neopakuje hook doslova; 2–4 klíčová slova dej do *hvězdiček* (zvýrazní se barvou kategorie)" },
+    kategorie: { type: "string", enum: ["zajimavosti", "rekordy", "hraci", "historie", "tymy"], description: "kategorie postu: zajímavosti, rekordy, hráči, historie, týmy" },
     foto_dotazy: { type: "array", items: { type: "string" }, description: "2–3 dotazy pro Wikimedia Commons" },
     k_overeni: { type: "array", items: { type: "string" } },
   },
-  required: ["hook", "dalsi_hooky", "telo", "cta", "hashtagy", "titulek", "foto_dotazy", "k_overeni"],
+  required: ["hook", "dalsi_hooky", "telo", "cta", "hashtagy", "titulek", "kategorie", "foto_dotazy", "k_overeni"],
 };
 let fotoDotazy = [];
 let zdrojeNavrhu = []; // zdroje z hledání (záložka Témata)
@@ -367,6 +470,7 @@ async function navrhniPost() {
     const zdrojeRadek = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
     $("#text").value = [r.hook, r.telo, r.cta, zdrojeRadek, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
     $("#titulek").value = r.titulek || "";
+    if (KATEGORIE[r.kategorie]) { nastaveni.kategorie = r.kategorie; uloz("dhpf_nastaveni", nastaveni); $("#kategoriePostu").value = r.kategorie; vykresliKategorie(); }
     AI.nabidniHooky("#text", [r.hook, ...(r.dalsi_hooky || [])]);
     fotoDotazy = r.foto_dotazy || [];
     prepocitej();
@@ -624,7 +728,7 @@ window.DHKoncepty?.registruj("post", {
     return {
       nazev: $("#titulek").value.trim() || text.split("\n")[0].trim() || "Post",
       data: { typ, hodnoty: hodnotyFormulare, text, titulek: $("#titulek").value, pohled,
-        nastaveni: { barva: nastaveni.barva, logo: nastaveni.logo, titulekZap: nastaveni.titulekZap, styl: nastaveni.styl, zvyrazneni: nastaveni.zvyrazneni } },
+        nastaveni: { barva: nastaveni.barva, logo: nastaveni.logo, titulekZap: nastaveni.titulekZap, styl: nastaveni.styl, zvyrazneni: nastaveni.zvyrazneni, kategorie: nastaveni.kategorie, cernobila: nastaveni.cernobila } },
       obrazky: { foto },
       platno,
     };
@@ -641,7 +745,10 @@ window.DHKoncepty?.registruj("post", {
     $("#barva").value = nastaveni.barva;
     $("#logo").value = nastaveni.logo;
     $("#titulekZap").checked = nastaveni.titulekZap;
-    $("#stylPostu").value = nastaveni.styl || "vyroci";
+    $("#stylPostu").value = nastaveni.styl || "dh";
+    $("#kategoriePostu").value = nastaveni.kategorie || "zajimavosti";
+    $("#cernobilaPostu").checked = nastaveni.cernobila !== false;
+    vykresliKategorie();
     $("#zvyrazneniPostu").value = nastaveni.zvyrazneni || "#ffc000";
     if (obrazky.foto) { pouzijFoto(obrazky.foto); pohled = d.pohled || pohled; $("#zoom").value = pohled.zoom; }
     else { foto = null; $("#fotoOvl").hidden = true; $("#fotoMalo").hidden = true; }
@@ -694,6 +801,19 @@ function init() {
   nastav("#logo", "logo");
   nastav("#titulekZap", "titulekZap", "checked");
   nastav("#stylPostu", "styl");
+  nastav("#kategoriePostu", "kategorie");
+  nastav("#cernobilaPostu", "cernobila", "checked");
+  $("#stylPostu").addEventListener("input", vykresliKategorie);
+  $("#kategoriePostu").addEventListener("input", vykresliKategorie);
+  $("#ikonaPostu").addEventListener("change", (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { try { localStorage.setItem(`dhpf_ikona_${nastaveni.kategorie}`, r.result); } catch { zprava("Ikona je moc velká na uložení.", true); return; } kresli(); vykresliKategorie(); };
+    r.readAsDataURL(f);
+  });
+  $("#ikonaReset").addEventListener("click", () => { try { localStorage.removeItem(`dhpf_ikona_${nastaveni.kategorie}`); } catch { /* nic */ } kresli(); vykresliKategorie(); });
+  vykresliKategorie();
   nastav("#zvyrazneniPostu", "zvyrazneni");
 
   $("#naucit").addEventListener("click", naucStyl);

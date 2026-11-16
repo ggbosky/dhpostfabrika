@@ -995,13 +995,16 @@
         </div>
         <div class="cela upozorneni" id="fotoMalo" hidden>Fotka má nízké rozlišení, na Instagramu může být rozmazaná.</div>
         <label class="cela">Titulek do obrázku <span class="muted" style="font-weight:400">– *slovo* = barva, „/“ = nový řádek u obálky</span><input id="titulek" placeholder="Vytvoří se sám, můžeš ho přepsat"></label>
-        <label>Styl<select id="stylPostu"><option value="vyroci">Jako „Dnes před lety“</option><option value="obalka">Jako obálka carouselu</option><option value="klasik">Původní (proužek)</option></select></label>
-        <label class="check"><input type="checkbox" id="titulekZap"> Zobrazit titulek</label>
+        <label>Styl<select id="stylPostu"><option value="dh">Šablona DH (kategorie)</option><option value="vyroci">Jako „Dnes před lety“</option><option value="obalka">Jako obálka carouselu</option><option value="klasik">Původní (proužek)</option></select></label>
+        <label class="jen-dh">Kategorie<select id="kategoriePostu"><option value="zajimavosti">🟦 Zajímavosti</option><option value="rekordy">🟥 Rekordy</option><option value="hraci">🟩 Hráči</option><option value="historie">🟨 Historie</option><option value="tymy">🟪 Týmy</option></select></label>
+        <label class="check jen-dh"><input type="checkbox" id="cernobilaPostu"> Černobílá fotka</label>
+        <div class="radek jen-dh" style="gap:8px;align-items:center"><label class="btn ghost small" style="margin:0">🖼 Vlastní ikona kategorie<input type="file" id="ikonaPostu" accept="image/png,image/webp,image/svg+xml,image/jpeg"></label><button type="button" class="btn ghost small" id="ikonaReset" hidden>↺ Výchozí ikona</button></div>
+        <label class="check"><input type="checkbox" id="titulekZap"> Zobrazit titulek / štítek</label>
         <label>Logo vlevo nahoře<select id="logo">
           <option value="auto">Automaticky (podle fotky)</option><option value="bila">Bílé</option>
           <option value="cerna">Černé</option><option value="vypnuto">Bez loga</option></select></label>
-        <label>Barva horního řádku / proužku<input type="color" id="barva"></label>
-        <label>Barva zvýraznění *slov*<input type="color" id="zvyrazneniPostu"></label>
+        <label class="mimo-dh">Barva horního řádku / proužku<input type="color" id="barva"></label>
+        <label class="mimo-dh">Barva zvýraznění *slov*<input type="color" id="zvyrazneniPostu"></label>
       </div>
       <div class="akce"><button type="button" class="btn" id="stahni">⬇️ Stáhnout obrázek</button>
         <button type="button" class="btn ghost" data-uloz-koncept="post">💾 Uložit koncept</button></div>
@@ -1549,28 +1552,28 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261116d"></script>
-<script src="grafika.js?v=20261116d"></script>
-<script src="koncepty.js?v=20261116d"></script>
-<script src="ai.js?v=20261116d"></script>
-<script src="app.js?v=20261116d"></script>
-<script src="carousel.js?v=20261116d"></script>
-<script src="vyroci.js?v=20261116d"></script>
-<script src="zpravy.js?v=20261116d"></script>
-<script src="reels-ulozeni.js?v=20261116d"></script>
-<script src="reels-hlas.js?v=20261116d"></script>
-<script src="reels-render.js?v=20261116d"></script>
-<script src="reels-zabery.js?v=20261116d"></script>
-<script src="reels.js?v=20261116d"></script>
-<script src="plan.js?v=20261116d"></script>
-<script src="stats.js?v=20261116d"></script>
-<script src="prehled.js?v=20261116d"></script>
-<script src="yt-ulozeni.js?v=20261116d"></script>
-<script src="promo.js?v=20261116d"></script>
-<script src="miniatury.js?v=20261116d"></script>
-<script src="yt-api.js?v=20261116d"></script>
-<script src="yt-studio.js?v=20261116d"></script>
-<script src="yt-analytics.js?v=20261116d"></script>
-<script src="shell.js?v=20261116d"></script>
+<script src="sablony.js?v=20261116e"></script>
+<script src="grafika.js?v=20261116e"></script>
+<script src="koncepty.js?v=20261116e"></script>
+<script src="ai.js?v=20261116e"></script>
+<script src="app.js?v=20261116e"></script>
+<script src="carousel.js?v=20261116e"></script>
+<script src="vyroci.js?v=20261116e"></script>
+<script src="zpravy.js?v=20261116e"></script>
+<script src="reels-ulozeni.js?v=20261116e"></script>
+<script src="reels-hlas.js?v=20261116e"></script>
+<script src="reels-render.js?v=20261116e"></script>
+<script src="reels-zabery.js?v=20261116e"></script>
+<script src="reels.js?v=20261116e"></script>
+<script src="plan.js?v=20261116e"></script>
+<script src="stats.js?v=20261116e"></script>
+<script src="prehled.js?v=20261116e"></script>
+<script src="yt-ulozeni.js?v=20261116e"></script>
+<script src="promo.js?v=20261116e"></script>
+<script src="miniatury.js?v=20261116e"></script>
+<script src="yt-api.js?v=20261116e"></script>
+<script src="yt-studio.js?v=20261116e"></script>
+<script src="yt-analytics.js?v=20261116e"></script>
+<script src="shell.js?v=20261116e"></script>
 </body>
 </html>
