@@ -158,7 +158,51 @@ async function vykresliVidea() {
           <button type="button" class="btn small ghost" data-ys-meta="${esc(v.id)}">✎ Metadata / SEO</button>
           <button type="button" class="btn small ghost" data-ys-mini="${esc(v.id)}">🖼 Miniatura</button>
           <button type="button" class="btn small ghost" data-ys-kom="${esc(v.id)}">💬 Komentáře</button>
+          <button type="button" class="btn small ${v.naplanovano && new Date(v.naplanovano) > new Date() ? "" : "ghost"}" data-ys-upoutavka="${esc(v.id)}" title="Krátký reel 9:16 na Instagram / Shorts, který natáhne lidi na tohle video">🎬 Upoutávka</button>
         </div></div></article>`).join("")}</div></div>`;
+}
+
+// Upoutávka: z videa (naplánovaného i hotového) krátký reel, který natáhne lidi na YouTube.
+async function upoutavka(id) {
+  const v = videa.find((x) => x.id === id);
+  if (!v) return;
+  // video nahrané z Reels přes tuhle aplikaci → render máme v historii
+  let render = null;
+  try {
+    const pubs = await U().vsechny("publikace");
+    const z = pubs.find((x) => x.stav?.videoId === id && x.zdroj?.typ === "reel");
+    if (z) render = await window.DHReelsUloziste.nacti("rendery", z.zdroj.reelRender);
+  } catch { /* nic */ }
+  const prem = window.DHReels?.kdyPremiera(v.naplanovano);
+  let dlg = $("#ysUpoutavkaDlg");
+  if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "ysUpoutavkaDlg"; dlg.className = "card ys-dialog"; document.body.appendChild(dlg); }
+  dlg.innerHTML = `
+    <h2 style="margin-top:0">🎬 Upoutávka na video</h2>
+    <p style="margin:0 0 6px"><b>${esc(v.nazev)}</b></p>
+    <p class="muted" style="margin:0 0 12px;font-size:13.5px">${prem ? `📅 Premiéra ${esc(prem.datum)} – upoutávka skončí výzvou „${esc(prem.kratce)} · odkaz v bio“.` : "Video už je venku – upoutávka skončí výzvou „Celé video na YouTube · odkaz v bio“."}
+      AI napíše háček a krátký scénář bez spoileru, záběry vezme z tvého videa (podle kapitol) a v Reels to doladíš, namluvíš a vyrenderuješ jako 9:16.</p>
+    ${render ? `<p class="zprava ok" style="margin:0 0 10px">Tohle video vzniklo v Reels – použiju render „${esc(render.nazev)}“, nic nahrávat nemusíš.</p>` : `
+    <label>Soubor videa z počítače<span class="muted" style="font-weight:400"> – YouTube API stažení videa neumožňuje; vyber MP4, které jsi nahrával</span>
+      <span class="btn ghost ys-soubor" style="margin-top:6px">📁 Vybrat video<input type="file" id="ysUpSoubor" accept="video/*"></span></label>
+    <p class="muted" id="ysUpSouborInfo" style="font-size:13px;margin:6px 0 0"></p>`}
+    <label style="margin-top:12px">Délka upoutávky<select id="ysUpDelka"><option value="15">15 s – jen háček a výzva</option><option value="30" selected>30 s (doporučeno)</option><option value="45">45 s</option></select></label>
+    <div class="akce"><button type="button" class="btn" id="ysUpVytvor">🎬 Vytvořit upoutávku</button><button type="button" class="btn ghost" id="ysUpZavri">Zavřít</button></div>
+    <div class="zprava" id="ysUpZprava" hidden></div>`;
+  let soubor = null;
+  $("#ysUpSoubor")?.addEventListener("change", (e) => { soubor = e.target.files[0] || null; $("#ysUpSouborInfo").textContent = soubor ? `✓ ${soubor.name} (${(soubor.size / 1048576).toFixed(0)} MB)` : ""; });
+  $("#ysUpZavri").addEventListener("click", () => dlg.close());
+  $("#ysUpVytvor").addEventListener("click", async (e) => {
+    const zdroj = render ? new File([render.blob], `${render.nazev || "video"}.mp4`, { type: "video/mp4" }) : soubor;
+    const z = $("#ysUpZprava");
+    if (!zdroj) { z.hidden = false; z.className = "zprava chyba"; z.textContent = "Vyber soubor videa."; return; }
+    e.currentTarget.disabled = true;
+    z.hidden = false; z.className = "zprava"; z.textContent = "Připravuji upoutávku… (AI scénář ~10–30 s)";
+    try {
+      await window.DHReels.zUpoutavky({ video: v, soubor: zdroj, delka: +$("#ysUpDelka").value });
+      dlg.close();
+    } catch (er) { z.className = "zprava chyba"; z.textContent = er.message; e.currentTarget.disabled = false; }
+  });
+  dlg.showModal();
 }
 
 // Úprava metadat existujícího videa (SEO generátor nad hotovým videem).
@@ -652,6 +696,7 @@ function init() {
     };
     if (d.ys && akce[d.ys]) return akce[d.ys]();
     if (d.ysMeta) return upravMetadata(d.ysMeta);
+    if (d.ysUpoutavka) return upoutavka(d.ysUpoutavka);
     if (d.ysMini) return miniaturaKVideu(d.ysMini);
     if (d.ysKom) { komentareVideo = d.ysKom; krok = "komentare"; vykresliVse(); return; }
     if (d.ysHashtag !== undefined) { const h = pub.seo.hashtagy[+d.ysHashtag]; h.vybran = !h.vybran; t.classList.toggle("on", h.vybran); ulozPub(); return; }

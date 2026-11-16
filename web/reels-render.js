@@ -241,7 +241,7 @@ function kresliNadpisSceny(ctx, text, alfa) {
   ctx.restore();
 }
 
-async function kresliOutro(ctx, alfa) {
+async function kresliOutro(ctx, alfa, texty = null) {
   if (alfa <= 0) return;
   const av = await nactiAvatar();
   ctx.save();
@@ -258,9 +258,10 @@ async function kresliOutro(ctx, alfa) {
   ctx.font = `800 46px ${PISMO_T}`;
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
-  ctx.fillText("Sledujte další příběhy", W / 2, 1020);
+  const [r1, r2] = texty?.length ? texty : ["Sledujte další příběhy", "z historie hokeje"];
+  ctx.fillText(r1, W / 2, 1020, W - 120);
   ctx.fillStyle = "#ffc000";
-  ctx.fillText("z historie hokeje", W / 2, 1080);
+  if (r2) ctx.fillText(r2, W / 2, 1080, W - 120);
   ctx.textAlign = "left";
   ctx.restore();
 }
@@ -340,7 +341,7 @@ async function kresliSnimek(ctx, p, osa, t, elementy) {
   }
   if (vz.outro !== false) {
     const zbyva = osa.celkem - t;
-    if (zbyva < 2.4) await kresliOutro(ctx, Math.min(1, (2.4 - zbyva) / 0.4));
+    if (zbyva < 2.4) await kresliOutro(ctx, Math.min(1, (2.4 - zbyva) / 0.4), vz.outroText);
   }
   // nájezd z černé na začátku
   if (t < 0.25) { ctx.fillStyle = `rgba(0,0,0,${1 - t / 0.25})`; ctx.fillRect(0, 0, W, H); }

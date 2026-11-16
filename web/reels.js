@@ -1042,6 +1042,119 @@ function init() {
   R.zjistiFormat().then((f) => { $("#rFormat").textContent = f.poznamka || `Výstup: MP4 · H.264 · ${f.audio?.mux === "aac" ? "AAC" : "Opus"}`; });
 }
 
-window.DHReels = { otevri, get projekt() { return p; } };
+// ------------------------------------------------- upoutávka na YouTube video --
+// Z (naplánovaného) videa na YouTube udělá krátký reel 9:16: háček, pár záběrů bez spoileru a CTA s datem premiéry.
+
+const DNY_TYDNE = ["v neděli", "v pondělí", "v úterý", "ve středu", "ve čtvrtek", "v pátek", "v sobotu"];
+function kdyPremiera(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (!(d > new Date())) return null;
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  const den = new Date(d); den.setHours(0, 0, 0, 0);
+  const rozdil = Math.round((den - dnes) / 864e5);
+  const hodina = d.toLocaleTimeString("cs-CZ", { hour: "numeric", minute: "2-digit" });
+  const kdy = rozdil === 0 ? "dnes" : rozdil === 1 ? "zítra" : rozdil < 7 ? DNY_TYDNE[d.getDay()] : `${d.getDate()}. ${d.getMonth() + 1}.`;
+  return { kdy, hodina, text: `${kdy} v ${hodina}`, kratce: `${kdy.toUpperCase()} ${hodina}`, datum: d.toLocaleString("cs-CZ") };
+}
+
+const SCHEMA_UPOUTAVKA = {
+  type: "object",
+  properties: {
+    sceny: { type: "array", items: { type: "object", properties: { text: { type: "string" }, titulek: { type: "string" }, cas_s: { type: "number" } }, required: ["text", "titulek", "cas_s"] } },
+    popisek: { type: "string" },
+    hashtagy: { type: "array", items: { type: "string" } },
+  },
+  required: ["sceny", "popisek", "hashtagy"],
+};
+
+async function zUpoutavky({ video, soubor, delka = 30 }) {
+  const premiera = kdyPremiera(video.naplanovano);
+  const kapitoly = Z.casyZPopisu(video.popis || "").map((k) => {
+    const c = String(k.cas).split(":").map(Number);
+    return { s: c.length === 3 ? c[0] * 3600 + c[1] * 60 + c[2] : c[0] * 60 + (c[1] || 0), popis: k.popis };
+  }).filter((k) => Number.isFinite(k.s));
+  p = novyProjekt({ tema: `Upoutávka: ${video.nazev}`, delka, ton: "dokument", jazyky: ["cs"] });
+  p.nazev = `🎬 ${video.nazev}`.slice(0, 80);
+  p.upoutavka = { videoId: video.id, nazev: video.nazev, url: `https://youtu.be/${video.id}`, premiera: video.naplanovano || null };
+  p.vzhled.outroText = premiera ? ["Celé video na YouTube", `${premiera.kratce} · odkaz v bio`] : ["Celé video na YouTube", "odkaz v bio"];
+  await U.pozadejTrvaleUloziste();
+  zprava("#rTemataZprava", "Načítám video…");
+  const k = await Z.importujSoubor(p, soubor);
+  k.licence = { stav: "prava", nazev: "vlastní video kanálu Deník hokeje", autor: "Deník hokeje", odkaz: p.upoutavka.url };
+  k.puvod = p.upoutavka.url;
+  const delkaVidea = k.delka || video.delka || 600;
+  const nSc = { 15: 3, 30: 5, 45: 7, 60: 8 }[delka] || 5;
+
+  let r = null;
+  if (AI()?.maKlic()) {
+    zprava("#rTemataZprava", "AI píše scénář upoutávky…");
+    try {
+      r = await AI().gemini({
+        system: `Píšeš scénáře krátkých upoutávek (Instagram Reels / YouTube Shorts) pro český hokejový kanál „Deník hokeje“. Cíl: aby lidi šli na celé video na YouTube.
+Pravidla:
+- česky, mluvená řeč, krátké věty; ${nSc} scén, každá 1–2 věty (celkem asi ${Math.round(delka * 2.3)} slov)
+- 1. scéna = háček do 2 sekund: otázka, šokující fakt nebo napětí. Žádné „Ahoj“ ani „V dnešním videu“.
+- NEVYZRAZUJ pointu ani konec příběhu – nech otevřenou otázku, ať to lidi musí dokoukat na YouTube.
+- poslední scéna = výzva: ${premiera ? `celé video vychází ${premiera.text} na YouTube Deník hokeje, odkaz je v bio` : "celé video je na YouTube Deník hokeje, odkaz je v bio"}.
+- vymýšlej jen z toho, co je v názvu, popisu a kapitolách videa; nic nepřidávej.
+- „titulek“ = krátký nápis na obrazovce (max 4 slova, verzálky), může být prázdný.
+- „cas_s“ = sekunda v původním videu, odkud použít záběr k té scéně (0–${Math.round(delkaVidea - 6)}). Ber časy kapitol, pokud jsou; scény ať mají různé časy.
+- popisek pod reel: háček (1 řádek), 1–2 řádky o čem video je bez spoileru, ${premiera ? `„🎬 Celé video ${premiera.text} na YouTube – odkaz v bio“` : "„🎬 Celé video na YouTube – odkaz v bio“"}, otázka do komentářů. Hashtagy 3–5.`,
+        zadani: `NÁZEV: ${video.nazev}
+POPIS: ${(video.popis || "").slice(0, 1800)}
+KAPITOLY: ${kapitoly.length ? kapitoly.map((x) => `${x.s}s ${x.popis}`).join("; ") : "(nejsou)"}
+DÉLKA VIDEA: ${Math.round(delkaVidea)} s
+${premiera ? `PREMIÉRA: ${premiera.datum}` : "Video už je venku."}`,
+        schema: SCHEMA_UPOUTAVKA,
+        teplota: 0.8,
+      });
+    } catch (e) { zprava("#rTemataZprava", `AI scénář se nepovedl (${esc(e.message)}), použiju jednoduchou kostru – texty uprav.`, "varovani"); }
+  }
+  if (!r?.sceny?.length) {
+    const cta = premiera ? `Celé video vychází ${premiera.text} na YouTube. Odkaz je v bio.` : "Celé video najdeš na YouTube. Odkaz je v bio.";
+    r = {
+      sceny: [
+        { text: `${video.nazev}. Znáte tenhle příběh?`, titulek: "", cas_s: kapitoly[0]?.s ?? delkaVidea * 0.1 },
+        ...kapitoly.slice(1, nSc - 1).map((x) => ({ text: `${x.popis}.`, titulek: "", cas_s: x.s })),
+        { text: cta, titulek: premiera ? premiera.kratce : "NA YOUTUBE", cas_s: delkaVidea * 0.6 },
+      ],
+      popisek: `${video.nazev}\n\n🎬 ${premiera ? `Celé video ${premiera.text} na YouTube` : "Celé video na YouTube"} – odkaz v bio`,
+      hashtagy: ["#denikhokeje", "#hokej"],
+    };
+  }
+  const omez = (x) => Math.max(0, Math.min(Number(x) || 0, Math.max(0, delkaVidea - 6)));
+  // časy z YouTube délky přepočítat na délku vybraného souboru (kdyby byl kratší/zkrácený)
+  const ytDelka = video.delka || delkaVidea;
+  const meritko = ytDelka > delkaVidea + 5 ? delkaVidea / ytDelka : 1;
+  const vybrane = r.sceny.slice(0, nSc + 1);
+  let casy = vybrane.map((x) => omez((Number(x.cas_s) || 0) * meritko));
+  const kolize = casy.some((c, i) => casy.some((d, j) => j < i && Math.abs(c - d) < 3));
+  if (kolize) casy = vybrane.map((_, i) => omez(((i + 0.5) / vybrane.length) * Math.max(0, delkaVidea - 6)));
+  p.sceny = vybrane.map((x, i) => {
+    const start = casy[i];
+    const s = {
+      id: U.noveId("s"), text: x.text, titulek: x.titulek || "", zaber: `záběr z videa v ${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")}`,
+      dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
+      klip: { klipId: k.id, start: +start.toFixed(1), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 0.25 },
+      extra: [], hlas: null, titulky: [], titulkyRucne: false,
+    };
+    // ve fire stylu druhý rychlý střih o kus dál ve stejném videu
+    if (i > 0 && start + 8 < delkaVidea) s.extra.push({ klipId: k.id, start: +(start + 4).toFixed(1), fokus: 0.5, rezim: "rozmazane", zoom: 1.08, zvuk: 0 });
+    s.titulky = R.autoTitulky(s.text);
+    return s;
+  });
+  p.scenar = { hooky: [{ text: p.sceny[0].text, sila: 0 }], hook: 0, cta: "",
+    popisek: r.popisek || "", hashtagy: AI()?.cisteHashtagy ? AI().cisteHashtagy(r.hashtagy || []) : (r.hashtagy || []), nejiste: [] };
+  ulozPozdeji();
+  window.DHShell?.jdi("reels");
+  vykresliVse();
+  prepniKrok("scenar");
+  obnovNahled();
+  zprava("#rScenarZprava", `Upoutávka je připravená ✓ ${p.sceny.length} scén ze záběrů tvého videa${premiera ? `, na konci „${premiera.kratce}“` : ""}. Uprav texty, pak <b>Hlas</b> → <b>Export</b>.`, "ok");
+  return p;
+}
+
+window.DHReels = { otevri, zUpoutavky, kdyPremiera, get projekt() { return p; } };
 init();
 })();
