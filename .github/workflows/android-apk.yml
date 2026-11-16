@@ -1,0 +1,64 @@
+name: Mobilní aplikace – Android APK
+
+# Zdarma a bez účtu na expo.dev: GitHub sestaví instalační soubor DH-Fabrika.apk
+# a dá ho do „Releases“ – odkaz pro stažení do telefonu:
+# https://github.com/ggbosky/dhpostfabrika/releases/latest/download/DH-Fabrika.apk
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/intelligent-lovelace-qzitaa, main]
+    paths: ["mobil/**", ".github/workflows/android-apk.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobil
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobil/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Instalace knihoven
+        run: npm ci
+      - name: Vygenerovat Android projekt
+        run: npx expo prebuild --platform android --clean --no-install
+      # Vždy stejný podpis → novou verzi jde nainstalovat přes starou (data v aplikaci zůstanou)
+      - name: Podpis aplikace
+        run: cp podpis/dh-fabrika.keystore android/app/debug.keystore
+      - name: Sestavit APK
+        working-directory: mobil/android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+      - name: Připravit soubor
+        run: cp android/app/build/outputs/apk/release/app-release.apk ../DH-Fabrika.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DH-Fabrika-apk
+          path: DH-Fabrika.apk
+      - name: Zveřejnit ke stažení (Releases)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobil-apk
+          name: DH Fabrika – Android
+          make_latest: true
+          body: |
+            Instalační soubor mobilní aplikace DH Fabrika pro Android.
+            V telefonu otevři odkaz níž (DH-Fabrika.apk), stáhni a nainstaluj – povol „Instalovat neznámé aplikace“ pro prohlížeč.
+            Sestaveno z commitu ${{ github.sha }}.
+          files: DH-Fabrika.apk
