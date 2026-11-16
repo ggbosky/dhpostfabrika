@@ -277,27 +277,32 @@ function kresliDH(text) {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.restore();
 
-  // nadpis kategorie + pod ním podtitulek (menší, ExtraBold)
-  const okraj = 58, sirka = W - 2 * okraj;
-  let v = 56, radky = [];
-  for (; v >= 40; v -= 2) {
-    ctx.font = `800 ${v}px ${MONT}`;
-    radky = text ? G.zalomBohaty(ctx, text, sirka) : [];
-    if (radky.length <= 4 && radky.every((r) => G.sirkaRadku(ctx, r) <= sirka)) break;
+  // nadpis kategorie (Poppins Bold) + pod ním podtitulek (Roboto Medium, verzálky)
+  const okraj = 64, sirka = W - 2 * okraj;
+  let v = 68, radky = [];
+  const vejde = (max) => radky.length <= max && radky.every((r) => G.sirkaRadku(ctx, r) <= sirka);
+  // nejdřív zkusit 3 řádky v plné velikosti, teprve pak zmenšovat na 4
+  for (const [od, doV, max] of [[68, 54, 3], [56, 42, 4]]) {
+    for (v = od; v >= doV; v -= 2) {
+      ctx.font = `500 ${v}px ${ROBOTO}`;
+      radky = text ? G.zalomBohaty(ctx, text, sirka) : [];
+      if (vejde(max)) break;
+    }
+    if (vejde(max)) break;
   }
   const rozestup = Math.round(v * 1.24);
-  const posledni = H - 74;
+  const posledni = H - 58;
   const prvni = posledni - Math.max(0, radky.length - 1) * rozestup;
-  const vNadpis = 104;
-  const yNadpis = radky.length ? prvni - v - 34 : posledni;
+  const vNadpis = 94;
+  const yNadpis = radky.length ? prvni - v - 28 : posledni;
   G.ztmaveni(ctx, yNadpis - vNadpis - 430, yNadpis + 30, W, H);
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   if (nastaveni.titulekZap) {
-    ctx.font = `900 ${vNadpis}px ${MONT}`;
+    ctx.font = `700 ${vNadpis}px ${POPPINS}`;
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(kat.nazev.toUpperCase(), okraj - 4, yNadpis);
+    ctx.fillText(kat.nazev.toUpperCase(), okraj - 3, yNadpis);
   }
-  ctx.font = `800 ${v}px ${MONT}`;
+  ctx.font = `500 ${v}px ${ROBOTO}`;
   radky.forEach((r, i) => G.kresliBohatyRadek(ctx, r, okraj, prvni + i * rozestup, barva));
 
   // ikona vpravo nahoře
@@ -309,6 +314,8 @@ function kresliDH(text) {
 // Styl „Dnes před lety“: Anton vlevo dole, *slova* v barvě zvýraznění, plynulé ztmavení.
 const ANTON = '"Anton", "Impact", "Arial Narrow", sans-serif';
 const MONT = '"Montserrat", "Arial Black", Impact, sans-serif';
+const POPPINS = '"Poppins", "Montserrat", "Arial Black", sans-serif'; // nadpis kategorie (šablona DH)
+const ROBOTO = '"Roboto", "Helvetica Neue", Arial, sans-serif';    // podtitulek (šablona DH)
 function kresliVyroci(titulek) {
   const G = window.DHG;
   const sirka = W - 2 * 40 - 20;
@@ -829,7 +836,7 @@ function init() {
 
   nastavTahani();
   kresli();
-  if (document.fonts) Promise.all([document.fonts.load(`400 80px Anton`), document.fonts.load(`900 80px Montserrat`), document.fonts.load(`700 80px Oswald`)]).then(kresli).catch(() => {});
+  if (document.fonts) Promise.all([document.fonts.load(`400 80px Anton`), document.fonts.load(`900 80px Montserrat`), document.fonts.load(`700 80px Poppins`), document.fonts.load(`500 60px Roboto`), document.fonts.load(`700 80px Oswald`)]).then(kresli).catch(() => {});
 }
 
 init();
