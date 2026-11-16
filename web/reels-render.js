@@ -45,32 +45,67 @@ async function nastavVideo(el, a) {
 }
 
 // Titulky scény: krátké kousky (max ~30 znaků), časované podle délky hlasu.
-function autoTitulky(text, hlasDelka) {
-  const s = slova(String(text || "").replace(/\s+/g, " "));
-  const zdroj = String(text || "").split(/\s+/).filter(Boolean) // se značkami *
-    // „18 000“, „č. 68“, „1. září“ nesmí skončit každé v jiném titulku
+// Slova scény (se značkami *) – čísla typu „18 000“, „č. 68“, „1. září“ drží pohromadě.
+function slovaTitulku(text) {
+  return String(text || "").split(/\s+/).filter(Boolean)
     .reduce((acc, w) => {
       const pred = acc[acc.length - 1];
       if (pred && /^\*?(\d{1,3}|č\.|#|\d{1,2}\.)$/.test(pred) && /^\*?\d|^[a-záčďéěíňóřšťúůýž]+[.,!?]?\*?$/.test(w) && (/^\*?\d/.test(w) || /\d\.$/.test(pred))) acc[acc.length - 1] = `${pred}\u00a0${w}`;
       else acc.push(w);
       return acc;
     }, []);
-  const kusy = [];
-  let kus = [];
+}
+const konecVety = (w) => /[.!?…]["“”»]?$/.test(w.replace(/\*/g, ""));
+// Věty scény (jak je čte hlas) – podle nich se titulky časují na pauzy v nahrávce.
+function vetyTextu(text) {
+  const out = [];
+  let veta = [];
+  for (const w of slovaTitulku(text)) { veta.push(w); if (konecVety(w)) { out.push(veta.join(" ")); veta = []; } }
+  if (veta.length) out.push(veta.join(" "));
+  return out.map((v) => v.replace(/\*/g, "").replace(/\u00a0/g, " "));
+}
+
+// Titulky scény: krátké kousky (max ~24 znaků, nikdy přes konec věty). Když známe časy vět v nahrávce (vety),
+// kousky se rozloží uvnitř každé věty – titulek pak ukazuje přesně to, co hlas právě říká.
+function autoTitulky(text, hlasDelka, vety = null) {
+  const s = slova(String(text || "").replace(/\s+/g, " "));
+  const zdroj = slovaTitulku(text);
+  const kusy = [];  // {text, veta}
+  let kus = [], iVety = 0;
   const delkaKusu = (k) => k.join(" ").replace(/\*/g, "").length;
   zdroj.forEach((w, i) => {
     kus.push(w);
-    const konecVety = /[.!?…:;]$/.test(w.replace(/\*/g, ""));
-    if (delkaKusu(kus) >= 24 || konecVety || kus.length >= 5 || i === zdroj.length - 1) { kusy.push(kus.join(" ")); kus = []; }
+    const kv = konecVety(w), carka = /[:;]$/.test(w.replace(/\*/g, ""));
+    if (delkaKusu(kus) >= 24 || kv || carka || kus.length >= 5 || i === zdroj.length - 1) { kusy.push({ text: kus.join(" "), veta: iVety }); kus = []; }
+    if (kv) iVety++;
   });
   // Neuzavřené *zvýraznění* přes hranici kusu doplníme.
-  const opravene = kusy.map((k) => ((k.match(/\*/g) || []).length % 2 ? k.replace(/\*/g, "") : k));
-  const znaku = opravene.reduce((a, k) => a + k.replace(/\*/g, "").length, 0) || 1;
+  kusy.forEach((k) => { if ((k.text.match(/\*/g) || []).length % 2) k.text = k.text.replace(/\*/g, ""); });
+  const delka = (k) => k.text.replace(/\*/g, "").length + 2;
+  const pocetVet = new Set(kusy.map((k) => k.veta)).size;
+  if (vety && vety.length === pocetVet) {
+    const out = [];
+    for (let v = 0; v < pocetVet; v++) {
+      const ve = kusy.filter((k) => k.veta === v);
+      const zn = ve.reduce((a, k) => a + delka(k), 0) || 1;
+      let t = vety[v].od;
+      const rozsah = Math.max(0.3, vety[v].do - vety[v].od);
+      ve.forEach((k, j) => {
+        const d = (delka(k) / zn) * rozsah;
+        // drží až do začátku další věty (žádné blikání v pauze)
+        const doKonce = j === ve.length - 1 ? (vety[v + 1]?.od ?? t + d) : t + d;
+        out.push({ text: k.text, od: +(t + 0.2).toFixed(2), do: +(Math.max(t + d, doKonce) + 0.2).toFixed(2) });
+        t += d;
+      });
+    }
+    return out;
+  }
+  const znaku = kusy.reduce((a, k) => a + delka(k), 0) || 1;
   let t = 0.2;
   const celkem = Math.max(0.5, hlasDelka || s.length / SLOV_ZA_SEKUNDU);
-  return opravene.map((k) => {
-    const d = (k.replace(/\*/g, "").length / znaku) * celkem;
-    const z = { text: k, od: +t.toFixed(2), do: +(t + d).toFixed(2) };
+  return kusy.map((k) => {
+    const d = (delka(k) / znaku) * celkem;
+    const z = { text: k.text, od: +t.toFixed(2), do: +(t + d).toFixed(2) };
     t += d;
     return z;
   });
@@ -241,6 +276,41 @@ function kresliNadpisSceny(ctx, text, alfa) {
   ctx.restore();
 }
 
+// Upoutávka: stálý pruh nahoře – ikona YouTube, „nové video / premiéra“ a název videa.
+const DNY_K = ["NE", "PO", "ÚT", "ST", "ČT", "PÁ", "SO"];
+function kresliPruhYouTube(ctx, p, t) {
+  const u = p.upoutavka;
+  const a = Math.min(1, t / 0.35);
+  ctx.save();
+  ctx.globalAlpha = a;
+  const x = 70, y = 150;
+  // ikona přehrávání (červený zaoblený obdélník s bílým trojúhelníkem)
+  const iw = 112, ih = 78;
+  ctx.fillStyle = "#ff0033"; ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 18;
+  ctx.beginPath(); ctx.roundRect(x, y, iw, ih, 22); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.moveTo(x + iw * 0.4, y + ih * 0.27); ctx.lineTo(x + iw * 0.4, y + ih * 0.73); ctx.lineTo(x + iw * 0.7, y + ih * 0.5); ctx.closePath(); ctx.fill();
+  // štítek
+  let stitek = "NOVÉ VIDEO NA YOUTUBE";
+  if (u.premiera) {
+    const d = new Date(u.premiera);
+    if (d > new Date()) stitek = `PREMIÉRA ${DNY_K[d.getDay()]} ${d.getDate()}. ${d.getMonth() + 1}. · ${d.toLocaleTimeString("cs-CZ", { hour: "numeric", minute: "2-digit" })}`;
+  }
+  ctx.font = `800 34px ${PISMO_T}`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  ctx.fillStyle = "#ffc000"; ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 10;
+  ctx.fillText(stitek, x + iw + 24, y + 22, W - (x + iw + 24) - 60);
+  // název videa (max 2 řádky)
+  ctx.font = `900 44px ${PISMO_T}`; ctx.fillStyle = "#ffffff";
+  const slova = String(u.nazev || "").toUpperCase().split(/\s+/);
+  const max = W - (x + iw + 24) - 60;
+  const radky = [];
+  let r = "";
+  for (const w of slova) { const z = r ? `${r} ${w}` : w; if (ctx.measureText(z).width > max && r) { radky.push(r); r = w; } else r = z; }
+  if (r) radky.push(r);
+  if (radky.length > 2) { radky.length = 2; radky[1] = `${radky[1].replace(/\s+\S*$/, "")}…`; }
+  radky.forEach((rr, i) => ctx.fillText(rr, x + iw + 24, y + 70 + i * 50, max));
+  ctx.restore();
+}
+
 async function kresliOutro(ctx, alfa, texty = null) {
   if (alfa <= 0) return;
   const av = await nactiAvatar();
@@ -305,7 +375,8 @@ async function kresliSnimek(ctx, p, osa, t, elementy) {
 
   if (vz.logo !== false) G().kresliLogo(ctx, "bila", { x: 70, y: 150, sirka: 150 });
   const lokal = t - seg.od;
-  if (s.titulek) {
+  if (p.upoutavka) await kresliPruhYouTube(ctx, p, t);
+  else if (s.titulek) {
     const alfa = Math.min(1, lokal / 0.25) * Math.min(1, Math.max(0, (2.6 - lokal) / 0.3));
     kresliNadpisSceny(ctx, s.titulek, seg.i === 0 ? Math.min(1, lokal / 0.25) * Math.min(1, Math.max(0, (3.2 - lokal) / 0.3)) : alfa);
   }
@@ -665,5 +736,5 @@ function hashTextu(t) {
   return String(h);
 }
 
-window.DHReelsRender = { zaberySceny, aktivniZaber, W, H, FPS, casovaOsa, autoTitulky, srt, odhadDelky, pripravMedium, zapomenMedium, kresliSnimek, Nahled, render, kontrola, zjistiFormat, hashTextu, smichejProjekt, MIN_SEGMENTU };
+window.DHReelsRender = { vetyTextu, zaberySceny, aktivniZaber, W, H, FPS, casovaOsa, autoTitulky, srt, odhadDelky, pripravMedium, zapomenMedium, kresliSnimek, Nahled, render, kontrola, zjistiFormat, hashTextu, smichejProjekt, MIN_SEGMENTU };
 })();

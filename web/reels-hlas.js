@@ -429,6 +429,37 @@ function najdiPauzy(buf) {
   return { pauzy: vysledek, prah, db, krok: 0.01 };
 }
 
+// Časy vět v nahrávce podle pauz: věty = pole textů (jak jdou za sebou). Vrací [{od, do}] v sekundách.
+// Hranice = pauzy nejblíž místům, kde by věta měla podle délky textu končit.
+function vetyZPauz(buf, vety) {
+  const { pauzy } = najdiPauzy(buf);
+  const D = buf.duration;
+  let zacatek = 0, konec = D;
+  const p0 = pauzy.find((q) => q.od <= 0.06); if (p0) zacatek = p0.do;
+  const pk = pauzy.find((q) => q.do >= D - 0.06); if (pk) konec = pk.od;
+  if (konec - zacatek < 0.3) { zacatek = 0; konec = D; }
+  const n = vety.length;
+  if (n <= 1) return [{ od: zacatek, do: konec }];
+  const vnitrni = pauzy.filter((q) => q.od > zacatek + 0.1 && q.do < konec - 0.1);
+  const vahy = vety.map(vahaTextu), celk = vahy.reduce((a, b) => a + b, 0) || 1;
+  let kum = 0;
+  const ocek = vahy.slice(0, -1).map((v) => { kum += v; return zacatek + (kum / celk) * (konec - zacatek); });
+  const hranice = [];
+  let posledni = zacatek;
+  for (const t of ocek) {
+    let nej = null, nejSkore = Infinity;
+    for (const q of vnitrni) {
+      if (q.stred <= posledni + 0.2) continue;
+      const skore = Math.abs(q.stred - t) - Math.min(0.4, q.delka) * 0.8; // delší pauza = pravděpodobnější konec věty
+      if (skore < nejSkore) { nejSkore = skore; nej = q; }
+    }
+    const h = nej && Math.abs(nej.stred - t) < Math.max(1.2, (konec - zacatek) / n) ? { od: nej.od, do: nej.do } : { od: t, do: t };
+    hranice.push(h);
+    posledni = (h.od + h.do) / 2;
+  }
+  return vety.map((_, i) => ({ od: +(i ? hranice[i - 1].do : zacatek).toFixed(2), do: +(i < n - 1 ? hranice[i].od : konec).toFixed(2) }));
+}
+
 // Váha textu ≈ jak dlouho se bude číst (číslice se čtou dlouho).
 const vahaTextu = (t) => {
   const x = textProHlas(String(t || "").replace(/\[[^\]]{1,40}\]/g, " "));
@@ -629,5 +660,5 @@ function initNastaveni() {
 }
 initNastaveni();
 
-window.DHReelsHlas = { ceskaCisla, cisloSlovy, elNavrhniHlasy, elUlozNavrh, najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
+window.DHReelsHlas = { vetyZPauz, ceskaCisla, cisloSlovy, elNavrhniHlasy, elUlozNavrh, najdiPauzy, rozdelNaSceny, vyrizni, textProElevenLabs, EL_MODELY, maEleven, elKlic, elNastaveni, elUloz, elHlasy, elevenTTS, HLASY, VZORKOVANI, textProHlas, syntetizuj, nahravkaZMikrofonu, dekoduj, zapomen, delkaZvuku, smichej, prehraj, naWav };
 })();

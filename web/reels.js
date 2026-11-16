@@ -70,6 +70,16 @@ async function otevri(id) {
   vykresliVse();
   prepniKrok(p.sceny.length ? "strih" : p.vyzkum.fakta.length ? "scenar" : "vyzkum");
   obnovNahled();
+  // starší projekty: časy vět z nahraného hlasu → titulky přesně podle hlasu
+  const tenhle = p;
+  (async () => {
+    let zmena = false;
+    for (const s of tenhle.sceny) {
+      if (!s.hlas?.souborId || s.titulkyRucne || (s.hlas.vety && s.hlas.vetyHash === R.hashTextu(s.text))) continue;
+      try { const buf = await A.dekoduj(s.hlas.souborId, () => U.souborBlob(s.hlas.souborId)); vetyHlasu(s, buf); prepocitejTitulky(s); zmena = true; } catch { /* nic */ }
+    }
+    if (zmena && p === tenhle) { ulozPozdeji(); vykresliHlas(); obnovNahled(+$("#rPosuv").value || 0); }
+  })();
 }
 
 // ---------------------------------------------------------------- navigace --
@@ -318,7 +328,7 @@ async function prepisScenu(i) {
       schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
       teplota: 0.9,
     });
-    if (r.text) { s.text = r.text; if (!s.titulkyRucne) s.titulky = R.autoTitulky(s.text, s.hlas?.delka); }
+    if (r.text) { s.text = r.text; prepocitejTitulky(s); }
     vykresliScenar(); vykresliHlas(); ulozPozdeji();
     zprava("#rScenarZprava", `Scéna ${i + 1} přepsaná – nezapomeň pro ni znovu vygenerovat hlas.`, "ok");
   } catch (e) { zprava("#rScenarZprava", esc(e.message), "chyba"); }
@@ -605,6 +615,17 @@ function vykresliHlas() {
 
 // Čísla v textu převede AI na slova ve správném pádě („s 5 góly“ → „s pěti góly“).
 // Bez AI klíče (nebo při chybě) se použijí pravidla v DHReelsHlas.ceskaCisla.
+// Titulky scény: s časy vět z nahrávky (pauzy) sedí přesně na hlas; bez nahrávky odhad.
+function vetyHlasu(s, buf) {
+  try { s.hlas.vety = A.vetyZPauz(buf, R.vetyTextu(s.text)); s.hlas.vetyHash = R.hashTextu(s.text); } catch { /* bez vět */ }
+}
+function prepocitejTitulky(s) {
+  if (!s || s.titulkyRucne) return;
+  const r = p.hlas?.rychlost || 1;
+  const vety = s.hlas?.vety && s.hlas.vetyHash === R.hashTextu(s.text) ? s.hlas.vety.map((v) => ({ od: v.od / r, do: v.do / r })) : null;
+  s.titulky = R.autoTitulky(s.text, s.hlas?.delka ? s.hlas.delka / r : null, vety);
+}
+
 let mluvaSelhala = 0;
 async function pripravMluvu(indexy) {
   const potreba = indexy.filter((i) => {
@@ -642,7 +663,8 @@ async function hlasScenu(i, tiche = false) {
   const souborId = await U.ulozSoubor(blob, { nazev: `hlas-${i + 1}.${eleven ? "mp3" : "wav"}` });
   const buf = await A.dekoduj(souborId, async () => blob);
   s.hlas = { souborId, delka: buf.duration, zdroj: eleven ? "elevenlabs" : "piper", hlasId: p.hlas.hlasId, textHash: R.hashTextu(s.text) };
-  if (!s.titulkyRucne) s.titulky = R.autoTitulky(s.text, buf.duration / p.hlas.rychlost);
+  vetyHlasu(s, buf);
+  prepocitejTitulky(s);
 }
 
 async function hlasVse() {
@@ -689,7 +711,8 @@ async function ulozHlasSceny(i, buf, zdroj, nazev) {
   const dek = await A.dekoduj(souborId, async () => blob);
   const s = p.sceny[i];
   s.hlas = { souborId, delka: dek.duration, zdroj, hlasId: zdroj, textHash: R.hashTextu(s.text) };
-  if (!s.titulkyRucne) s.titulky = R.autoTitulky(s.text, dek.duration / p.hlas.rychlost);
+  vetyHlasu(s, dek);
+  prepocitejTitulky(s);
 }
 
 async function importCelehoAudia(soubor) {
@@ -730,7 +753,8 @@ async function mikrofon(i, tl) {
     const buf = await A.dekoduj(souborId, async () => blob);
     const s = p.sceny[idx];
     s.hlas = { souborId, delka: buf.duration, zdroj: "mikrofon", textHash: R.hashTextu(s.text) };
-    if (!s.titulkyRucne) s.titulky = R.autoTitulky(s.text, buf.duration / p.hlas.rychlost);
+    vetyHlasu(s, buf);
+    prepocitejTitulky(s);
     vykresliHlas(); vykresliStrih(); ulozPozdeji(); obnovNahled();
     zprava("#rHlasZprava", `Nahrávka scény ${idx + 1} uložena (${buf.duration.toFixed(1)} s).`, "ok");
     return;
@@ -919,7 +943,7 @@ function init() {
       if (d.rHakce === "tts") { try { t.disabled = true; await hlasScenu(i); vykresliHlas(); vykresliStrih(); ulozPozdeji(); obnovNahled(); zprava("#rHlasZprava", `Hlas scény ${i + 1} hotový.`, "ok"); } catch (er) { zprava("#rHlasZprava", esc(er.message), "chyba"); } finally { t.disabled = false; } return; }
       if (d.rHakce === "mic") return mikrofon(i, t);
       if (d.rHakce === "soubor") { souborProScenu = i; $("#rSouborSceny").value = ""; $("#rSouborSceny").click(); return; }
-      if (d.rHakce === "titulky") { s.titulkyRucne = false; s.titulky = R.autoTitulky(s.text, s.hlas ? s.hlas.delka / p.hlas.rychlost : null); vykresliHlas(); ulozPozdeji(); obnovNahled(); return; }
+      if (d.rHakce === "titulky") { s.titulkyRucne = false; prepocitejTitulky(s); vykresliHlas(); ulozPozdeji(); obnovNahled(); return; }
     }
     if (d.rHledat !== undefined) { t.disabled = true; try { await hledatScenu(+d.rHledat); } catch (er) { zprava("#rZaberyZprava", esc(er.message), "chyba"); } t.disabled = false; return; }
     if (d.rPouzit !== undefined) return pouzitVysledek(+d.rPouzit);
@@ -947,9 +971,9 @@ function init() {
     const t = e.target, d = t.dataset;
     const sc = t.closest(".r-scena, .r-strih-scena, .r-hlas-scena");
     const i = sc ? +sc.dataset.i : -1;
-    if (d.rPole) { p.sceny[i][d.rPole] = t.value; if (d.rPole === "text" && !p.sceny[i].titulkyRucne) p.sceny[i].titulky = R.autoTitulky(t.value, p.sceny[i].hlas?.delka); ulozPozdeji(); if (e.type === "change") { vykresliHlas(); obnovNahled(R.casovaOsa(p).segmenty[i]?.od + 0.3); } return; }
+    if (d.rPole) { p.sceny[i][d.rPole] = t.value; if (d.rPole === "text") prepocitejTitulky(p.sceny[i]); ulozPozdeji(); if (e.type === "change") { vykresliHlas(); obnovNahled(R.casovaOsa(p).segmenty[i]?.od + 0.3); } return; }
     if (d.rDotaz) { p.sceny[i].dotazy[d.rDotaz] = t.value; ulozPozdeji(); return; }
-    if (t.name === "rHook") { p.scenar.hook = +t.value; p.sceny[0].text = p.scenar.hooky[p.scenar.hook].text; p.sceny[0].titulky = R.autoTitulky(p.sceny[0].text, p.sceny[0].hlas?.delka); vykresliScenar(); vykresliHlas(); ulozPozdeji(); return; }
+    if (t.name === "rHook") { p.scenar.hook = +t.value; p.sceny[0].text = p.scenar.hooky[p.scenar.hook].text; prepocitejTitulky(p.sceny[0]); vykresliScenar(); vykresliHlas(); ulozPozdeji(); return; }
     if (d.fakt !== undefined) { p.vyzkum.fakta[+d.fakt].pouzit = t.checked; ulozPozdeji(); return; }
     if (d.rZknihovny !== undefined || d.rKlip !== undefined) {
       const si = +(d.rZknihovny ?? d.rKlip);
@@ -1007,7 +1031,7 @@ function init() {
   $("#rRychlost").addEventListener("input", (e) => {
     p.hlas.rychlost = +e.target.value;
     $("#rRychlostHodnota").textContent = `${Math.round(p.hlas.rychlost * 100)} %`;
-    p.sceny.forEach((s) => { if (s.hlas && !s.titulkyRucne) s.titulky = R.autoTitulky(s.text, s.hlas.delka / p.hlas.rychlost); });
+    p.sceny.forEach((s) => { if (s.hlas) prepocitejTitulky(s); });
     ulozPozdeji();
   });
   $("#rGenHlas").addEventListener("click", hlasVse);
@@ -1094,11 +1118,13 @@ async function zUpoutavky({ video, soubor, delka = 30 }) {
         system: `Píšeš scénáře krátkých upoutávek (Instagram Reels / YouTube Shorts) pro český hokejový kanál „Deník hokeje“. Cíl: aby lidi šli na celé video na YouTube.
 Pravidla:
 - česky, mluvená řeč, krátké věty; ${nSc} scén, každá 1–2 věty (celkem asi ${Math.round(delka * 2.3)} slov)
-- 1. scéna = háček do 2 sekund: otázka, šokující fakt nebo napětí. Žádné „Ahoj“ ani „V dnešním videu“.
+- 1. scéna = háček do 2 sekund: otázka, šokující fakt nebo napětí. Žádné „Ahoj“.
+- Scény tvoří JEDEN souvislý příběh: každá věta navazuje na předchozí (žádné samostatné hesla), a text jasně odkazuje na nové video
+  na YouTube („v novém videu“, „na YouTube ukážeme…“, „uvidíš…“), ať je jasné, že jde o upoutávku.
 - NEVYZRAZUJ pointu ani konec příběhu – nech otevřenou otázku, ať to lidi musí dokoukat na YouTube.
 - poslední scéna = výzva: ${premiera ? `celé video vychází ${premiera.text} na YouTube Deník hokeje, odkaz je v bio` : "celé video je na YouTube Deník hokeje, odkaz je v bio"}.
 - vymýšlej jen z toho, co je v názvu, popisu a kapitolách videa; nic nepřidávej.
-- „titulek“ = krátký nápis na obrazovce (max 4 slova, verzálky), může být prázdný.
+- „titulek“ nech prázdný (nahoře je stálý pruh „nové video na YouTube“ a dole titulky toho, co se říká).
 - „cas_s“ = sekunda v původním videu, odkud použít záběr k té scéně (0–${Math.round(delkaVidea - 6)}). Ber časy kapitol, pokud jsou; scény ať mají různé časy.
 - popisek pod reel: háček (1 řádek), 1–2 řádky o čem video je bez spoileru, ${premiera ? `„🎬 Celé video ${premiera.text} na YouTube – odkaz v bio“` : "„🎬 Celé video na YouTube – odkaz v bio“"}, otázka do komentářů. Hashtagy 3–5.`,
         zadani: `NÁZEV: ${video.nazev}
@@ -1134,7 +1160,7 @@ ${premiera ? `PREMIÉRA: ${premiera.datum}` : "Video už je venku."}`,
   p.sceny = vybrane.map((x, i) => {
     const start = casy[i];
     const s = {
-      id: U.noveId("s"), text: x.text, titulek: x.titulek || "", zaber: `záběr z videa v ${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")}`,
+      id: U.noveId("s"), text: x.text, titulek: "", zaber: `záběr z videa v ${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")}`,
       dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
       klip: { klipId: k.id, start: +start.toFixed(1), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 0.25 },
       extra: [], hlas: null, titulky: [], titulkyRucne: false,
