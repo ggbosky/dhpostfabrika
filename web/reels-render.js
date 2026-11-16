@@ -21,9 +21,10 @@ function casovaOsa(p) {
   let t = 0;
   // souvislý hlas (namluvený najednou / nahraný celý): scény na sebe navazují bez mezer – audio je plynulé
   const souvisly = !!p.hlas?.souvisly && p.sceny.every((s) => s.hlas?.souborId && s.hlas.souvisly);
+  const bezHlasu = !!p.bezHlasu; // upoutávka: úseky videa s původním zvukem, délka = délka úseku
   const segmenty = p.sceny.map((s, i) => {
-    const hlasDelka = s.hlas?.delka ? s.hlas.delka / rychlost : odhadDelky(s.text);
-    const delka = souvisly ? hlasDelka + (i === p.sceny.length - 1 ? 0.8 : 0) : Math.max(2.5, hlasDelka + 0.5);
+    const hlasDelka = bezHlasu ? Math.max(0.5, s.trvani || 4) : s.hlas?.delka ? s.hlas.delka / rychlost : odhadDelky(s.text);
+    const delka = bezHlasu ? hlasDelka + (i === p.sceny.length - 1 && p.vzhled?.outro !== false ? 2.2 : 0) : souvisly ? hlasDelka + (i === p.sceny.length - 1 ? 0.8 : 0) : Math.max(2.5, hlasDelka + 0.5);
     const seg = { i, scena: s, od: t, do: t + delka, delka, hlasOd: souvisly ? t : t + 0.2, hlasDelka };
     t += delka;
     return seg;
@@ -465,7 +466,8 @@ async function smichejProjekt(p, osa, pokrok = () => {}) {
       try {
         const buf = await A().dekoduj(`klip-${klip.id}`, async () => (klip.souborId ? U().souborBlob(klip.souborId) : (await fetch(klip.url)).blob()));
         const hlasitost = s.klip.zvuk * (s.hlas ? 0.35 : 1); // pod hlasem se původní zvuk ztlumí
-        stopy.push({ buffer: buf, od: seg.od, offset: s.klip.start || 0, delka: seg.delka / Math.max(1, zaberySceny(s).length), hlasitost, prolnuti: 0.12 });
+        const delkaZvuku = p.bezHlasu ? Math.min(seg.delka, s.trvani || seg.delka) : seg.delka / Math.max(1, zaberySceny(s).length);
+        stopy.push({ buffer: buf, od: seg.od, offset: s.klip.start || 0, delka: delkaZvuku, hlasitost, prolnuti: p.bezHlasu ? 0.06 : 0.12 });
       } catch { /* video bez zvukové stopy */ }
     }
     pokrok(seg.i / osa.segmenty.length);
@@ -694,8 +696,9 @@ async function kontrola(p) {
       pouziti.push({ klip: k.klipId, od: foto ? 0 : k.start || 0, do: foto ? 0 : (k.start || 0) + seg.delka / z.length, scena: seg.i + 1, foto });
     }
   }
-  const minimum = MIN_SEGMENTU[p.delka] || 6;
-  if (pouziti.length >= minimum) pridej("ok", `${pouziti.length} záběrů (minimum pro ${p.delka} s je ${minimum}).`);
+  const minimum = p.bezHlasu ? 1 : MIN_SEGMENTU[p.delka] || 6;
+  if (p.bezHlasu) pridej("ok", `${pouziti.length} úseků z videa s původním zvukem.`);
+  else if (pouziti.length >= minimum) pridej("ok", `${pouziti.length} záběrů (minimum pro ${p.delka} s je ${minimum}).`);
   else pridej("chyba", `Jen ${pouziti.length} záběrů – pro ${p.delka} s je potřeba aspoň ${minimum} různých video segmentů.`);
   const opakovani = [];
   for (let i = 0; i < pouziti.length; i++) for (let j = i + 1; j < pouziti.length; j++) {
@@ -709,7 +712,8 @@ async function kontrola(p) {
   if (bezPrav.length) pridej("chyba", `Chybí potvrzení práv u ${bezPrav.length} záběrů: ${bezPrav.map((k) => `„${k.nazev}“`).join(", ")}. Potvrď je v knihovně záběrů.`);
   else if (pouziti.length) pridej("ok", "Všechny záběry mají volnou licenci nebo potvrzená práva.");
 
-  // 4) hlas a čeština
+  // 4) hlas a čeština (upoutávka bez namlouvání tyhle body přeskočí)
+  if (!p.bezHlasu) {
   const bezHlasu = osa.segmenty.filter((s) => !s.scena.hlas?.souborId).map((s) => s.i + 1);
   if (bezHlasu.length) pridej("chyba", `Chybí český hlas ve scénách ${bezHlasu.join(", ")}.`);
   else pridej("ok", "Hlas je ve všech scénách.");
@@ -721,13 +725,15 @@ async function kontrola(p) {
   if (!cesky || anglicka > 3) pridej("chyba", "Text nevypadá jako čeština – vše musí být česky.");
   else pridej("ok", "Text je česky.");
 
+  }
   // 5) titulky
   const bezTitulku = osa.segmenty.filter((s) => !(s.scena.titulky || []).length).map((s) => s.i + 1);
-  if (p.vzhled?.titulky !== false && bezTitulku.length) pridej("chyba", `Chybí titulky ve scénách ${bezTitulku.join(", ")}.`);
-  else pridej("ok", "Titulky jsou připravené a časované podle hlasu.");
+  if (p.vzhled?.titulky !== false && bezTitulku.length) pridej(p.bezHlasu ? "varovani" : "chyba", `Chybí titulky ve scénách ${bezTitulku.join(", ")}${p.bezHlasu ? " (v úseku není řeč, nebo chyběl přepis)" : ""}.`);
+  else pridej("ok", p.bezHlasu ? "Titulky jsou podle toho, co ve videu zazní." : "Titulky jsou připravené a časované podle hlasu.");
 
   // 6) fakta a zdroje
-  const fakta = p.vyzkum?.fakta || [];
+  const fakta = p.bezHlasu ? null : p.vyzkum?.fakta || [];
+  if (fakta) {
   if (!fakta.length) pridej("varovani", "Scénář nevychází z rešerše – fakta nejsou podložená zdroji.");
   else {
     const pouzita = new Set(sceny.flatMap((s) => s.fakta || []));
@@ -739,11 +745,12 @@ async function kontrola(p) {
     if (nejista.length) pridej("varovani", `${nejista.length} použitých faktů je označeno jako nejisté.`);
     if (!sporna.length && !bezZdroje.length) pridej("ok", "Použitá fakta mají zdroje.");
   }
+  }
   if ((p.scenar?.nejiste || []).length) pridej("varovani", `AI označila k ověření: ${p.scenar.nejiste.slice(0, 3).join("; ")}`);
 
   // 7) délka a formát
   const odchylka = Math.abs(osa.celkem - p.delka) / p.delka;
-  if (odchylka > 0.2) pridej("varovani", `Délka ${osa.celkem.toFixed(0)} s se liší od cíle ${p.delka} s – uprav text scén.`);
+  if (odchylka > 0.2) pridej("varovani", `Délka ${osa.celkem.toFixed(0)} s se liší od cíle ${p.delka} s – ${p.bezHlasu ? "uber nebo přidej úsek" : "uprav text scén"}.`);
   else pridej("ok", `Délka ${osa.celkem.toFixed(0)} s (cíl ${p.delka} s).`);
   if (osa.celkem > 90.5) pridej("chyba", "Reel je delší než 90 s.");
   const format = await zjistiFormat();

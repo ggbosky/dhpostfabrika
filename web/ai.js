@@ -38,17 +38,17 @@ class AIChyba extends Error {}
 
 // ------------------------------------------------------------------ Gemini --
 
-async function geminiPrimo({ system, zadani, schema, teplota = 0.9, obrazky = [] }) {
+async function geminiPrimo({ system, zadani, schema, teplota = 0.9, obrazky = [], limitPokusu = LIMIT_POKUSU_MS, limitCelkem = LIMIT_CELKEM_MS }) {
   if (!maGemini()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
   const poradi = MODELY; // vždy od nejrychlejšího (přetížené / vyčerpané modely se přeskočí za pár sekund)
-  const konec = Date.now() + LIMIT_CELKEM_MS;
+  const konec = Date.now() + limitCelkem;
   let limit = false, chyba = null;
 
   for (const model of poradi) {
     const zbyva = konec - Date.now();
     if (zbyva < 3000) break;
     const preruseni = new AbortController();
-    const casovac = setTimeout(() => preruseni.abort(), Math.min(zbyva, LIMIT_POKUSU_MS));
+    const casovac = setTimeout(() => preruseni.abort(), Math.min(zbyva, limitPokusu));
     let odpoved, data;
     try {
       odpoved = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -1138,6 +1138,6 @@ function init() {
   });
 }
 
-window.DHAI = { obrazekProAI, generujObrazek, OBR_MODELY, obrModel, obrZdarma, nastavObrModel: (m) => uloz(KLIC_OBR_MODEL, m), COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
+window.DHAI = { geminiPrimo, obrazekProAI, generujObrazek, OBR_MODELY, obrModel, obrZdarma, nastavObrModel: (m) => uloz(KLIC_OBR_MODEL, m), COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
 init();
 })();

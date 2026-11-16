@@ -95,6 +95,8 @@ function prepniKrok(k) {
 function vykresliVse() {
   $("#rNazevProjektu").textContent = p ? `${p.nazev} · ${p.delka} s` : "Žádný otevřený projekt";
   $$(".r-krok").forEach((b) => { if (b.dataset.krok !== "zalozit") b.disabled = !p; });
+  // upoutávka z videa se nenamlouvá – krok Hlas (a rešerše) zmizí
+  $$('.r-krok[data-krok="hlas"], .r-krok[data-krok="vyzkum"]').forEach((b) => { b.hidden = !!p?.bezHlasu; });
   if (!p) return;
   vykresliVyzkum();
   vykresliScenar();
@@ -621,6 +623,14 @@ function vetyHlasu(s, buf) {
 }
 function prepocitejTitulky(s) {
   if (!s || s.titulkyRucne) return;
+  if (p.bezHlasu) {
+    // upoutávka: titulky = přepis toho, co ve videu zazní; opravený text převezme časy slov
+    const w = s.text.split(/\s+/).filter(Boolean);
+    const prepis = s.prepis || [];
+    const slova = prepis.length && w.length === prepis.length ? prepis.map((x, i) => ({ ...x, text: w[i] })) : null;
+    s.titulky = s.text.trim() ? R.autoTitulky(s.text, s.trvani || 4, { slova, posun: 0 }) : [];
+    return;
+  }
   const r = p.hlas?.rychlost || 1;
   const h = R.hashTextu(s.text);
   const slova = s.hlas?.slova?.length && s.hlas.slovaHash === h ? s.hlas.slova.map((w) => ({ text: w.text, od: w.od / r, do: w.do / r })) : null;
@@ -1133,102 +1143,148 @@ function kdyPremiera(iso) {
   return { kdy, hodina, text: `${kdy} v ${hodina}`, kratce: `${kdy.toUpperCase()} ${hodina}`, datum: d.toLocaleString("cs-CZ") };
 }
 
-const SCHEMA_UPOUTAVKA = {
+// Přepis řeči z videa (Gemini – rozumí zvuku). Vrací slova s časy [{text, od, do}] v sekundách od začátku videa.
+const SCHEMA_PREPIS = {
+  type: "object",
+  properties: { useky: { type: "array", items: { type: "object", properties: { od: { type: "number" }, do: { type: "number" }, text: { type: "string" } }, required: ["od", "do", "text"] } } },
+  required: ["useky"],
+};
+async function prepisVidea(buf, stav = () => {}) {
+  if (!AI()?.maGemini?.()) return null;
+  // 16 kHz mono, kusy po 3 minutách (aby se vešly do jednoho požadavku)
+  const SR = 16000, KUS = 180;
+  const off = new OfflineAudioContext(1, Math.ceil(buf.duration * SR), SR);
+  const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+  const mono = await off.startRendering();
+  const slova = [];
+  const pocet = Math.ceil(mono.duration / KUS);
+  for (let k = 0; k < pocet; k++) {
+    stav(`🎧 Přepisuji řeč z videa… ${k + 1} / ${pocet}`);
+    const od = k * KUS, doK = Math.min(mono.duration, od + KUS);
+    const kus = A.vyrizni(mono, od, doK);
+    const wav = A.naWav(kus);
+    const b64 = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.readAsDataURL(wav); });
+    const r = await AI().geminiPrimo({
+      system: "Jsi přesný přepisovač řeči. Přepisuješ česky (případně slovensky) mluvené slovo z nahrávky přesně tak, jak zazní – slovo od slova, s interpunkcí. Hudbu, ruchy a potlesk vynech. Nic si nevymýšlej; když řeč není, vrať prázdný seznam.",
+      zadani: `Přepiš řeč v nahrávce (délka ${(doK - od).toFixed(1)} s). Rozděl ji na krátké úseky (jedna věta nebo její část, max 12 slov) a ke každému uveď čas začátku a konce v sekundách od začátku TÉTO nahrávky.`,
+      schema: SCHEMA_PREPIS, teplota: 0, obrazky: [{ mime: "audio/wav", data: b64 }], limitPokusu: 120000, limitCelkem: 240000,
+    });
+    for (const u of r.useky || []) {
+      const t0 = Math.max(0, Number(u.od) || 0) + od, t1 = Math.min(doK, (Number(u.do) || 0) + od);
+      const w = String(u.text || "").trim().split(/\s+/).filter(Boolean);
+      if (!w.length || !(t1 > t0)) continue;
+      const zn = w.reduce((a, x) => a + x.length + 1, 0);
+      let t = t0;
+      for (const x of w) { const d = ((x.length + 1) / zn) * (t1 - t0); slova.push({ text: x, od: +t.toFixed(2), do: +(t + d).toFixed(2) }); t += d; }
+    }
+  }
+  return slova.sort((x, y) => x.od - y.od);
+}
+// slova → věty s časy
+function vetyZeSlov(slova) {
+  const out = []; let v = [];
+  slova.forEach((w, i) => {
+    v.push(w);
+    const dalsi = slova[i + 1];
+    if (/[.!?…]$/.test(w.text) || !dalsi || dalsi.od - w.do > 1.2) { out.push({ od: v[0].od, do: v[v.length - 1].do, slova: v, text: v.map((x) => x.text).join(" ") }); v = []; }
+  });
+  return out;
+}
+
+const SCHEMA_VYBER = {
   type: "object",
   properties: {
-    sceny: { type: "array", items: { type: "object", properties: { text: { type: "string" }, titulek: { type: "string" }, cas_s: { type: "number" } }, required: ["text", "titulek", "cas_s"] } },
+    useky: { type: "array", items: { type: "object", properties: { od_veta: { type: "integer" }, do_veta: { type: "integer" } }, required: ["od_veta", "do_veta"] } },
     popisek: { type: "string" },
     hashtagy: { type: "array", items: { type: "string" } },
   },
-  required: ["sceny", "popisek", "hashtagy"],
+  required: ["useky", "popisek", "hashtagy"],
 };
 
-async function zUpoutavky({ video, soubor, delka = 30 }) {
+// Upoutávka = vystříhané nejzajímavější části videa s PŮVODNÍM zvukem + titulky toho, co v nich zazní. Žádné namlouvání.
+async function zUpoutavky({ video, soubor, delka = 30, stav = () => {} }) {
   const premiera = kdyPremiera(video.naplanovano);
-  const kapitoly = Z.casyZPopisu(video.popis || "").map((k) => {
-    const c = String(k.cas).split(":").map(Number);
-    return { s: c.length === 3 ? c[0] * 3600 + c[1] * 60 + c[2] : c[0] * 60 + (c[1] || 0), popis: k.popis };
-  }).filter((k) => Number.isFinite(k.s));
   p = novyProjekt({ tema: `Upoutávka: ${video.nazev}`, delka, ton: "dokument", jazyky: ["cs"] });
   p.nazev = `🎬 ${video.nazev}`.slice(0, 80);
+  p.bezHlasu = true;
   p.upoutavka = { videoId: video.id, nazev: video.nazev, url: `https://youtu.be/${video.id}`, premiera: video.naplanovano || null };
   p.vzhled.outroText = premiera ? ["Celé video na YouTube", `${premiera.kratce} · odkaz v bio`] : ["Celé video na YouTube", "odkaz v bio"];
+  p.vzhled.strih = "klidny"; // bez záblesků přes mluvené slovo
   await U.pozadejTrvaleUloziste();
-  zprava("#rTemataZprava", "Načítám video…");
+  stav("Načítám video…");
   const k = await Z.importujSoubor(p, soubor);
   k.licence = { stav: "prava", nazev: "vlastní video kanálu Deník hokeje", autor: "Deník hokeje", odkaz: p.upoutavka.url };
   k.puvod = p.upoutavka.url;
   const delkaVidea = k.delka || video.delka || 600;
-  const nSc = { 15: 3, 30: 5, 45: 7, 60: 8 }[delka] || 5;
 
-  let r = null;
-  if (AI()?.maKlic()) {
-    zprava("#rTemataZprava", "AI píše scénář upoutávky…");
+  // 1) přepis řeči
+  let slova = null;
+  try {
+    stav("Načítám zvuk videa…");
+    const buf = await A.dekoduj(`klip-${k.id}`, async () => U.souborBlob(k.souborId));
+    slova = await prepisVidea(buf, stav);
+  } catch (e) { console.warn("Přepis se nepovedl:", e); slova = null; }
+  const vety = slova?.length ? vetyZeSlov(slova) : [];
+
+  // 2) výběr nejzajímavějších úseků
+  let vyber = null;
+  if (vety.length && AI()?.maKlic()) {
+    stav("✂️ AI vybírá nejzajímavější části videa…");
     try {
-      r = await AI().gemini({
-        system: `Píšeš scénáře krátkých upoutávek (Instagram Reels / YouTube Shorts) pro český hokejový kanál „Deník hokeje“. Cíl: aby lidi šli na celé video na YouTube.
-Pravidla:
-- česky, mluvená řeč, krátké věty; ${nSc} scén, každá 1–2 věty (celkem asi ${Math.round(delka * 2.3)} slov)
-- 1. scéna = háček do 2 sekund: otázka, šokující fakt nebo napětí. Žádné „Ahoj“.
-- Scény tvoří JEDEN souvislý příběh: každá věta navazuje na předchozí (žádné samostatné hesla), a text jasně odkazuje na nové video
-  na YouTube („v novém videu“, „na YouTube ukážeme…“, „uvidíš…“), ať je jasné, že jde o upoutávku.
-- NEVYZRAZUJ pointu ani konec příběhu – nech otevřenou otázku, ať to lidi musí dokoukat na YouTube.
-- poslední scéna = výzva: ${premiera ? `celé video vychází ${premiera.text} na YouTube Deník hokeje, odkaz je v bio` : "celé video je na YouTube Deník hokeje, odkaz je v bio"}.
-- vymýšlej jen z toho, co je v názvu, popisu a kapitolách videa; nic nepřidávej.
-- „titulek“ nech prázdný (nahoře je stálý pruh „nové video na YouTube“ a dole titulky toho, co se říká).
-- „cas_s“ = sekunda v původním videu, odkud použít záběr k té scéně (0–${Math.round(delkaVidea - 6)}). Ber časy kapitol, pokud jsou; scény ať mají různé časy.
-- popisek pod reel: háček (1 řádek), 1–2 řádky o čem video je bez spoileru, ${premiera ? `„🎬 Celé video ${premiera.text} na YouTube – odkaz v bio“` : "„🎬 Celé video na YouTube – odkaz v bio“"}, otázka do komentářů. Hashtagy 3–5.`,
-        zadani: `NÁZEV: ${video.nazev}
-POPIS: ${(video.popis || "").slice(0, 1800)}
-KAPITOLY: ${kapitoly.length ? kapitoly.map((x) => `${x.s}s ${x.popis}`).join("; ") : "(nejsou)"}
-DÉLKA VIDEA: ${Math.round(delkaVidea)} s
-${premiera ? `PREMIÉRA: ${premiera.datum}` : "Video už je venku."}`,
-        schema: SCHEMA_UPOUTAVKA,
-        teplota: 0.8,
+      vyber = await AI().gemini({
+        system: `Stříháš krátkou upoutávku (Reels/Shorts) z videa českého hokejového kanálu „Deník hokeje“. Cíl: aby lidi šli na celé video na YouTube.
+Z přepisu vyber 2–5 úseků (každý = souvislý rozsah vět od_veta–do_veta), dohromady asi ${delka} s (max ${Math.round(delka * 1.3)} s).
+- 1. úsek = nejsilnější háček (otázka, šokující výrok, napětí) – ideálně do 3 s pochopitelný
+- úseky jdou v pořadí, v jakém dávají smysl jako příběh; každý úsek musí začínat a končit celou větou
+- nevyzrazuj pointu – konec nech otevřený
+- popisek pod reel: háček (1 řádek), 1–2 řádky bez spoileru, ${premiera ? `„🎬 Celé video ${premiera.text} na YouTube – odkaz v bio“` : "„🎬 Celé video na YouTube – odkaz v bio“"}, otázka do komentářů; hashtagy 3–5`,
+        zadani: `NÁZEV VIDEA: ${video.nazev}\nPOPIS: ${(video.popis || "").slice(0, 1200)}\n\nPŘEPIS (číslo věty · čas · text):\n${vety.map((v, i) => `${i} · ${v.od.toFixed(1)}–${v.do.toFixed(1)} s · ${v.text}`).join("\n").slice(0, 60000)}`,
+        schema: SCHEMA_VYBER, teplota: 0.6,
       });
-    } catch (e) { zprava("#rTemataZprava", `AI scénář se nepovedl (${esc(e.message)}), použiju jednoduchou kostru – texty uprav.`, "varovani"); }
+    } catch (e) { console.warn("Výběr úseků selhal:", e); }
   }
-  if (!r?.sceny?.length) {
-    const cta = premiera ? `Celé video vychází ${premiera.text} na YouTube. Odkaz je v bio.` : "Celé video najdeš na YouTube. Odkaz je v bio.";
-    r = {
-      sceny: [
-        { text: `${video.nazev}. Znáte tenhle příběh?`, titulek: "", cas_s: kapitoly[0]?.s ?? delkaVidea * 0.1 },
-        ...kapitoly.slice(1, nSc - 1).map((x) => ({ text: `${x.popis}.`, titulek: "", cas_s: x.s })),
-        { text: cta, titulek: premiera ? premiera.kratce : "NA YOUTUBE", cas_s: delkaVidea * 0.6 },
-      ],
-      popisek: `${video.nazev}\n\n🎬 ${premiera ? `Celé video ${premiera.text} na YouTube` : "Celé video na YouTube"} – odkaz v bio`,
-      hashtagy: ["#denikhokeje", "#hokej"],
-    };
+  let useky = (vyber?.useky || []).map((u) => [Math.max(0, Math.min(u.od_veta, u.do_veta)), Math.min(vety.length - 1, Math.max(u.od_veta, u.do_veta))])
+    .filter(([a, b]) => vety[a] && vety[b]).slice(0, 5);
+  if (!useky.length && vety.length) {
+    // bez AI: první věty z několika míst videa
+    const n = Math.max(2, Math.round(delka / 10));
+    useky = [...Array(n)].map((_, i) => { const a = Math.floor((i / n) * vety.length); return [a, a]; });
   }
-  const omez = (x) => Math.max(0, Math.min(Number(x) || 0, Math.max(0, delkaVidea - 6)));
-  // časy z YouTube délky přepočítat na délku vybraného souboru (kdyby byl kratší/zkrácený)
-  const ytDelka = video.delka || delkaVidea;
-  const meritko = ytDelka > delkaVidea + 5 ? delkaVidea / ytDelka : 1;
-  const vybrane = r.sceny.slice(0, nSc + 1);
-  let casy = vybrane.map((x) => omez((Number(x.cas_s) || 0) * meritko));
-  const kolize = casy.some((c, i) => casy.some((d, j) => j < i && Math.abs(c - d) < 3));
-  if (kolize) casy = vybrane.map((_, i) => omez(((i + 0.5) / vybrane.length) * Math.max(0, delkaVidea - 6)));
-  p.sceny = vybrane.map((x, i) => {
-    const start = casy[i];
-    const s = {
-      id: U.noveId("s"), text: x.text, titulek: "", zaber: `záběr z videa v ${Math.floor(start / 60)}:${String(Math.floor(start % 60)).padStart(2, "0")}`,
-      dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
-      klip: { klipId: k.id, start: +start.toFixed(1), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 0 },
-      extra: [], hlas: null, titulky: [], titulkyRucne: false,
-    };
-    // ve fire stylu druhý rychlý střih o kus dál ve stejném videu
-    if (i > 0 && start + 8 < delkaVidea) s.extra.push({ klipId: k.id, start: +(start + 4).toFixed(1), fokus: 0.5, rezim: "rozmazane", zoom: 1.08, zvuk: 0 });
-    s.titulky = R.autoTitulky(s.text);
-    return s;
-  });
+
+  // 3) scény: úsek videa s původním zvukem + titulky ze slov
+  const hrana = (x) => Math.max(0, Math.min(x, delkaVidea - 0.2));
+  if (useky.length) {
+    p.sceny = useky.map(([a, b]) => {
+      const start = hrana(vety[a].od - 0.15), konec = hrana(vety[b].do + 0.35);
+      const sl = vety.slice(a, b + 1).flatMap((v) => v.slova).map((w) => ({ text: w.text, od: +(w.od - start).toFixed(2), do: +(w.do - start).toFixed(2) }));
+      const text = sl.map((w) => w.text).join(" ");
+      const sc = { id: U.noveId("s"), text, titulek: "", zaber: `úsek videa ${cas(start)}–${cas(konec)}`, dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
+        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 1 }, extra: [], hlas: null,
+        trvani: +(konec - start).toFixed(2), prepis: sl, prepisHash: R.hashTextu(text), titulky: [], titulkyRucne: false };
+      sc.titulky = R.autoTitulky(text, sc.trvani, { slova: sl, posun: 0 });
+      return sc;
+    });
+  } else {
+    // bez přepisu (chybí Gemini klíč / ve videu není řeč): úseky rozložené po videu, bez titulků
+    const n = Math.max(3, Math.round(delka / 8)), d = delka / n;
+    p.sceny = [...Array(n)].map((_, i) => {
+      const start = hrana(((i + 0.5) / n) * Math.max(0, delkaVidea - d));
+      return { id: U.noveId("s"), text: "", titulek: "", zaber: `úsek videa ${cas(start)}`, dotazy: Object.fromEntries(LANG.map((l) => [l, ""])), fakta: [],
+        klip: { klipId: k.id, start: +start.toFixed(2), fokus: 0.5, rezim: "rozmazane", zoom: 1, zvuk: 1 }, extra: [], hlas: null, trvani: +d.toFixed(2), titulky: [], titulkyRucne: false };
+    });
+  }
   p.scenar = { hooky: [{ text: p.sceny[0].text, sila: 0 }], hook: 0, cta: "",
-    popisek: r.popisek || "", hashtagy: AI()?.cisteHashtagy ? AI().cisteHashtagy(r.hashtagy || []) : (r.hashtagy || []), nejiste: [] };
+    popisek: vyber?.popisek || `${video.nazev}\n\n🎬 ${premiera ? `Celé video ${premiera.text} na YouTube` : "Celé video na YouTube"} – odkaz v bio`,
+    hashtagy: AI()?.cisteHashtagy ? AI().cisteHashtagy(vyber?.hashtagy || ["#denikhokeje", "#hokej"]) : ["#denikhokeje", "#hokej"], nejiste: [] };
   ulozPozdeji();
   window.DHShell?.jdi("reels");
   vykresliVse();
-  prepniKrok("scenar");
+  prepniKrok("strih");
   obnovNahled();
-  zprava("#rScenarZprava", `Upoutávka je připravená ✓ ${p.sceny.length} scén ze záběrů tvého videa${premiera ? `, na konci „${premiera.kratce}“` : ""}. Uprav texty, pak <b>Hlas</b> → <b>Export</b>.`, "ok");
+  const celkem = R.casovaOsa(p).celkem;
+  window.DHToast?.(slova?.length
+    ? `Upoutávka hotová ✓ ${p.sceny.length} úseků z videa (${celkem.toFixed(0)} s) s původním zvukem a titulky. Zkontroluj náhled a dej Export.`
+    : `Upoutávka hotová – ${p.sceny.length} úseků s původním zvukem, ale BEZ titulků (${AI()?.maGemini?.() ? "ve videu jsem nenašel řeč" : "přepis řeči potřebuje Gemini klíč"}).`, slova?.length ? "ok" : "info");
   return p;
 }
 

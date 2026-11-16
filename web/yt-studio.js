@@ -181,7 +181,8 @@ async function upoutavka(id) {
     <h2 style="margin-top:0">🎬 Upoutávka na video</h2>
     <p style="margin:0 0 6px"><b>${esc(v.nazev)}</b></p>
     <p class="muted" style="margin:0 0 12px;font-size:13.5px">${prem ? `📅 Premiéra ${esc(prem.datum)} – upoutávka skončí výzvou „${esc(prem.kratce)} · odkaz v bio“.` : "Video už je venku – upoutávka skončí výzvou „Celé video na YouTube · odkaz v bio“."}
-      AI napíše háček a krátký scénář bez spoileru, záběry vezme z tvého videa (podle kapitol) a v Reels to doladíš, namluvíš a vyrenderuješ jako 9:16.</p>
+      Žádné namlouvání: aplikace přepíše řeč z videa, AI vybere nejzajímavější úseky (háček na začátek, bez spoileru) a poskládá je s <b>původním zvukem</b> a <b>titulky</b> toho, co v nich zazní – i pro lidi bez zvuku. Nahoře pruh s ikonou YouTube, na konci výzva.
+      ${AI().maGemini() ? "" : "<br><b>⚠️ Titulky z přepisu potřebují Gemini klíč</b> (Můj styl → AI pomocník) – bez něj budou úseky bez titulků."}</p>
     ${render ? `<p class="zprava ok" style="margin:0 0 10px">Tohle video vzniklo v Reels – použiju render „${esc(render.nazev)}“, nic nahrávat nemusíš.</p>` : `
     <label>Soubor videa z počítače<span class="muted" style="font-weight:400"> – YouTube API stažení videa neumožňuje; vyber MP4, které jsi nahrával</span>
       <span class="btn ghost ys-soubor" style="margin-top:6px">📁 Vybrat video<input type="file" id="ysUpSoubor" accept="video/*"></span></label>
@@ -198,9 +199,9 @@ async function upoutavka(id) {
     const z = $("#ysUpZprava");
     if (!zdroj) { z.hidden = false; z.className = "zprava chyba"; z.textContent = "Vyber soubor videa."; return; }
     tl.disabled = true;
-    z.hidden = false; z.className = "zprava"; z.textContent = "Připravuji upoutávku… (AI scénář ~10–30 s)";
+    z.hidden = false; z.className = "zprava"; z.textContent = "Připravuji upoutávku…";
     try {
-      await window.DHReels.zUpoutavky({ video: v, soubor: zdroj, delka: +$("#ysUpDelka").value });
+      await window.DHReels.zUpoutavky({ video: v, soubor: zdroj, delka: +$("#ysUpDelka").value, stav: (t) => { z.textContent = t; } });
       dlg.close();
     } catch (er) { z.className = "zprava chyba"; z.textContent = er.message; tl.disabled = false; }
   });
