@@ -159,6 +159,7 @@ async function vykresliVidea() {
           <button type="button" class="btn small ghost" data-ys-mini="${esc(v.id)}">🖼 Miniatura</button>
           <button type="button" class="btn small ghost" data-ys-kom="${esc(v.id)}">💬 Komentáře</button>
           <button type="button" class="btn small ${v.naplanovano && new Date(v.naplanovano) > new Date() ? "" : "ghost"}" data-ys-upoutavka="${esc(v.id)}" title="Krátký reel 9:16 na Instagram / Shorts, který natáhne lidi na tohle video">🎬 Upoutávka</button>
+          <button type="button" class="btn small ghost" data-ys-propagace="${esc(v.id)}" title="Texty na propagaci: komunitní příspěvek, story, IG, připnutý komentář, háčky na Shorts">📣 Propagace</button>
         </div></div></article>`).join("")}</div></div>`;
 }
 
@@ -203,6 +204,79 @@ async function upoutavka(id) {
     } catch (er) { z.className = "zprava chyba"; z.textContent = er.message; e.currentTarget.disabled = false; }
   });
   dlg.showModal();
+}
+
+// 📣 Balíček propagace: všechny texty, kterými se video rozšíří mimo YouTube vyhledávání.
+const SCHEMA_PROPAGACE = {
+  type: "object",
+  properties: {
+    komunitni: { type: "string" }, anketa_otazka: { type: "string" }, anketa_moznosti: { type: "array", items: { type: "string" } },
+    pripnuty: { type: "string" }, ig_popisek: { type: "string" }, story: { type: "array", items: { type: "string" } },
+    x_post: { type: "string" }, shorts_hooky: { type: "array", items: { type: "string" } }, tipy: { type: "array", items: { type: "string" } },
+  },
+  required: ["komunitni", "anketa_otazka", "anketa_moznosti", "pripnuty", "ig_popisek", "story", "x_post", "shorts_hooky", "tipy"],
+};
+async function propagace(id) {
+  const v = videa.find((x) => x.id === id);
+  if (!v) return;
+  if (!AI().maKlic()) { toast("Propagace potřebuje AI klíč (Můj styl → AI pomocník).", "info"); return; }
+  const prem = window.DHReels?.kdyPremiera(v.naplanovano);
+  let dlg = $("#ysPropagaceDlg");
+  if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "ysPropagaceDlg"; dlg.className = "card ys-dialog ys-dialog-siroky"; document.body.appendChild(dlg); }
+  dlg.innerHTML = `<h2 style="margin-top:0">📣 Propagace videa</h2><p style="margin:0 0 10px"><b>${esc(v.nazev)}</b></p><p class="muted">AI píše texty… (10–30 s)</p>
+    <div class="akce"><button type="button" class="btn ghost" data-ys-zavrit>Zavřít</button></div>`;
+  dlg.querySelector("[data-ys-zavrit]").addEventListener("click", () => dlg.close());
+  dlg.showModal();
+  try {
+    const odkaz = `https://youtu.be/${v.id}`;
+    const r = await AI().gemini({
+      system: `Jsi social media manažer českého hokejového kanálu „Deník hokeje“ (YouTube + Instagram). Píšeš česky, úderně, bez klišé, bez vymýšlení faktů
+– vycházej jen z názvu a popisu videa. Nevyzrazuj pointu videa. Emoji střídmě.
+${prem ? `Video má premiéru ${prem.text} (${prem.datum}) – zmiň ji tam, kde to dává smysl.` : "Video už je venku."}`,
+      zadani: `NÁZEV: ${v.nazev}
+POPIS: ${(v.popis || "").slice(0, 2000)}
+ODKAZ: ${odkaz}
+
+Napiš:
+- komunitni: komunitní příspěvek na YouTube (2–4 krátké řádky, háček + výzva ke zhlédnutí)
+- anketa_otazka + anketa_moznosti (2–4 možnosti): anketa do komunity, která navnadí na téma videa
+- pripnuty: připnutý komentář pod video – otázka, která rozjede diskuzi (max 2 věty)
+- ig_popisek: popisek na Instagram k upoutávce (háček, 1–2 řádky, „odkaz v bio“, otázka, 3–5 hashtagů)
+- story: 3 krátké texty na 3 IG stories za sebou (napětí → co uvidí → výzva „odkaz v příběhu“)
+- x_post: příspěvek na X/Threads (max 260 znaků včetně odkazu ${odkaz})
+- shorts_hooky: 3 první věty (háčky) pro Shorts/Reels k tomuto videu, každá max 10 slov
+- tipy: 3 konkrétní tipy, kdy a kde to zveřejnit (např. komunitní příspěvek den před premiérou, story 2 h před)`,
+      schema: SCHEMA_PROPAGACE,
+      teplota: 0.8,
+    });
+    const pole = [
+      ["📝 Komunitní příspěvek (YouTube)", r.komunitni],
+      ["📊 Anketa do komunity", `${r.anketa_otazka}\n${(r.anketa_moznosti || []).map((x) => `• ${x}`).join("\n")}`],
+      ["📌 Připnutý komentář", r.pripnuty],
+      ["📸 Instagram – popisek k upoutávce", r.ig_popisek],
+      ["📱 Instagram stories (3×)", (r.story || []).map((x, i) => `${i + 1}) ${x}`).join("\n")],
+      ["𝕏 X / Threads", r.x_post],
+      ["🎬 Háčky na Shorts / Reels", (r.shorts_hooky || []).map((x) => `• ${x}`).join("\n")],
+    ];
+    dlg.innerHTML = `<h2 style="margin-top:0">📣 Propagace videa</h2><p style="margin:0 0 12px"><b>${esc(v.nazev)}</b> · <a href="${esc(odkaz)}" target="_blank" rel="noopener">${esc(odkaz)}</a></p>
+      <div class="ys-propagace">${pole.map(([n, t], i) => `<div class="ys-prop"><div class="radek" style="justify-content:space-between;align-items:center"><b>${n}</b><button type="button" class="btn small ghost" data-ys-kopir="${i}">📋 Kopírovat</button></div><textarea rows="${Math.min(7, String(t || "").split("\n").length + 2)}" data-ys-prop="${i}">${esc(t || "")}</textarea></div>`).join("")}</div>
+      ${r.tipy?.length ? `<h3 style="margin:14px 0 6px">Kdy a kde</h3><ul class="muted" style="margin:0">${r.tipy.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      <div class="akce"><button type="button" class="btn" data-ys-upoutavka-z="${esc(v.id)}">🎬 Udělat upoutávku</button><button type="button" class="btn ghost" data-ys-plan>📅 Komunitní příspěvek do plánu</button><button type="button" class="btn ghost" data-ys-zavrit>Zavřít</button></div>`;
+    dlg.querySelectorAll("[data-ys-kopir]").forEach((b) => b.addEventListener("click", async () => {
+      const t = dlg.querySelector(`[data-ys-prop="${b.dataset.ysKopir}"]`).value;
+      try { await navigator.clipboard.writeText(t); toast("Zkopírováno ✓"); } catch { dlg.querySelector(`[data-ys-prop="${b.dataset.ysKopir}"]`).select(); }
+    }));
+    dlg.querySelector("[data-ys-zavrit]").addEventListener("click", () => dlg.close());
+    dlg.querySelector("[data-ys-upoutavka-z]").addEventListener("click", () => { dlg.close(); upoutavka(v.id); });
+    dlg.querySelector("[data-ys-plan]").addEventListener("click", () => {
+      const den = v.naplanovano ? new Date(new Date(v.naplanovano).getTime() - 864e5) : new Date();
+      window.DHPlan?.pridej({ nazev: `Komunitní příspěvek: ${v.nazev}`, format: "youtube", stav: "napad", datum: den.toISOString().slice(0, 10), zadani: dlg.querySelector('[data-ys-prop="0"]').value });
+      toast("Přidáno do plánu ✓");
+    });
+  } catch (e) {
+    dlg.innerHTML = `<h2 style="margin-top:0">📣 Propagace videa</h2><p class="zprava chyba">${esc(e.message)}</p><div class="akce"><button type="button" class="btn ghost" data-ys-zavrit>Zavřít</button></div>`;
+    dlg.querySelector("[data-ys-zavrit]").addEventListener("click", () => dlg.close());
+  }
 }
 
 // Úprava metadat existujícího videa (SEO generátor nad hotovým videem).
@@ -697,6 +771,7 @@ function init() {
     if (d.ys && akce[d.ys]) return akce[d.ys]();
     if (d.ysMeta) return upravMetadata(d.ysMeta);
     if (d.ysUpoutavka) return upoutavka(d.ysUpoutavka);
+    if (d.ysPropagace) return propagace(d.ysPropagace);
     if (d.ysMini) return miniaturaKVideu(d.ysMini);
     if (d.ysKom) { komentareVideo = d.ysKom; krok = "komentare"; vykresliVse(); return; }
     if (d.ysHashtag !== undefined) { const h = pub.seo.hashtagy[+d.ysHashtag]; h.vybran = !h.vybran; t.classList.toggle("on", h.vybran); ulozPub(); return; }

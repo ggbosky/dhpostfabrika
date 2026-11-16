@@ -39,6 +39,7 @@ const REF_TYPY = {
 };
 const PISMA = { Anton: "Anton", Montserrat: "Montserrat", Oswald: "Oswald", "Roboto Condensed": "Roboto Condensed" };
 const REZIMY = {
+  vyrez: "✂️ Vyříznutý hráč s obrysem (zdarma)",
   "ai-foto": "AI kompozice ze skutečné fotky",
   "ai-scena": "AI scéna bez tváří skutečných lidí",
   foto: "Jen skutečné fotky (bez AI, zdarma)",
@@ -215,6 +216,56 @@ function kresliCover(ctx, img, x, y, w, h, cy = 0.4) {
 
 // Pozadí jen ze skutečných fotek – bez generování, bez úprav tváří.
 // pozadi (volitelné) = AI scéna bez lidí; skutečná fotka se na ni jen položí, tvář se nijak nemění.
+// ✂️ Vyříznutý hráč: rozmazané tmavé pozadí z téže fotky, záře v akcentní barvě, hráč s bílým obrysem.
+async function slozVyrez(k, fotky, stav = () => {}) {
+  const akcent = /^#[0-9a-f]{6}$/i.test(k.akcent || "") ? k.akcent : "#e01e26";
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+  const duel = k.rozvrzeni === "duel" && fotky.length >= 2;
+  const textVpravo = k.text_pozice === "vpravo";
+  const pozice = duel ? [0.24, 0.76] : [textVpravo ? 0.3 : k.text_pozice === "stred" ? 0.5 : 0.7];
+  // pozadí
+  ctx.save(); ctx.filter = "blur(18px) brightness(0.4) saturate(1.2)";
+  kresliCover(ctx, fotky[0], -40, -40, W + 80, H + 80); ctx.restore();
+  ctx.fillStyle = "rgba(5,5,8,0.35)"; ctx.fillRect(0, 0, W, H);
+  // paprsky a záře za hráčem
+  for (const px of pozice) {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(W * px, H * 0.55, 10, W * px, H * 0.55, H * 0.75);
+    g.addColorStop(0, akcent + "aa"); g.addColorStop(0.5, akcent + "33"); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.translate(W * px, H * 0.5);
+    for (let i = 0; i < 12; i++) {
+      ctx.rotate((Math.PI * 2) / 12);
+      const lg = ctx.createLinearGradient(0, 0, H, 0); lg.addColorStop(0, "rgba(255,255,255,0.07)"); lg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(H * 1.2, -40); ctx.lineTo(H * 1.2, 40); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // hráči
+  for (let i = 0; i < pozice.length; i++) {
+    stav(`✂️ Vyřezávám hráče ${pozice.length > 1 ? `${i + 1}/${pozice.length} ` : ""}z fotky… (poprvé se stáhne model ~25 MB)`);
+    const vyr = await window.DHVyrez.vyrizni(fotky[i], fotky[i].src || null);
+    const st = window.DHVyrez.sObrysem(vyr, { tloustka: Math.max(6, Math.round(vyr.width / 90)), zare: akcent, zareSila: 34 });
+    let h = H * (duel ? 0.98 : 1.04), w = h * (st.width / st.height);
+    const maxW = W * (duel ? 0.5 : 0.62);
+    if (w > maxW) { w = maxW; h = w * (st.height / st.width); }
+    const x = W * pozice[i] - w / 2, y = H - h + H * 0.03;
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 10;
+    ctx.drawImage(st, x, y, w, h); ctx.restore();
+  }
+  if (duel) {
+    ctx.save(); ctx.font = `150px Anton, Impact, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.shadowColor = akcent; ctx.shadowBlur = 40; ctx.fillStyle = "#ffffff"; ctx.fillText("VS", W / 2, H * 0.52);
+    ctx.lineWidth = 6; ctx.strokeStyle = akcent; ctx.strokeText("VS", W / 2, H * 0.52); ctx.restore();
+  }
+  const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.75);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.94));
+}
+
 async function slozZFotek(k, fotky, pozadi = null) {
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
@@ -303,7 +354,7 @@ const SCHEMA_KONCEPTY = {
           styl: { type: "string", enum: ["A", "B", "C", "D", "E"] },
           kompozice: { type: "string", description: "česky: co přesně je na obrázku, kde je subjekt, co v pozadí" },
           proc_klikne: { type: "string" },
-          rezim: { type: "string", enum: ["ai-foto", "ai-scena", "foto"] },
+          rezim: { type: "string", enum: ["vyrez", "ai-foto", "ai-scena", "foto"] },
           prompt_en: { type: "string", description: "anglický prompt pro fotorealistický generátor, bez textu v obraze" },
           foto_dotazy: { type: "array", items: { type: "string" } },
           rozvrzeni: { type: "string", enum: ["plna", "vpravo", "vlevo", "duel", "kolaz"] },
@@ -332,6 +383,9 @@ REALISMUS A PRAVDIVOST (nejdůležitější):
 - Skutečné hráče NIKDY negeneruj „z hlavy“. ${maFotkuHrace
     ? "Uživatel dodal skutečné fotky – pro koncepty s hráčem použij režim \"ai-foto\" (fotka jde do generátoru jako reference, tvář se nesmí měnit) nebo \"foto\"."
     : "Uživatel nedodal fotky hráče – pro koncepty s konkrétním hráčem použij režim \"foto\" (skutečné fotky z Wikimedia Commons podle foto_dotazy)."}
+- Režim "vyrez" = klasický silný YouTube styl: hráč ze skutečné fotky vyříznutý z pozadí, s bílým obrysem a září v akcentní barvě,
+  na rozmazaném tmavém pozadí (u rozvržení "duel" dva hráči proti sobě s VS). Zdarma a tvář se nemění. Použij ho aspoň u jednoho konceptu s hráčem;
+  nejlépe funguje s detailem / polopostavou (foto_dotazy na portrét hráče).
 - Režim "ai-scena" jen pro scény BEZ rozpoznatelných tváří skutečných lidí (aréna, led, výstroj, siluety zezadu, symbolické předměty, atmosféra).
 - Nevytvářej falešné „historické fotky“ skutečných událostí.
 - prompt_en: anglicky, fotorealistický popis (objektiv, světlo, textura kůže a látek, dobová výstroj, color grading), kompozice 16:9,
@@ -422,7 +476,13 @@ async function vytvorPozadi(i, rezim = null) {
   tlacitka.forEach((b) => { b.disabled = true; });
   try {
     let blob, zdroj, cena = null;
-    if (rezim === "foto") {
+    if (rezim === "vyrez") {
+      stav("Hledám fotku hráče…");
+      const fotky = await fotkyProKoncept(k);
+      if (!fotky.length) throw new Error("Nenašel jsem fotku hráče – nahraj ji v kroku Zadání (Fotka hráče).");
+      blob = await slozVyrez(k, fotky, stav);
+      zdroj = "vyrez";
+    } else if (rezim === "foto") {
       stav("Skládám ze skutečných fotek…");
       const fotky = await fotkyProKoncept(k);
       if (!fotky.length) throw new Error("Nenašel jsem vhodnou skutečnou fotku – nahraj ji v kroku Zadání (Fotka hráče).");
@@ -535,7 +595,10 @@ async function ohodnot(i) {
   const bboxy = vykresli(c.getContext("2d"), await pozadiKonceptu(k), k.editor);
   const slov = k.editor.vrstvy.map((v) => v.text.replace(/\*/g, "").split(/\s+/).filter(Boolean).length).reduce((a, b) => a + b, 0);
   const kontrasty = kontrastTextu(c, bboxy, k.editor);
+  // YouTube kreslí vpravo dole délku videa (~ 15 % šířky × 12 % výšky) – text tam nemá být
+  const podCasem = bboxy.some((b) => b && b.x + b.w > W * 0.84 && b.y + b.h > H * 0.86);
   const kontroly = [
+    [!podCasem, podCasem ? "Text zasahuje do pravého dolního rohu – tam YouTube zobrazí délku videa a překryje ho" : "Pravý dolní roh je volný pro délku videa"],
     [slov <= 4, `Text: ${slov} ${slov === 1 ? "slovo" : slov < 5 ? "slova" : "slov"} ${slov <= 4 ? "(do 4 – dobře)" : "– zkrať na max. 4 silná slova"}`],
     ...k.editor.vrstvy.map((v, j) => [v.velikost >= 72, `Vrstva ${j + 1}: velikost ${v.velikost} px ${v.velikost >= 72 ? "– na mobilu čitelné" : "– na mobilu bude malá, zvětši aspoň na 72 px"}`]),
     ...kontrasty.map((kr, j) => kr == null ? null : [kr >= 4.5, `Kontrast vrstvy ${j + 1}: ${kr.toFixed(1)}:1 ${kr >= 4.5 ? "– výborný" : kr >= 3 ? "– hraniční, přidej obrys/ztmavení" : "– špatně čitelné"}`]).filter(Boolean),
@@ -729,12 +792,17 @@ async function vykresliPorovnani() {
   if (!el || el.hidden) return;
   const hotove = p.koncepty.map((k, i) => [k, i]).filter(([k]) => k.varianty.length);
   if (!hotove.length) { el.innerHTML = `<div class="card"><p class="muted" style="margin:0">Až vytvoříš pozadí u konceptů, uvidíš je tady vedle sebe – ve velikosti pro počítač i pro mobil.</p></div>`; return; }
-  el.innerHTML = `<p class="muted" style="margin:0 0 12px">Takhle je uvidí lidé: velká verze (domovská stránka) a malá (mobil, doporučená videa). Skóre = kvalita designu, ne předpověď CTR.</p>
-    <div class="mt-porovnani">${hotove.map(([k, i]) => `<article class="card mt-por" data-i="${i}">
-      <div class="mt-por-velka" data-mt-velka="${i}"></div>
-      <div class="mt-por-info"><div class="mt-por-mala" data-mt-mala="${i}"></div>
+  const tema = (() => { try { return localStorage.getItem("dhpf_mt_yt_tema") || "tmave"; } catch { return "tmave"; } })();
+  const titul = esc(p.vstup.titulek || p.vstup.tema || "Název videa");
+  el.innerHTML = `<div class="radek" style="justify-content:space-between;align-items:center;margin:0 0 12px;gap:10px;flex-wrap:wrap">
+      <p class="muted" style="margin:0">Takhle je uvidí lidé na YouTube – velká karta (domovská stránka) a malá (mobil, doporučená videa). Skóre = kvalita designu, ne předpověď CTR.</p>
+      <div class="chips"><button type="button" class="chip ${tema === "tmave" ? "on" : ""}" data-mt-yttema="tmave">🌙 Tmavý YouTube</button><button type="button" class="chip ${tema === "svetle" ? "on" : ""}" data-mt-yttema="svetle">☀️ Světlý</button></div></div>
+    <div class="mt-porovnani ytk-${tema}">${hotove.map(([k, i]) => `<article class="card mt-por" data-i="${i}">
+      <div class="ytk"><div class="mt-por-velka" data-mt-velka="${i}"></div><span class="ytk-cas">12:34</span></div>
+      <div class="ytk-meta"><img src="brand/dh-avatar.webp" alt=""><div><b>${titul}</b><small>Deník hokeje · 12 tis. zhlédnutí · před 2 dny</small></div></div>
+      <div class="mt-por-info"><div class="ytk ytk-mala"><div class="mt-por-mala" data-mt-mala="${i}"></div><span class="ytk-cas">12:34</span></div>
         <div><b>${esc(k.nazev)}</b><small class="muted">${esc(STYLY[k.styl]?.nazev || "")}${k.skore?.celkem != null ? ` · design ${k.skore.celkem.toLocaleString("cs-CZ")}/10` : ""}</small>
-        <small class="muted yt-titulek">${esc(p.vstup.titulek || p.vstup.tema)}</small></div></div>
+        <small class="muted yt-titulek">${titul}</small></div></div>
       <div class="radek" style="gap:6px;margin-top:8px"><button type="button" class="btn small" data-mt-edit="${i}">✎ Upravit a exportovat</button>
         <button type="button" class="btn small ghost" data-mt-skore="${i}">📊 Ohodnotit</button></div>
     </article>`).join("")}</div>`;
@@ -962,7 +1030,7 @@ function init() {
     }
     if (d.mtRefsmaz !== undefined) { p.reference.splice(+d.mtRefsmaz, 1); ulozPozdeji(); vykresliZadani(); return; }
     if (d.mt === "vse") {
-      const ai = p.koncepty.filter((k) => k.rezim !== "foto").length;
+      const ai = p.koncepty.filter((k) => !["foto", "vyrez"].includes(k.rezim)).length;
       const cena = (AI().OBR_MODELY[AI().obrModel()]?.cena || 0.05) * ai;
       if (ai && !AI().obrZdarma() && !confirm(`Vytvořit pozadí u ${p.koncepty.length} konceptů? ${ai}× AI obrázek ≈ ${cena.toFixed(2)} USD (účtuje Google).`)) return;
       for (let i = 0; i < p.koncepty.length; i++) await vytvorPozadi(i);
@@ -970,12 +1038,13 @@ function init() {
     }
     if (d.mtVytvor !== undefined) {
       const i = +d.mtVytvor, k = p.koncepty[i];
-      if (k.rezim !== "foto" && !AI().obrZdarma() && !confirm(`Vygenerovat AI obrázek? ≈ ${(AI().OBR_MODELY[AI().obrModel()]?.cena || 0.05).toLocaleString("cs-CZ")} USD (účtuje Google).`)) return;
+      if (!["foto", "vyrez"].includes(k.rezim) && !AI().obrZdarma() && !confirm(`Vygenerovat AI obrázek? ≈ ${(AI().OBR_MODELY[AI().obrModel()]?.cena || 0.05).toLocaleString("cs-CZ")} USD (účtuje Google).`)) return;
       await vytvorPozadi(i);
       if (krok === "editor") vykresliEditor();
       return;
     }
     if (d.mtPrepis !== undefined) return navrhniKoncepty(+d.mtPrepis);
+    if (d.mtYttema) { try { localStorage.setItem("dhpf_mt_yt_tema", d.mtYttema); } catch { /* nic */ } vykresliPorovnani(); return; }
     if (d.mtEdit !== undefined) { aktivni = +d.mtEdit; vybranaVrstva = 0; krok = "editor"; vykresliVse(); return; }
     if (d.mtVar) { const [i, id] = d.mtVar.split(":"); p.koncepty[+i].vybranaVarianta = id; p.koncepty[+i].skore = null; ulozPozdeji(); if (krok === "editor") vykresliEditor(); else vykresliKoncepty(); return; }
     if (d.mtSkore !== undefined) { if (krok !== "editor") { aktivni = +d.mtSkore; krok = "editor"; await vykresliVse(); } t.disabled = true; await ohodnot(+d.mtSkore); t.disabled = false; return; }

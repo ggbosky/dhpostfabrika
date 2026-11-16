@@ -12,8 +12,6 @@ const U = () => window.DHYtUloziste;
 const toast = (t, d = "ok") => window.DHToast?.(t, d);
 
 const KLIC = "dhpf_promo";
-const TRANSFORMERS = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";
-const MODEL_VYREZ = "Xenova/modnet"; // Apache-2.0, ~25 MB, stáhne se jednou a prohlížeč si ho pamatuje
 const W = 1080;
 const FORMATY = { "4x5": { nazev: "Post 4:5", h: 1350 }, "1x1": { nazev: "Čtverec 1:1", h: 1080 }, "9x16": { nazev: "Story 9:16", h: 1920 } };
 const UHLY = {
@@ -27,6 +25,7 @@ const SABLONY = {
   plakat: { nazev: "🔥 Plakát", popis: "jméno za hráčem, záře, číslo" },
   sticker: { nazev: "💥 Sticker", popis: "duotón, bílý obrys, velké písmo" },
   staty: { nazev: "📊 Statistiky", popis: "hráč + čísla kariéry" },
+  cislo: { nazev: "🔢 Číslo", popis: "obří milník (1 921 BODŮ) + hráč" },
 };
 const PISMO_H = '"Anton", "Oswald", Impact, sans-serif';
 const PISMO_T = '"Montserrat", "Arial Black", sans-serif';
@@ -37,7 +36,7 @@ const prazdna = () => ({
   data: { jmeno: "", prijmeni: "", cislo: "", prezdivka: "", tym: "", headline: "", podtitul: "", staty: [], popisek: "", hashtagy: [], zdroje: [] },
   barvy: ["#c8102e", "#ffc000"],
   fotoId: null, vyrezId: null, kredit: "",
-  hrac: { zoom: 1, x: 0, y: 0 },
+  hrac: { zoom: 1, x: 0, y: 0 }, fotoPozadi: true,
 });
 let st = prazdna();
 try { st = { ...prazdna(), ...JSON.parse(localStorage.getItem(KLIC) || "{}") }; } catch { /* nic */ }
@@ -131,25 +130,11 @@ async function najdiFoto(tiche = false) {
   } catch (e) { if (!tiche) zprava(esc(e.message), "chyba"); }
 }
 
-let modelSlib = null;
 async function vyrizni() {
   if (!foto) return;
   zprava("✂️ Vyřezávám hráče z pozadí… poprvé se stáhne model (~25 MB), pak to trvá pár sekund.");
   try {
-    if (!modelSlib) {
-      modelSlib = import(TRANSFORMERS).then(({ pipeline }) => pipeline("background-removal", MODEL_VYREZ, { dtype: "fp32", device: "wasm" }));
-      modelSlib.catch(() => { modelSlib = null; });
-    }
-    const seg = await modelSlib;
-    const url = URL.createObjectURL(await U().obrazekBlob(st.fotoId));
-    const out = await seg(url);
-    URL.revokeObjectURL(url);
-    const res = Array.isArray(out) ? out[0] : out;
-    const c = document.createElement("canvas");
-    c.width = res.width; c.height = res.height;
-    const data = new Uint8ClampedArray(res.data.length === res.width * res.height * 4 ? res.data : rgbaZ(res));
-    c.getContext("2d").putImageData(new ImageData(data, res.width, res.height), 0, 0);
-    const oriz = orizniPruhledne(c);
+    const oriz = await window.DHVyrez.vyrizni(await U().obrazekBlob(st.fotoId));
     vyrez = oriz;
     const blob = await new Promise((ok) => oriz.toBlob(ok, "image/png"));
     st.vyrezId = await U().ulozObrazek(blob, { promoVyrez: true });
@@ -161,24 +146,6 @@ async function vyrizni() {
     zprava(`Výřez se nepovedl (${esc(e.message)}). Plakát použije celou fotku.`, "varovani");
     vykresli();
   }
-}
-function rgbaZ(res) {
-  const n = res.width * res.height, ch = res.channels, out = new Uint8ClampedArray(n * 4);
-  for (let i = 0; i < n; i++) { out[i * 4] = res.data[i * ch]; out[i * 4 + 1] = res.data[i * ch + 1]; out[i * 4 + 2] = res.data[i * ch + 2]; out[i * 4 + 3] = ch === 4 ? res.data[i * ch + 3] : 255; }
-  return out;
-}
-// Ořízne průhledné okraje, ať se s hráčem dobře pracuje.
-function orizniPruhledne(c) {
-  const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-  let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
-  for (let y = 0; y < c.height; y += 2) for (let x = 0; x < c.width; x += 2) {
-    if (d[(y * c.width + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  }
-  if (x1 <= x0 || y1 <= y0) return c;
-  const o = document.createElement("canvas");
-  o.width = x1 - x0 + 1; o.height = y1 - y0 + 1;
-  o.getContext("2d").drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
-  return o;
 }
 
 // ------------------------------------------------------------- kreslení --
@@ -209,6 +176,13 @@ function velikostNaSirku(ctx, text, font, max, sirka, min = 30) {
 }
 // Text s *zvýrazněním* na jednom řádku, zarovnaný na střed.
 function radekZvyrazneni(ctx, text, x, y, barva, akcent, zarovnani = "center") {
+  const f = ease(faze(0.9, 0.45));
+  if (f <= 0) return;
+  ctx.save(); ctx.globalAlpha *= f; y += 40 * (1 - f);
+  radekZvyrazneniBez(ctx, text, x, y, barva, akcent, zarovnani);
+  ctx.restore();
+}
+function radekZvyrazneniBez(ctx, text, x, y, barva, akcent, zarovnani) {
   const kusy = String(text).split(/(\*[^*]+\*)/).filter(Boolean).map((k) => ({ t: k.replace(/\*/g, ""), a: k.startsWith("*") }));
   const sirka = kusy.reduce((s, k) => s + ctx.measureText(k.t).width, 0);
   let cx = zarovnani === "center" ? x - sirka / 2 : x;
@@ -216,10 +190,20 @@ function radekZvyrazneni(ctx, text, x, y, barva, akcent, zarovnani = "center") {
   for (const k of kusy) { ctx.fillStyle = k.a ? akcent : barva; ctx.fillText(k.t, cx, y); cx += ctx.measureText(k.t).width; }
 }
 // Hráč: výřez (nebo celá fotka) – vrátí obdélník, kam se nakreslil.
+// Animace (MP4): anim = čas v sekundách, jinak null (statický obrázek).
+let anim = null;
+const faze = (od, trvani) => (anim == null ? 1 : Math.max(0, Math.min(1, (anim - od) / trvani)));
+const ease = (x) => 1 - Math.pow(1 - x, 3);
+function rozmazaneFoto(ctx, h) {
+  if (!foto || st.fotoPozadi === false || !vyrez) return;
+  ctx.save(); ctx.globalAlpha = 0.55;
+  celaFoto(ctx, h, "blur(22px) brightness(0.45) saturate(1.15)");
+  ctx.restore();
+}
 function polohaHrace(h, vyskaPodil = 0.8, stredX = 0.5) {
   const z = vyrez;
   if (!z) return null;
-  const vh = h * vyskaPodil * (st.hrac.zoom || 1);
+  const vh = h * vyskaPodil * (st.hrac.zoom || 1) * (1 + 0.14 * (1 - ease(faze(0, 1.2))));
   const vw = vh * (z.width / z.height);
   const x = W * stredX - vw / 2 + (st.hrac.x || 0) * W * 0.5;
   const y = h - vh + (st.hrac.y || 0) * h * 0.4 + h * 0.02;
@@ -259,7 +243,13 @@ function kresliLogoPromo(ctx) {
 }
 function statyRadek(ctx, staty, y, akcent, h) {
   const s = staty.filter((x) => x.hodnota);
-  if (!s.length) return;
+  const fa = ease(faze(1.5, 0.5));
+  if (!s.length || fa <= 0) return;
+  ctx.save(); ctx.globalAlpha *= fa; y += 30 * (1 - fa);
+  statyRadekBez(ctx, s, y, akcent, h);
+  ctx.restore();
+}
+function statyRadekBez(ctx, s, y, akcent, h) {
   const sirka = (W - 120) / s.length;
   s.forEach((x, i) => {
     const cx = 60 + sirka * i + sirka / 2;
@@ -280,6 +270,7 @@ function sablonaPlakat(ctx, h) {
   const c1 = jas(b1) < 0.12 ? c2 : b1; // černá týmová barva by nesvítila – záře dostane akcent
   ctx.fillStyle = "#060608"; ctx.fillRect(0, 0, W, h);
   if (!vyrez && foto) { celaFoto(ctx, h, "grayscale(0.35) contrast(1.15) brightness(0.8)"); ctx.fillStyle = hex(c1, 0.25); ctx.fillRect(0, 0, W, h); }
+  rozmazaneFoto(ctx, h);
   let g = ctx.createRadialGradient(W * 0.5, h * 0.36, 10, W * 0.5, h * 0.4, h * 0.6);
   g.addColorStop(0, hex(c1, 0.85)); g.addColorStop(0.45, hex(c1, 0.25)); g.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, h);
@@ -306,7 +297,7 @@ function sablonaPlakat(ctx, h) {
   let vJm = 0;
   if (prijmeni) {
     vJm = velikostNaSirku(ctx, prijmeni, (v) => `${v}px ${PISMO_H}`, h * 0.3, W * 0.94);
-    ctx.save(); ctx.font = `${vJm}px ${PISMO_H}`; ctx.textAlign = "center";
+    ctx.save(); ctx.globalAlpha = ease(faze(0.25, 0.6)); ctx.font = `${vJm}px ${PISMO_H}`; ctx.textAlign = "center";
     const tg = ctx.createLinearGradient(0, yJm - vJm, 0, yJm);
     tg.addColorStop(0, "#ffffff"); tg.addColorStop(1, "#c9c9c9");
     ctx.fillStyle = tg; ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 30;
@@ -413,6 +404,7 @@ function sablonaSticker(ctx, h) {
 function sablonaStaty(ctx, h) {
   const [c1, c2] = st.barvy, d = st.data;
   ctx.fillStyle = "#08080b"; ctx.fillRect(0, 0, W, h);
+  rozmazaneFoto(ctx, h);
   // diagonální panel v barvě týmu
   ctx.save(); ctx.beginPath(); ctx.moveTo(W * 0.42, 0); ctx.lineTo(W, 0); ctx.lineTo(W, h); ctx.lineTo(W * 0.24, h); ctx.closePath();
   const g = ctx.createLinearGradient(W * 0.3, 0, W, h); g.addColorStop(0, hex(c1, 0.95)); g.addColorStop(1, hex(c1, 0.35));
@@ -461,12 +453,108 @@ function sablonaStaty(ctx, h) {
   kresliZrno(ctx, W, h, 0.08);
 }
 
+// 🔢 Číslo: obří milník přes celou šířku, hráč před ním, jméno dole
+function sablonaCislo(ctx, h) {
+  const [b1, c2] = st.barvy, d = st.data;
+  const c1 = jas(b1) < 0.12 ? c2 : b1;
+  ctx.fillStyle = "#060608"; ctx.fillRect(0, 0, W, h);
+  if (!vyrez && foto) { celaFoto(ctx, h, "grayscale(0.4) brightness(0.55)"); }
+  rozmazaneFoto(ctx, h);
+  let g = ctx.createRadialGradient(W / 2, h * 0.3, 10, W / 2, h * 0.32, h * 0.65);
+  g.addColorStop(0, hex(c1, 0.75)); g.addColorStop(0.5, hex(c1, 0.2)); g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, h);
+  const s = d.staty.find((x) => x.hodnota) || (d.cislo ? { hodnota: `#${d.cislo}`, popis: "" } : null);
+  const yCislo = h * 0.34;
+  if (s) {
+    const t = s.hodnota.toUpperCase();
+    const v = velikostNaSirku(ctx, t, (x) => `${x}px ${PISMO_H}`, h * 0.27, W * 0.94);
+    const f = ease(faze(0.2, 0.7));
+    ctx.save(); ctx.globalAlpha = f; ctx.font = `${v}px ${PISMO_H}`; ctx.textAlign = "center";
+    ctx.translate(W / 2, yCislo); const sk = 1 + 0.25 * (1 - f); ctx.scale(sk, sk);
+    const tg = ctx.createLinearGradient(0, -v * 0.8, 0, 0); tg.addColorStop(0, "#ffffff"); tg.addColorStop(1, c2);
+    ctx.fillStyle = tg; ctx.shadowColor = hex(c2, 0.55); ctx.shadowBlur = 50;
+    ctx.fillText(t, 0, 0); ctx.restore();
+    if (s.popis) {
+      ctx.save(); ctx.globalAlpha = ease(faze(0.6, 0.5));
+      ctx.font = `800 ${Math.round(h * 0.034)}px ${PISMO_U}`; ctx.textAlign = "center"; ctx.fillStyle = "#ffffff";
+      ctx.letterSpacing = "6px"; ctx.fillText(s.popis.toUpperCase(), W / 2, yCislo + h * 0.055); ctx.restore();
+    }
+  }
+  const r = polohaHrace(h, 0.55);
+  if (r) {
+    ctx.save(); ctx.shadowColor = hex(c1, 0.9); ctx.shadowBlur = 60; ctx.drawImage(vyrez, r.x, r.y, r.w, r.h); ctx.restore();
+    ctx.drawImage(vyrez, r.x, r.y, r.w, r.h);
+  }
+  g = ctx.createLinearGradient(0, h * 0.68, 0, h);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.6, "rgba(0,0,0,0.8)"); g.addColorStop(1, "rgba(0,0,0,0.95)");
+  ctx.fillStyle = g; ctx.fillRect(0, h * 0.68, W, h * 0.32);
+  const jm = (d.jmeno || d.prijmeni || "").toUpperCase();
+  if (jm) {
+    const vj = velikostNaSirku(ctx, jm, (x) => `${x}px ${PISMO_H}`, h * 0.075, W - 120);
+    ctx.font = `${vj}px ${PISMO_H}`; radekZvyrazneni(ctx, jm, W / 2, h * 0.9, "#ffffff", c2);
+  }
+  if (d.podtitul) {
+    ctx.save(); ctx.globalAlpha = ease(faze(1.3, 0.5));
+    ctx.font = `italic 800 ${Math.round(h * 0.022)}px ${PISMO_T}`; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.fillText(d.podtitul, W / 2, h * 0.948, W - 120); ctx.restore();
+  }
+  if (d.prezdivka) stitek(ctx, d.prezdivka, W - 56, 60, c2, h);
+  kresliLogoPromo(ctx);
+  vineta(ctx, W, h, 0.45);
+  kresliZrno(ctx, W, h, 0.1);
+}
+
 function kresliDo(c, sablona = st.sablona) {
   const h = vyska();
   c.width = W; c.height = h;
   const ctx = c.getContext("2d");
   ctx.textBaseline = "alphabetic";
-  ({ plakat: sablonaPlakat, sticker: sablonaSticker, staty: sablonaStaty }[sablona] || sablonaPlakat)(ctx, h);
+  ctx.save();
+  if (anim != null) { const z = 1.06 - 0.06 * ease(Math.min(1, anim / DELKA_ANIM)); ctx.translate(W / 2, h / 2); ctx.scale(z, z); ctx.translate(-W / 2, -h / 2); }
+  ({ plakat: sablonaPlakat, sticker: sablonaSticker, staty: sablonaStaty, cislo: sablonaCislo }[sablona] || sablonaPlakat)(ctx, h);
+  ctx.restore();
+  // záblesk ve chvíli, kdy dopadne titulek
+  if (anim != null && anim > 0.9 && anim < 1.12) { ctx.fillStyle = `rgba(255,255,255,${0.35 * (1 - (anim - 0.9) / 0.22)})`; ctx.fillRect(0, 0, W, h); }
+}
+
+// ---------------------------------------------------------- animované MP4 --
+const DELKA_ANIM = 6, FPS_ANIM = 30;
+const MUXER_URL = "https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.js";
+function nactiMuxer() {
+  if (window.Mp4Muxer) return Promise.resolve(window.Mp4Muxer);
+  return new Promise((ok, chyba) => { const sc = document.createElement("script"); sc.src = MUXER_URL; sc.onload = () => ok(window.Mp4Muxer); sc.onerror = () => chyba(new Error("Nepodařilo se načíst knihovnu pro MP4.")); document.head.appendChild(sc); });
+}
+async function exportujVideo() {
+  if (typeof VideoEncoder === "undefined") { zprava("Tenhle prohlížeč neumí vytvořit video – použij Chrome nebo Edge.", "chyba"); return; }
+  const b = $("#prVideo"); b.disabled = true;
+  try {
+    const h = vyska();
+    const Mp4Muxer = await nactiMuxer();
+    let kodek = "avc1.640028";
+    try { kodek = (await window.DHReelsRender?.zjistiFormat?.())?.video || kodek; } catch { /* výchozí */ }
+    const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: "avc", width: W, height: h, frameRate: FPS_ANIM }, fastStart: "in-memory", firstTimestampBehavior: "offset" });
+    let chyba = null;
+    const enc = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: (e) => { chyba = e; } });
+    enc.configure({ codec: kodek, width: W, height: h, bitrate: 8_000_000, framerate: FPS_ANIM, avc: { format: "avc" } });
+    const c = document.createElement("canvas");
+    const n = DELKA_ANIM * FPS_ANIM;
+    for (let i = 0; i < n; i++) {
+      if (chyba) throw chyba;
+      anim = i / FPS_ANIM;
+      kresliDo(c);
+      const fr = new VideoFrame(c, { timestamp: Math.round((i / FPS_ANIM) * 1e6), duration: Math.round(1e6 / FPS_ANIM) });
+      enc.encode(fr, { keyFrame: i % 60 === 0 }); fr.close();
+      while (enc.encodeQueueSize > 6) await new Promise((ok) => setTimeout(ok, 5));
+      if (i % 15 === 0) zprava(`🎬 Skládám video… ${Math.round((i / n) * 100)} %`);
+    }
+    await enc.flush();
+    if (chyba) throw chyba;
+    muxer.finalize();
+    const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
+    G().stahniBlob(blob, `promo-${G().slug(st.data.prijmeni || st.jmeno || "hrac")}-${st.sablona}.mp4`);
+    zprava(`Video staženo ✓ ${DELKA_ANIM} s, ${W}×${h} – hodí se do Reels a Stories (přidej hudbu přímo v Instagramu).`, "ok");
+  } catch (e) { zprava(`Video se nepovedlo: ${esc(e.message)}`, "chyba"); }
+  finally { anim = null; b.disabled = false; vykresli(); }
 }
 
 let kresliCekani = null;
@@ -512,7 +600,7 @@ function vykresliFormular() {
     ${st.kredit ? `<p class="muted" style="font-size:12.5px;margin:6px 0 0">${esc(st.kredit)} – autor fotky se přidá do popisku.</p>` : ""}`;
   $("#prPopisek").value = popisekSKreditem();
   $("#prBarva1").value = st.barvy[0]; $("#prBarva2").value = st.barvy[1];
-  $("#prUhel").value = st.uhel; $("#prFormat").value = st.format; $("#prLogo").checked = st.logo;
+  $("#prUhel").value = st.uhel; $("#prFormat").value = st.format; $("#prLogo").checked = st.logo; $("#prFotoPozadi").checked = st.fotoPozadi !== false;
   $("#prZoom").value = st.hrac.zoom; $("#prX").value = st.hrac.x; $("#prY").value = st.hrac.y;
   $$("[data-pr-sablona]").forEach((b) => b.classList.toggle("on", b.dataset.prSablona === st.sablona));
 }
@@ -576,9 +664,11 @@ function init() {
           <label>Hráč vodorovně<input type="range" id="prX" min="-1" max="1" step="0.01"></label>
           <label>Hráč svisle<input type="range" id="prY" min="-1" max="1" step="0.01"></label>
           <label class="check"><input type="checkbox" id="prLogo"> Logo Deníku hokeje</label>
+          <label class="check"><input type="checkbox" id="prFotoPozadi"> Rozmazaná fotka v pozadí</label>
         </div>
         <div class="akce">
           <button type="button" class="btn" id="prStahnout">⬇️ Stáhnout PNG</button>
+          <button type="button" class="btn ghost" id="prVideo" title="6 s animace (nájezd kamery, dopad titulku, čísla) pro Reels a Stories">🎬 Animované MP4</button>
           <button type="button" class="btn ghost" id="prVyrizni">✂️ Vyříznout znovu</button>
           <button type="button" class="btn ghost" id="prNovy">↺ Nový hráč</button>
         </div>
@@ -605,6 +695,8 @@ function init() {
     $(id).addEventListener("input", (e) => { f(e.target.value); uloz(); vykresli(); });
   }
   $("#prLogo").addEventListener("change", (e) => { st.logo = e.target.checked; uloz(); vykresli(); });
+  $("#prFotoPozadi").addEventListener("change", (e) => { st.fotoPozadi = e.target.checked; uloz(); vykresli(); });
+  $("#prVideo").addEventListener("click", exportujVideo);
   el.addEventListener("click", (e) => {
     const s = e.target.closest("[data-pr-sablona]");
     if (s) { st.sablona = s.dataset.prSablona; uloz(); $$("[data-pr-sablona]").forEach((b) => b.classList.toggle("on", b === s)); vykresli(); }
@@ -631,6 +723,6 @@ function init() {
   document.addEventListener("dh:zalozka", (e) => { if (e.detail === "promo") vykresli(); });
 }
 
-window.DHPromo = { get stav() { return st; }, vykresli, nastavFoto, kresliDo };
+window.DHPromo = { get stav() { return st; }, vykresli, nastavFoto, kresliDo, exportujVideo };
 init();
 })();
