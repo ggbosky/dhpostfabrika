@@ -1,0 +1,23 @@
+{
+  "name": "DH Post Fabrika",
+  "short_name": "Post Fabrika",
+  "description": "Redakční nástroj Deníku hokeje – posty, carousely, reels, promo grafiky a YouTube.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090909",
+  "theme_color": "#090909",
+  "lang": "cs",
+  "icons": [
+    { "src": "brand/ikona-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "brand/ikona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "brand/ikona-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Nový post", "url": "./#post", "icons": [{ "src": "brand/ikona-192.png", "sizes": "192x192" }] },
+    { "name": "Carousel", "url": "./#carousel", "icons": [{ "src": "brand/ikona-192.png", "sizes": "192x192" }] },
+    { "name": "Reels", "url": "./#reels", "icons": [{ "src": "brand/ikona-192.png", "sizes": "192x192" }] },
+    { "name": "Promo hráče", "url": "./#promo", "icons": [{ "src": "brand/ikona-192.png", "sizes": "192x192" }] }
+  ]
+}

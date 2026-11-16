@@ -48,6 +48,7 @@ def main():
     shutil.rmtree(cil, ignore_errors=True)
     os.makedirs(cil)
     shutil.copytree(os.path.join(zdroj, "brand"), os.path.join(cil, "brand"))
+    shutil.copy(os.path.join(zdroj, "manifest.webmanifest"), os.path.join(cil, "manifest.webmanifest"))
     with open(os.path.join(os.path.dirname(__file__), "login.html"), encoding="utf-8") as f:
         sablona = f.read()
 

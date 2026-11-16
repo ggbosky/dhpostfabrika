@@ -281,6 +281,7 @@ async function polozkyPalety() {
     akce.unshift(["Náhled v Instagramu", "telefon", "ig instagram kontrola nahled", () => otevriIG(aktualni)]);
     akce.unshift(["Uložit koncept", "ulozit", "ulozit ctrl s", () => ulozKoncept(aktualni)]);
   }
+  if (!jeNainstalovano()) akce.push(["Nainstalovat aplikaci do PC", "styl", "instalovat desktop pc windows aplikace pwa plocha", nainstaluj]);
   if (window.__dhZamceno) akce.push(["Odhlásit (zamknout aplikaci)", "styl", "logout odhlasit heslo zamknout", odhlasit]);
   akce.forEach(([nazev, ikona, klic, spust]) => out.push({ skupina: "Akce", nazev, ikona, klic, spust }));
   try {
@@ -411,8 +412,44 @@ function init() {
     $(".bok-stav")?.appendChild(b);
   }
 
+  initInstalace();
+
   const start = location.hash.slice(1);
   jdi(STRANKY[start] ? start : "prehled");
+}
+
+// ------------------------------------------------- aplikace do PC (PWA) --
+
+const jeNainstalovano = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let instalVyzva = null;
+function initInstalace() {
+  instalVyzva = window.__dhInstal || null;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "pill odhlasit";
+  b.id = "shInstal";
+  b.textContent = "💻 Aplikace do PC";
+  b.title = "Nainstalovat jako aplikaci do počítače (vlastní okno, ikona na ploše a liště)";
+  b.hidden = jeNainstalovano();
+  b.addEventListener("click", nainstaluj);
+  $(".bok-stav")?.appendChild(b);
+  addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); instalVyzva = e; b.hidden = jeNainstalovano(); });
+  addEventListener("appinstalled", () => { b.hidden = true; instalVyzva = null; toast("Hotovo ✓ DH Post Fabrika je nainstalovaná – najdeš ji v nabídce Start a na ploše."); });
+}
+async function nainstaluj() {
+  if (jeNainstalovano()) { toast("Aplikace už běží jako nainstalovaná ✓"); return; }
+  if (instalVyzva) {
+    instalVyzva.prompt();
+    try { await instalVyzva.userChoice; } catch { /* nic */ }
+    instalVyzva = null;
+    return;
+  }
+  const edge = /Edg\//.test(navigator.userAgent), chrome = /Chrome\//.test(navigator.userAgent) && !edge;
+  alert(edge
+    ? "Instalace v Microsoft Edge:\n\n1. Vpravo nahoře klikni na ⋯ (Nastavení a další).\n2. Aplikace → Nainstalovat tento web jako aplikaci.\n3. Potvrď Nainstalovat a zaškrtni Připnout na hlavní panel / Vytvořit zástupce na ploše."
+    : chrome
+      ? "Instalace v Google Chrome:\n\n1. V adresním řádku vpravo klikni na ikonu „Nainstalovat“ (monitor se šipkou),\n   nebo ⋮ → Uložit a sdílet → Nainstalovat stránku jako aplikaci.\n2. Potvrď Nainstalovat."
+      : "Instalovat jako aplikaci jde v prohlížeči Google Chrome nebo Microsoft Edge (Windows i Mac). Otevři tuhle stránku v jednom z nich a klikni znovu na „💻 Aplikace do PC“.");
 }
 
 function odhlasit() {

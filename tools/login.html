@@ -8,6 +8,11 @@
 <link rel="icon" type="image/png" href="brand/favicon.png">
 <link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
 <meta name="theme-color" content="#090909">
+<link rel="manifest" href="manifest.webmanifest">
+<script>
+  // Instalace do PC (PWA): událost si schováme, aplikace po přihlášení nabídne tlačítko „Nainstalovat“.
+  addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); window.__dhInstal = e; });
+</script>
 <style>
   :root { color-scheme: dark; --red: #b0121a; --red-hot: #e01e26; --line: #2a2a2a; --muted: #9b9b9b; }
   * { box-sizing: border-box; }
