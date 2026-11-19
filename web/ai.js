@@ -99,7 +99,7 @@ async function geminiPrimo({ system, zadani, schema, teplota = 0.9, obrazky = []
 // Pozn.: hledání nejde kombinovat s JSON režimem, proto se JSON čte z textu.
 // casovyLimit: celkový čas na odpověď (ms). Gemini 2.5 Flash bez „přemýšlení“ odpoví i s hledáním
 // obvykle do 10 s; při přetížení se zkusí znovu / jiný model, ale nikdy déle než limit.
-async function hledatNaWebuGemini({ system, zadani, teplota = 0.3, casovyLimit = 30000 }) {
+async function hledatNaWebuGemini({ system, zadani, teplota = 0.3, casovyLimit = 30000, obrazky = [], odkazy = false }) {
   if (!maGemini()) throw new AIChyba("Chybí Gemini klíč – vlož ho v záložce Můj styl → AI pomocník.");
   const konec = Date.now() + casovyLimit;
   const poradi = ["gemini-2.5-flash", "gemini-2.5-flash", ...MODELY.filter((m) => m !== "gemini-2.5-flash")];
@@ -117,8 +117,9 @@ async function hledatNaWebuGemini({ system, zadani, teplota = 0.3, casovyLimit =
         headers: { "Content-Type": "application/json", "x-goog-api-key": klic() },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: zadani }] }],
-          tools: [{ google_search: {} }],
+          contents: [{ role: "user", parts: [...obrazky.map((o) => ({ inlineData: { mimeType: o.mime, data: o.data } })), { text: zadani }] }],
+          // odkazy: model si přečte i stránky, jejichž adresy jsou v zadání (URL context)
+          tools: odkazy ? [{ google_search: {} }, { url_context: {} }] : [{ google_search: {} }],
           generationConfig: {
             temperature: teplota,
             // bez dlouhého „přemýšlení“ – výrazně rychlejší odpověď
@@ -145,6 +146,8 @@ async function hledatNaWebuGemini({ system, zadani, teplota = 0.3, casovyLimit =
         zdroje,
         podpory: (gm.groundingSupports || []).map((s) => ({ text: s.segment?.text || "", indexy: s.groundingChunkIndices || [] })),
         dotazy: gm.webSearchQueries || [],
+        nactene: (kandidat.urlContextMetadata?.urlMetadata || []).map((m) => ({
+          url: m.retrievedUrl || "", ok: /SUCCESS/i.test(m.urlRetrievalStatus || "") })),
       };
       // Model odpověděl bez hledání na webu → jeden pokus s delším přemýšlením (pokud zbývá čas).
       if (!zdroje.length && !bezHledani && konec - Date.now() > 12000) { bezHledani = vysledek; rozpocet = 1024; continue; }
@@ -367,9 +370,16 @@ function textObjektu(x) {
 // Odpověď Claude → stejný tvar jako u Gemini: { text, zdroje, podpory, dotazy }.
 function claudeVysledek({ text, bloky, preruseno }) {
   const nalezene = new Map(); // klíč URL → URL z výsledků hledání
-  const dotazy = [];
+  const dotazy = [], nactene = [];
   for (const b of bloky) {
     if (b.type === "server_tool_use" && b.input?.query) dotazy.push(b.input.query);
+    if (b.type === "web_fetch_tool_result") {
+      const c = b.content || {};
+      const url = c.url || c.content?.source?.url || "";
+      const ok = c.type === "web_fetch_result";
+      nactene.push({ url, ok, chyba: ok ? "" : (c.error_code || "nepřečteno") });
+      if (ok && url) nalezene.set(klicUrl(url), url);
+    }
     if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
       b.content.forEach((r) => { if (r?.url) nalezene.set(klicUrl(r.url), r.url); });
     }
@@ -404,17 +414,22 @@ function claudeVysledek({ text, bloky, preruseno }) {
   objektyZTextu(text).forEach(projdi);
   const blok = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/i) || text.match(/^\s*(\[[\s\S]*\])\s*$/);
   if (blok) { try { projdi(JSON.parse(blok[1])); } catch { /* objekty už prošly výše */ } }
-  return { text, zdroje, podpory, dotazy, preruseno };
+  return { text, zdroje, podpory, dotazy, nactene, preruseno };
 }
 
-async function claudeWeb({ system, zadani, priTextu, casovyLimit, hledani = 4 }) {
+// odkazy: Claude si může přečíst i stránky, jejichž adresy jsou v zadání (nástroj web_fetch).
+async function claudeWeb({ system, zadani, priTextu, casovyLimit, hledani = 4, obrazky = [], odkazy = false }) {
   const r = await claudeVolani({
     system: system + POKYN_ZDROJE,
     zadani,
     priTextu,
     casovyLimit,
+    obrazky,
     nastaveni: {
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: hledani }],
+      tools: [
+        { type: "web_search_20260209", name: "web_search", max_uses: hledani },
+        ...(odkazy ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: 4 }] : []),
+      ],
       output_config: { effort: "low" },
     },
   });
