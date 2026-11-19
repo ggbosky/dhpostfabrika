@@ -1032,9 +1032,10 @@
       <div class="ovladani">
         <div class="cela radek">
           <label class="btn ghost small" for="foto" style="color:var(--text);font-weight:600">📷 Nahrát fotku</label>
+          <button type="button" class="btn ghost small" data-vlozit-fotku title="Vložit fotku zkopírovanou do schránky (na počítači stačí Ctrl+V)">📋 Vložit</button>
           <button type="button" class="btn ghost small" id="webFoto">🔍 Najít jinou fotku</button>
           <input type="file" id="foto" accept="image/*">
-          <span class="muted" style="font-size:13px">nebo přetáhni na náhled · bez fotky vznikne grafika s titulkem</span>
+          <span class="muted" style="font-size:13px">zkopírovanou fotku vlož <b>Ctrl+V</b> nebo přetáhni na náhled · bez fotky vznikne grafika s titulkem</span>
         </div>
         <div class="cela" id="fotoOvl" hidden>
           <div class="radek">
@@ -1101,7 +1102,7 @@
           <button type="button" class="btn ghost small" id="cReset">Začít znovu</button>
         </div>
         <p class="muted napoveda">Slovo mezi hvězdičkami <code>*takhle*</code> bude v nadpisu <b class="tematicka">tematickou barvou</b>
-          (vybereš u náhledu) a v textu <b class="zluta">žlutě</b>. Barvy jde u každého slidu změnit – 💧 kapátko nabere barvu přímo z fotky. Enter v nadpisu = nový řádek. Fotku posuneš tažením po náhledu.</p>
+          (vybereš u náhledu) a v textu <b class="zluta">žlutě</b>. Barvy jde u každého slidu změnit – 💧 kapátko nabere barvu přímo z fotky. Enter v nadpisu = nový řádek. Fotku posuneš tažením po náhledu. Zkopírovanou fotku vložíš <b>Ctrl+V</b> do vybraného slidu.</p>
         <div id="slidy"></div>
         <div class="akce"><button type="button" class="btn ghost" id="cPridat">＋ Přidat slide</button></div>
       </div>
@@ -1190,6 +1191,7 @@
           <b>Hlavní fotka (pozadí)</b>
           <div class="foto-radek">
             <label class="btn ghost small">📷 Nahrát<input type="file" accept="image/*" id="vFotoSoubor"></label>
+            <button type="button" class="btn ghost small" data-vlozit-fotku title="Vložit fotku zkopírovanou do schránky (na počítači stačí Ctrl+V)">📋 Vložit</button>
             <button type="button" class="btn ghost small" id="vFotoNajdi">🔍 Najít</button>
             <span class="jmeno" id="vFotoInfo"></span>
           </div>
@@ -1199,6 +1201,7 @@
           <b>Malá kulatá fotka (nepovinné)</b>
           <div class="foto-radek">
             <label class="btn ghost small">📷 Nahrát<input type="file" accept="image/*" id="vVlozkaSoubor"></label>
+            <button type="button" class="btn ghost small" data-vlozit-fotku title="Vložit fotku zkopírovanou do schránky (na počítači stačí Ctrl+V)">📋 Vložit</button>
             <button type="button" class="btn ghost small" id="vVlozkaNajdi">🔍 Najít</button>
             <button type="button" class="btn ghost small" id="vBezVlozky">Odebrat</button>
             <span class="jmeno" id="vVlozkaInfo"></span>
@@ -1601,30 +1604,31 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261119a"></script>
-<script src="grafika.js?v=20261119a"></script>
-<script src="koncepty.js?v=20261119a"></script>
-<script src="ai.js?v=20261119a"></script>
-<script src="app.js?v=20261119a"></script>
-<script src="carousel.js?v=20261119a"></script>
-<script src="vyroci.js?v=20261119a"></script>
-<script src="zpravy.js?v=20261119a"></script>
-<script src="reels-ulozeni.js?v=20261119a"></script>
-<script src="reels-hlas.js?v=20261119a"></script>
-<script src="reels-render.js?v=20261119a"></script>
-<script src="reels-zabery.js?v=20261119a"></script>
-<script src="reels.js?v=20261119a"></script>
-<script src="plan.js?v=20261119a"></script>
-<script src="stats.js?v=20261119a"></script>
-<script src="prehled.js?v=20261119a"></script>
-<script src="yt-ulozeni.js?v=20261119a"></script>
-<script src="vyrez.js?v=20261119a"></script>
-<script src="prepis.js?v=20261119a"></script>
-<script src="promo.js?v=20261119a"></script>
-<script src="miniatury.js?v=20261119a"></script>
-<script src="yt-api.js?v=20261119a"></script>
-<script src="yt-studio.js?v=20261119a"></script>
-<script src="yt-analytics.js?v=20261119a"></script>
-<script src="shell.js?v=20261119a"></script>
+<script src="sablony.js?v=20261119b"></script>
+<script src="grafika.js?v=20261119b"></script>
+<script src="koncepty.js?v=20261119b"></script>
+<script src="ai.js?v=20261119b"></script>
+<script src="app.js?v=20261119b"></script>
+<script src="carousel.js?v=20261119b"></script>
+<script src="vyroci.js?v=20261119b"></script>
+<script src="zpravy.js?v=20261119b"></script>
+<script src="reels-ulozeni.js?v=20261119b"></script>
+<script src="reels-hlas.js?v=20261119b"></script>
+<script src="reels-render.js?v=20261119b"></script>
+<script src="reels-zabery.js?v=20261119b"></script>
+<script src="reels.js?v=20261119b"></script>
+<script src="plan.js?v=20261119b"></script>
+<script src="stats.js?v=20261119b"></script>
+<script src="prehled.js?v=20261119b"></script>
+<script src="yt-ulozeni.js?v=20261119b"></script>
+<script src="vyrez.js?v=20261119b"></script>
+<script src="prepis.js?v=20261119b"></script>
+<script src="promo.js?v=20261119b"></script>
+<script src="miniatury.js?v=20261119b"></script>
+<script src="yt-api.js?v=20261119b"></script>
+<script src="yt-studio.js?v=20261119b"></script>
+<script src="yt-analytics.js?v=20261119b"></script>
+<script src="schranka.js?v=20261119b"></script>
+<script src="shell.js?v=20261119b"></script>
 </body>
 </html>

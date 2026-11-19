@@ -635,6 +635,7 @@ function init() {
           <button type="button" class="btn" id="prNavrhni">✨ Vytvořit</button>
           <button type="button" class="btn ghost" id="prNajdiFoto">🔍 Najít fotku</button>
           <label class="btn ghost">📷 Nahrát fotku<input type="file" id="prSoubor" accept="image/*"></label>
+          <button type="button" class="btn ghost" data-vlozit-fotku title="Vložit fotku zkopírovanou do schránky (na počítači stačí Ctrl+V)">📋 Vložit</button>
         </div>
         <div class="zprava" id="prZprava" hidden></div>
         <p class="muted" style="font-size:12.5px;margin:10px 0 0">Jen skutečné fotky (Wikimedia Commons s autorem, nebo tvoje vlastní) – nic se negeneruje.</p>

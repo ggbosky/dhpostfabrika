@@ -354,6 +354,7 @@ function kartaSlidu(s, i) {
       <div class="radek" style="gap:6px"><button type="button" class="btn ghost small" data-akce="uderneji" title="AI přepíše texty tohoto slidu úderněji">🔥 Úderněji</button><span class="c-stav muted"></span></div>
       <div class="foto-radek">
         <label class="btn ghost small" style="color:var(--text);font-weight:600">📷 ${s.img ? "Vlastní fotka" : "Nahrát fotku"}<input type="file" accept="image/*" data-akce="foto"></label>
+        <button type="button" class="btn ghost small" data-vlozit-fotku title="Vložit fotku zkopírovanou do schránky (na počítači stačí Ctrl+V)">📋 Vložit</button>
         <button type="button" class="btn ghost small" data-akce="webFoto">🔍 Najít fotku</button>
         ${s.img ? `<span class="jmeno" title="${esc(s.kredit || s.nazevFota)}">${esc(s.kredit ? s.kredit.replace("📸 Foto: ", "") : s.nazevFota)}</span><button type="button" class="btn ghost small" data-akce="bezFota">Odebrat</button>` : "<span>bez fotky = tmavé pozadí</span>"}
       </div>
