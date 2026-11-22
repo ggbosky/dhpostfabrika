@@ -295,8 +295,20 @@ function kresliDH(text) {
   const prvni = posledni - Math.max(0, radky.length - 1) * rozestup;
   const vNadpis = 94;
   const yNadpis = radky.length ? prvni - v - 28 : posledni;
-  G.ztmaveni(ctx, yNadpis - vNadpis - 430, yNadpis + 30, W, H);
+  // Plynulé ztmavení odspodu: žádná plná černá plocha, fotka prosvítá i pod textem.
+  // Začíná vysoko nad nadpisem a sílí pozvolna (easing), aby nebyl vidět žádný předěl.
+  const odY = Math.max(0, yNadpis - vNadpis - 520);
+  const zt = ctx.createLinearGradient(0, odY, 0, H);
+  for (let i = 0; i <= 24; i++) {
+    const t = i / 24;
+    const e = t * t * (3 - 2 * t); // smoothstep
+    zt.addColorStop(t, `rgba(0,0,0,${(0.9 * Math.pow(e, 0.85)).toFixed(3)})`);
+  }
+  ctx.fillStyle = zt;
+  ctx.fillRect(0, odY, W, H - odY);
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 2;
   if (nastaveni.titulekZap) {
     ctx.font = `700 ${vNadpis}px ${POPPINS}`;
     ctx.fillStyle = "#ffffff";
@@ -304,6 +316,7 @@ function kresliDH(text) {
   }
   ctx.font = `500 ${v}px ${ROBOTO}`;
   radky.forEach((r, i) => G.kresliBohatyRadek(ctx, r, okraj, prvni + i * rozestup, barva));
+  ctx.restore();
 
   // ikona vpravo nahoře
   const ik = ikonaKategorie(nastaveni.kategorie in KATEGORIE ? nastaveni.kategorie : "zajimavosti");
