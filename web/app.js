@@ -295,19 +295,24 @@ function kresliDH(text) {
   const prvni = posledni - Math.max(0, radky.length - 1) * rozestup;
   const vNadpis = 94;
   const yNadpis = radky.length ? prvni - v - 28 : posledni;
-  // Ztmavení jako u postů účtu: fotka nad nadpisem plynule přejde do černé, text pak leží na černé.
-  // Přechod končí těsně nad nadpisem (smoothstep = bez viditelné hrany).
-  const plneY = Math.min(H, yNadpis - vNadpis * 0.78);
-  const odY = Math.max(0, plneY - 400);
-  const zt = ctx.createLinearGradient(0, odY, 0, plneY);
-  for (let i = 0; i <= 24; i++) {
-    const t = i / 24;
-    zt.addColorStop(t, `rgba(0,0,0,${(t * t * (3 - 2 * t)).toFixed(3)})`);
+  // Ztmavení jako u postů účtu: žádná plná černá plocha. Fotka postupně tmavne od poloviny
+  // obrázku, pod nadpisem je ještě znát (cca 75 %) a teprve úplně dole je skoro černá.
+  // Jeden spojitý přechod bez plató → není vidět hrana ani „obdélník“.
+  const hlavaY = yNadpis - vNadpis * 0.75;             // horní hrana nadpisu
+  const odY = Math.max(0, Math.min(hlavaY - 520, H * 0.42));
+  const alfa = (y) => {
+    if (y <= odY) return 0;
+    if (y <= hlavaY) { const t = (y - odY) / (hlavaY - odY); return 0.74 * t * t * (3 - 2 * t); }
+    const t = (y - hlavaY) / Math.max(1, H - hlavaY);
+    return 0.74 + (0.93 - 0.74) * Math.sqrt(t);
+  };
+  const zt = ctx.createLinearGradient(0, odY, 0, H);
+  for (let i = 0; i <= 40; i++) {
+    const y = odY + (H - odY) * (i / 40);
+    zt.addColorStop(i / 40, `rgba(0,0,0,${alfa(y).toFixed(3)})`);
   }
   ctx.fillStyle = zt;
-  ctx.fillRect(0, odY, W, plneY - odY);
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, plneY - 1, W, H - plneY + 1);
+  ctx.fillRect(0, odY, W, H - odY);
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 2;
