@@ -295,17 +295,19 @@ function kresliDH(text) {
   const prvni = posledni - Math.max(0, radky.length - 1) * rozestup;
   const vNadpis = 94;
   const yNadpis = radky.length ? prvni - v - 28 : posledni;
-  // Plynulé ztmavení odspodu: žádná plná černá plocha, fotka prosvítá i pod textem.
-  // Začíná vysoko nad nadpisem a sílí pozvolna (easing), aby nebyl vidět žádný předěl.
-  const odY = Math.max(0, yNadpis - vNadpis - 520);
-  const zt = ctx.createLinearGradient(0, odY, 0, H);
+  // Ztmavení jako u postů účtu: fotka nad nadpisem plynule přejde do černé, text pak leží na černé.
+  // Přechod končí těsně nad nadpisem (smoothstep = bez viditelné hrany).
+  const plneY = Math.min(H, yNadpis - vNadpis * 0.78);
+  const odY = Math.max(0, plneY - 400);
+  const zt = ctx.createLinearGradient(0, odY, 0, plneY);
   for (let i = 0; i <= 24; i++) {
     const t = i / 24;
-    const e = t * t * (3 - 2 * t); // smoothstep
-    zt.addColorStop(t, `rgba(0,0,0,${(0.9 * Math.pow(e, 0.85)).toFixed(3)})`);
+    zt.addColorStop(t, `rgba(0,0,0,${(t * t * (3 - 2 * t)).toFixed(3)})`);
   }
   ctx.fillStyle = zt;
-  ctx.fillRect(0, odY, W, H - odY);
+  ctx.fillRect(0, odY, W, plneY - odY);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, plneY - 1, W, H - plneY + 1);
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 22; ctx.shadowOffsetY = 2;
