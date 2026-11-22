@@ -49,6 +49,62 @@ function jeDnesniDen(t) {
   return false;
 }
 
+// ------------------------------------------------- paměť už nalezených témat --
+// Každé nalezené téma se zapamatuje. Při dalším hledání ho AI dostane jako „už jsme měli“
+// a podobná témata se navíc vyřadí i po odpovědi – takže se pořád hledá něco nového.
+const KLIC_HIST = "dhpf_temata_historie";
+const norm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const slovaTematu = (s) => new Set(norm(s).split(" ").filter((w) => w.length >= 4 || /^\d{2,}$/.test(w)));
+
+function nactiHistorii() { try { return JSON.parse(localStorage.getItem(KLIC_HIST)) || []; } catch { return []; } }
+function zapamatuj(seznam) {
+  const h = nactiHistorii();
+  for (const t of seznam) {
+    if (!t?.titulek || h.some((x) => x.t === t.titulek)) continue;
+    h.unshift({ t: t.titulek, d: t.datum || "", f: (t.fakta || [])[0] || "", cas: Date.now() });
+  }
+  try { localStorage.setItem(KLIC_HIST, JSON.stringify(h.slice(0, 500))); } catch { /* plné úložiště */ }
+  vykresliPamet();
+}
+// Názvy z plánu publikace – i to už je „použité“.
+function nazvyZPlanu() {
+  try {
+    const p = JSON.parse(localStorage.getItem("dhpf_plan"));
+    const pole = Array.isArray(p) ? p : Array.isArray(p?.polozky) ? p.polozky : [];
+    return pole.map((x) => x?.nazev).filter(Boolean);
+  } catch { return []; }
+}
+// Stejné téma? Sdílí většinu klíčových slov (jména, týmy, čísla, roky) z titulku a hlavního faktu.
+function jeOpakovani(t, historie) {
+  const A = slovaTematu(`${t.titulek} ${(t.fakta || [])[0] || ""} ${t.datum || ""}`);
+  if (A.size < 2) return false;
+  return historie.some((h) => {
+    const B = slovaTematu(`${h.t} ${h.f || ""} ${h.d || ""}`);
+    let spolecna = 0;
+    A.forEach((w) => { if (B.has(w)) spolecna++; });
+    return spolecna >= 3 && spolecna / Math.min(A.size, B.size) >= 0.5;
+  });
+}
+function vykresliPamet() {
+  const el = $("#tPamet");
+  if (!el) return;
+  const n = nactiHistorii().length;
+  el.innerHTML = n ? `🧠 Pamatuji si ${n} už nalezených témat – hledám jen nová. <a href="#" id="tZapomen">Zapomenout</a>` : "";
+}
+
+// Pokaždé jiný úhel pohledu, aby AI nesahala po stejných „nejznámějších“ příbězích.
+const UHLY = ["brankáři", "obránci", "trenéři a jejich rozhodnutí", "juniorská mistrovství světa", "olympijské turnaje",
+  "československá liga 60.–80. let", "extraliga 90. let", "Češi v KHL", "draft NHL a nečekané volby", "Stanley Cup a play-off NHL",
+  "neznámí hráči s neuvěřitelným příběhem", "kuriózní góly a zápasy", "rekordní série a čísla", "rodinné hokejové dynastie",
+  "zimní stadiony a zápasy pod širým nebem", "rozhodčí a pravidla", "přestupy a emigrace hráčů", "kapitáni a lídři",
+  "nejmladší a nejstarší hráči", "nejdelší zápasy a prodloužení", "reprezentace na MS 70. a 80. let", "ženský hokej",
+  "dresy, čísla a jejich příběhy", "zranění a velké návraty", "hokejové rivality", "nižší soutěže a regionální kluby"];
+function nahodnyUhel() {
+  const u = [...UHLY].sort(() => Math.random() - 0.5).slice(0, 2);
+  const dekady = ["50.", "60.", "70.", "80.", "90.", "2000–2009", "2010–2019", "2020+"].sort(() => Math.random() - 0.5).slice(0, 2);
+  return { u, dekady };
+}
+
 let temata = [];
 let hledani = 0; // pořadí hledání – stará kontrola nesmí přepsat nová témata
 
@@ -76,6 +132,12 @@ async function najdiTemata() {
   const b = $("#tHledej");
   const moje = ++hledani;
   const klicFiltru = JSON.stringify([$("#tZamereni").value, $("#tObdobi").value, $("#tKde").value, vlastni, AI.dnes()]);
+  const historie = nactiHistorii();
+  const zPlanu = nazvyZPlanu();
+  const uzBylo = [...historie.slice(0, 150).map((h) => `${h.t}${h.d ? ` (${h.d})` : ""}`), ...zPlanu.slice(0, 60)];
+  const { u: uhly, dekady } = nahodnyUhel();
+  let opakovani = 0;
+  const nove = (pole) => pole.filter((t) => !jeOpakovani(t, historie) && !zPlanu.some((n) => jeOpakovani(t, [{ t: n }])));
   b.disabled = true;
   b.textContent = "Hledám na webu…";
   const start = Date.now();
@@ -93,7 +155,7 @@ async function najdiTemata() {
     const r = await AI.hledatNaWebuProud({
       priTextu: (text) => {
         if (moje !== hledani) return;
-        const nalezene = AI.objektyZTextu(text).filter((t) => t && t.titulek && (!jenDnes || jeDnesniDen(t)));
+        const nalezene = nove(AI.objektyZTextu(text).filter((t) => t && t.titulek && (!jenDnes || jeDnesniDen(t))));
         if (nalezene.length > videno) {
           videno = nalezene.length;
           temata = [...zOdkazu, ...nalezene.map((t) => ({ ...t, fakta: (t.fakta || []).filter(Boolean), zdroje: null }))];
@@ -110,11 +172,16 @@ Zásady:
   ${ZDROJE_TIPY}.
 - Když si nejsi jistý číslem nebo datem, téma vynech.
 - Žádná běžná zpravodajská témata (výsledky kola, přestupy, zranění), pokud v nich není rekord nebo milník.`,
-      zadani: `Najdi ${jenDnes ? "8" : "6"} nejzajímavějších témat.
+      zadani: `Najdi ${jenDnes ? "8" : "7"} zajímavých témat, která jsme ještě NEMĚLI.
 Druh: ${zamereni}.
 Období: ${obdobi}.
-Oblast: ${oblast}.${vlastni ? `\nUpřesnění od redaktora: ${vlastni}` : ""}
-
+Oblast: ${oblast}.${vlastni ? `\nUpřesnění od redaktora: ${vlastni}` : `
+Tentokrát hledej hlavně v těchto oblastech: ${uhly.join(", ")}${$("#tObdobi").value === "historie" ? `; přednostně z období ${dekady.join(" a ")}` : ""}.
+Nesahej po nejprofláknutějších příbězích (Nagano 98, Jágrovy rekordy, Hašek v Buffalu…), pokud k nim nemáš opravdu neznámý detail.`}
+${uzBylo.length ? `
+UŽ JSME MĚLI – tato témata NENAVRHUJ znovu, ani přeformulovaná (stejná událost, stejný rekord, stejný hráč ve stejné souvislosti):
+${uzBylo.map((x) => `- ${x}`).join("\n")}
+` : ""}
 Odpověz POUZE řádky JSON Lines – každé téma jeden řádek s jedním objektem, žádný jiný text:
 {"titulek": "krátký úderný titulek", "datum": "kdy se to stalo (den. měsíc. rok, nebo rok)", "fakta": ["krátké ověřené fakto", "…"] (2–4), "proc_zajimave": "1 věta", "format": "post" nebo "carousel"}`,
     });
@@ -123,6 +190,9 @@ Odpověz POUZE řádky JSON Lines – každé téma jeden řádek s jedním obje
     const vsech = data.length;
     if (jenDnes) data = data.filter(jeDnesniDen);
     const vyrazeno = vsech - data.length;
+    const predFiltrem = data.length;
+    data = nove(data);
+    opakovani = predFiltrem - data.length;
     const nova = data.map((t) => {
       const fakta = (t.fakta || []).filter(Boolean);
       const zdroje = AI.zdrojeProText(r, [t.titulek, ...fakta, t.proc_zajimave].join(" "));
@@ -131,15 +201,17 @@ Odpověz POUZE řádky JSON Lines – každé téma jeden řádek s jedním obje
     temata = [...zOdkazu, ...nova];
     if (!nova.length) {
       vykresli({});
+      if (opakovani) { zprava(`Našel jsem jen témata, která už jsme měli (${opakovani}). Klikni znovu – pokaždé hledám v jiných oblastech – nebo zkus jiný druh / období.`, "varovani"); return; }
       zprava(jenDnes ? `Na ${dnesniDen()} jsem tentokrát nenašel nic, co by šlo podložit zdrojem${vyrazeno ? ` (${vyrazeno} témat s jiným datem jsem vyřadil)` : ""}. Zkus to znovu nebo jiný druh / oblast.` : "Nic jsem nenašel. Zkus jiné zaměření nebo delší období.", "varovani");
       return;
     }
     clearInterval(odpocet);
     vykresli(r);
     ulozVysledek(klicFiltru, r);
+    zapamatuj(nova);
     b.disabled = false;
     b.textContent = "🔎 Najít témata";
-    zprava(`${nova.length === 1 ? "Nalezeno" : nova.length < 5 ? "Nalezena" : "Nalezeno"} ${pocetTemat(nova.length)} za ${Math.round((Date.now() - start) / 1000)} s${jenDnes ? `, ${nova.length === 1 ? "z" : "všechna z"} ${dnesniDen()}` : ""}${vyrazeno ? ` (${vyrazeno} s jiným datem vyřazeno)` : ""}${r.preruseno ? " (Google odpovídal pomalu, ukazuji, co stihl)" : ""}. Můžeš rovnou tvořit – druhá kontrola faktů běží na pozadí a odznaky se doplní samy.`, "ok");
+    zprava(`${nova.length === 1 ? "Nalezeno" : nova.length < 5 ? "Nalezena" : "Nalezeno"} ${pocetTemat(nova.length)} za ${Math.round((Date.now() - start) / 1000)} s${jenDnes ? `, ${nova.length === 1 ? "z" : "všechna z"} ${dnesniDen()}` : ""}${vyrazeno ? ` (${vyrazeno} s jiným datem vyřazeno)` : ""}${opakovani ? ` (${opakovani} už jsme měli – vyřazeno)` : ""}${r.preruseno ? " (Google odpovídal pomalu, ukazuji, co stihl)" : ""}. Můžeš rovnou tvořit – druhá kontrola faktů běží na pozadí a odznaky se doplní samy.`, "ok");
     overTemata(r, moje, nova).then(() => { if (moje === hledani) ulozVysledek(klicFiltru, r); }); // na pozadí, neblokuje
   } catch (e) {
     clearInterval(odpocet);
@@ -238,7 +310,7 @@ Odpověz POUZE blokem \`\`\`json s polem:
     odkazZprava(`Témata z odkazu: ${cile.length} · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (zkontroluj, co nesedí)` : ""}. Níž v seznamu vyber <b>✍️ Post</b>, <b>🎞️ Carousel</b>, <b>🎬 Reel</b> nebo <b>📆 Do plánu</b>.`, spatne ? "varovani" : "ok");
     return;
   }
-  zprava(`Nalezeno ${cile.length} témat · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b>, <b>🎞️ Carousel</b> nebo <b>🎬 Reel</b>, případně si téma ulož <b>📆 Do plánu</b>${temata.some(jeDnesniDen) ? " (u dnešních výročí i <b>📅 Dnes před lety</b>)" : ""}.`, spatne ? "varovani" : "ok");
+  zprava(`${cile.length === 1 ? "Nalezeno 1 téma" : cile.length < 5 ? `Nalezena ${cile.length} témata` : `Nalezeno ${cile.length} témat`} · ✅ ověřeno ${ok}${spatne ? ` · ❌ rozpor ${spatne} (ty raději nepoužívej)` : ""}. Vyber formát: <b>✍️ Post</b>, <b>🎞️ Carousel</b> nebo <b>🎬 Reel</b>, případně si téma ulož <b>📆 Do plánu</b>${temata.some(jeDnesniDen) ? " (u dnešních výročí i <b>📅 Dnes před lety</b>)" : ""}.`, spatne ? "varovani" : "ok");
 }
 
 function zadaniZTematu(t) {
@@ -396,6 +468,7 @@ Odpověz POUZE řádky JSON Lines – každé téma jeden řádek s jedním obje
     temata = [...nova, ...temata];
     vykresli(r);
     ulozVysledek("odkaz", r);
+    zapamatuj(nova);
     odkazy.forEach((u) => pridejDoSeznamu(u, text, { stav: "hotovo", pocet: nova.filter((t) => t.zOdkazu === u).length || nova.length, zpracovano: Date.now() }));
     $("#tOdkazy").value = "";
     $("#tOdkazText").value = "";
@@ -501,6 +574,14 @@ function init() {
   $("#tDnesVolba").textContent = `Výročí – stalo se ${dnesniDen()} (v jakémkoli roce)`;
   nactiPosledni();
   initOdkazy();
+  vykresliPamet();
+  $("#tPamet").addEventListener("click", (e) => {
+    if (e.target.id !== "tZapomen") return;
+    e.preventDefault();
+    if (!confirm("Zapomenout všechna už nalezená témata? Hledání je pak může nabídnout znovu.")) return;
+    try { localStorage.removeItem(KLIC_HIST); } catch { /* nic */ }
+    vykresliPamet();
+  });
   $("#tHledej").addEventListener("click", najdiTemata);
   $("#tSeznam").addEventListener("click", (e) => {
     const b = e.target.closest("button");
