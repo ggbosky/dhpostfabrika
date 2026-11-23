@@ -70,7 +70,7 @@ const prazdneBarvy = () => ({ hlavni: null, text: null, zvyrazneni: null });
 function barvySlidu(s) {
   const b = { ...prazdneBarvy(), ...(s.barvy || {}) };
   return s.typ === "titul"
-    ? { hlavni: b.hlavni || CERVENA, text: b.text || BILA, zvyrazneni: b.zvyrazneni || ZLUTA }
+    ? { hlavni: b.hlavni || CERVENA, text: b.text || BILA, zvyrazneni: b.zvyrazneni || b.hlavni || CERVENA }
     : { hlavni: b.hlavni || barvaNadpisu, text: b.text || BILA, zvyrazneni: b.zvyrazneni || ZLUTA };
 }
 
@@ -234,33 +234,97 @@ function kresliSwipe(ctx) {
   ctx.restore();
 }
 
+// Obálka jako posty účtu: barevná a bílá část tvoří JEDEN blok textu (Montserrat Black, verzálky, na střed),
+// zalomený do 2–3 řádků co největším písmem a s těsným řádkováním. Tečka na konci je bílá.
 function kresliTitul(ctx, s) {
-  // *slovo* v nápisu = zvýraznění vlastní barvou (jen na tomhle slidu)
-  const cervenyZ = s.cerveny.trim().toUpperCase();
-  const bilyZ = s.bily.trim().toUpperCase();
-  const cerveny = cervenyZ.replace(/\*/g, "");
-  const bily = bilyZ.replace(/\*/g, "");
   const barvy = barvySlidu(s);
-  const sirka = W - 120;
-  // Spodní řádek nesmí zasahovat do ikony „posuň dál“ vpravo dole (začíná na x ≈ 945):
-  // text je na střed, takže jeho šířka je nejvýš 2 × (925 − 540) px.
-  const sirkaDole = s.swipe ? 2 * (925 - W / 2) : sirka;
-  const vBily = bily ? velikostNaSirku(ctx, bily, 900, PISMO_TITUL, 170, sirkaDole) : 0;
-  const vCerveny = cerveny ? velikostNaSirku(ctx, cerveny, 900, PISMO_TITUL, 170, bily ? sirka : sirkaDole) : 0;
-  const yBily = H - 100;
-  const yCerveny = bily ? yBily - vBily * 0.72 - 75 : H - 110;
-  const horni = cerveny ? yCerveny - vCerveny * 0.72 : yBily - vBily * 0.72;
-  ztmaveni(ctx, horni - 600, horni + 150);
+  // slova s barvou: horní část = hlavní barva, dolní = bílá, *slovo* = zvýraznění; "\n" = vynucený nový řádek
+  const slova = [];
+  const pridej = (text, zaklad) => {
+    for (const [i, radek] of String(text || "").toUpperCase().split("\n").entries()) {
+      if (i > 0 && slova.length) slova.push(null);
+      for (const sl of naSlova(radek.trim())) slova.push(sl.map((u) => ({ t: u.t, c: u.a ? barvy.zvyrazneni : zaklad })));
+    }
+  };
+  pridej(s.cerveny, barvy.hlavni);
+  const hranice = slova.length; // první slovo bílé části – barevná část má ideálně vlastní řádky
+  pridej(s.bily, barvy.text);
+  while (slova.length && slova[slova.length - 1] === null) slova.pop();
+  if (!slova.length) { if (s.swipe) kresliSwipe(ctx); return; }
+  // koncová interpunkce v bílé (jako „JIHLAVA.“ na postech účtu)
+  const posl = slova[slova.length - 1];
+  const kus = posl[posl.length - 1];
+  const m = kus.t.match(/^(.*?)([.!?…:]+)$/u);
+  if (m && m[1] && kus.c !== barvy.text) { kus.t = m[1]; posl.push({ t: m[2], c: barvy.text }); }
+
+  const sirka = W - 130;
+  // poslední řádek nesmí zasahovat do ikony „posuň dál“ vpravo dole (text je na střed)
+  const sirkaDole = s.swipe ? 2 * (915 - W / 2) : sirka;
+  // Šířky měříme při 100 px a škálujeme. Pro 1–4 řádky najdeme vyvážené zalomení (nejužší nejširší řádek)
+  // a z něj největší písmo; vyhraje největší písmo, při podobné velikosti méně řádků.
+  ctx.font = `900 100px ${PISMO_TITUL}`;
+  const mez = ctx.measureText(" ").width;
+  const sirkaSl = (sl) => sl.reduce((a, u) => a + ctx.measureText(u.t).width, 0);
+  const useky = [[]];
+  for (const sl of slova) { if (sl === null) useky.push([]); else useky[useky.length - 1].push(sl); }
+  const bloky = useky.filter((u) => u.length);
+  const sirkaRadku = (r) => r.reduce((a, sl) => a + sirkaSl(sl), 0) + mez * (r.length - 1);
+  // všechna zalomení úseku do k řádků (slov je málo, stačí projít všechny možnosti)
+  const zalomeni = (u, k) => {
+    if (k === 1) return [[u]];
+    const out = [];
+    for (let i = 1; i <= u.length - k + 1; i++) for (const zbytek of zalomeni(u.slice(i), k - 1)) out.push([u.slice(0, i), ...zbytek]);
+    return out;
+  };
+  const MAX_V = 150, DOST_VELKE = 92;
+  let nejlepsi = null;
+  const indexSlova = new Map(slova.map((sl, i) => [sl, i]));
+  const sedi = (r) => !hranice || hranice >= slova.length || r.some((x) => indexSlova.get(x[0]) === hranice);
+  for (let n = bloky.length; n <= Math.max(4, bloky.length); n++) {
+    // rozděl n řádků mezi vynucené úseky (každý aspoň 1 řádek)
+    const varianty = [];
+    const rozdel = (i, zbyva, akt) => {
+      if (i === bloky.length) { if (zbyva === 0) varianty.push(akt); return; }
+      for (let k = 1; k <= Math.min(bloky[i].length, zbyva - (bloky.length - i - 1)); k++) {
+        for (const z of zalomeni(bloky[i], k)) rozdel(i + 1, zbyva - k, [...akt, ...z]);
+      }
+    };
+    rozdel(0, n, []);
+    let nej = null, nejSedi = null;
+    for (const r of varianty) {
+      const v = Math.min(MAX_V, ...r.map((x, i) => ((i === r.length - 1 ? sirkaDole : sirka) / sirkaRadku(x)) * 100));
+      if (!nej || v > nej.v) nej = { radky: r, v, n };
+      if (sedi(r) && (!nejSedi || v > nejSedi.v)) nejSedi = { radky: r, v, n };
+    }
+    // zalomení na hranici barevné a bílé části má přednost, pokud písmo není o moc menší
+    const kandidat = nejSedi && nejSedi.v >= nej.v * 0.88 ? nejSedi : nej;
+    if (kandidat && (!nejlepsi || nejlepsi.v < DOST_VELKE && kandidat.v > nejlepsi.v)) nejlepsi = kandidat;
+    // nejmenší počet řádků, při kterém je písmo dost velké (jako posty účtu: 2–3 řádky)
+    if (nejlepsi.v >= DOST_VELKE) break;
+  }
+  const radky = nejlepsi.radky;
+  const v = Math.max(56, Math.floor(nejlepsi.v));
+  ctx.font = `900 ${v}px ${PISMO_TITUL}`;
+  const rozestup = Math.round(v * 0.98); // těsné řádkování jako na postech účtu
+  const yPosledni = H - 105;
+  const yPrvni = yPosledni - (radky.length - 1) * rozestup;
+  const horni = yPrvni - v * 0.74;
+  ztmaveni(ctx, horni - 560, horni + 140);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  if (cerveny) {
-    ctx.font = `900 ${vCerveny}px ${PISMO_TITUL}`;
-    kresliRadek(ctx, naSlova(cervenyZ), W / 2, yCerveny, barvy.zvyrazneni, barvy.hlavni);
-  }
-  if (bily) {
-    ctx.font = `900 ${vBily}px ${PISMO_TITUL}`;
-    kresliRadek(ctx, naSlova(bilyZ), W / 2, yBily, barvy.zvyrazneni, barvy.text);
-  }
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 12;
+  const mezera = ctx.measureText(" ").width;
+  const sirkaV = (r) => r.reduce((a, sl) => a + sl.reduce((b, u) => b + ctx.measureText(u.t).width, 0), 0) + mezera * (r.length - 1);
+  radky.forEach((r, i) => {
+    let x = W / 2 - sirkaV(r) / 2;
+    const y = yPrvni + i * rozestup;
+    for (const sl of r) {
+      for (const u of sl) { ctx.fillStyle = u.c; ctx.fillText(u.t, x, y); x += ctx.measureText(u.t).width; }
+      x += mezera;
+    }
+  });
+  ctx.restore();
   if (s.swipe) kresliSwipe(ctx);
 }
 
