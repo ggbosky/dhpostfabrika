@@ -227,8 +227,8 @@ const SCHEMA = {
     datum: { type: "string", description: "den, kdy se událost PŮVODNĚ stala (rok v minulosti), ve tvaru D.M.RRRR" },
     text: { type: "string", description: "text do obrázku" },
     barva: { type: "string", description: "hex hlavní barvy týmu z příběhu, dobře čitelná na černé (např. #005DB8)" },
-    popisek: { type: "string", description: "text pod příspěvek bez hashtagů, max 400 znaků" },
-    dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty prvního řádku popisku" },
+    popisek: { type: "string", description: "text pod příspěvek bez hashtagů podle pravidel popisků: úvod „Podmět. Definující věta.“, pak 2–4 odstavce, bez otázky a bez emoji, cca 400–800 znaků" },
+    dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty úvodu popisku (podmět. definující věta)" },
     hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
     foto_dotaz: { type: "string", description: "hlavní fotka: 2–4 slova, hlavně jméno hráče/týmu" },
     vlozka_dotaz: { type: "string", description: "malá kulatá fotka: jiný hráč/osobnost nebo logo týmu, 2–4 slova" },
@@ -268,8 +268,9 @@ async function navrhni() {
 Datum ("datum") je den, kdy se událost PŮVODNĚ stala – v minulém roce, nikdy letošní datum (z něj se počítá „před X lety“).
 Text do obrázku ("text"): 1–2 úderné věty, celkem 50–100 znaků, ideálně 3 řádky oddělené \\n (každý řádek do ~32 znaků), BEZ emoji.
 Nejsilnější moment příběhu (číslo, okamžik, kontrast), ne suchý výčet. 3–5 klíčových slov obal hvězdičkami *takhle* – zobrazí se barvou týmu.
-Popisek: první řádek = hook s 📅 a tím nejsilnějším z příběhu, max 12 slov
-(„📅 Dnes před 31 lety…“ jen pokud událost připadá na dnešní den, jinak „📅 Před 31 lety…“), pak 1–2 krátké odstavce, na konci krátká otázka.
+Popisek: podle pravidel popisků níže. Začni podmětem příběhu a definující větou (ne datem ani „Před X lety“).
+Kdy se to stalo („Dnes je to přesně 31 let, co…“ jen pokud událost připadá na dnešní den, jinak „Před 31 lety…“) zmiň až ve druhém odstavci.
+Bez emoji, bez otázky na konci.
 
 ${AI.COPY}
 ${AI.stylDoPromptu()}

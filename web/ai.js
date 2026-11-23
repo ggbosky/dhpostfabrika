@@ -657,16 +657,14 @@ function stylDoPromptu() {
   let p = null;
   try { p = JSON.parse(localStorage.getItem("dhpf_profil")); } catch { /* nic */ }
   if (!p) {
-    return "Styl účtu (výchozí odhad): úderný fanouškovský tón, hook s 1 emoji, " +
-      "2–3 krátké odstavce, střídmě emoji (🏒 🚨 🔥 🇨🇿 👇), na konci otázka na fanoušky, " +
-      "hashtagy #denikhokeje #hokej + 1–3 k tématu (celkem 3–5).";
+    return "Styl účtu: vyprávěcí popisky podle vzoru výše – začátek podmětem a definující větou, 2–4 odstavce souvislostí, " +
+      "bez emoji, bez otázky na konci, 4–6 hashtagů malými písmeny (#hokej + druh + konkrétní téma).";
   }
   return [
     `Styl naučený z ${p.pocet} reálných postů účtu:`,
-    `- průměrná délka ${p.prumerZnaku} znaků (jen horní mez – piš kratší a údernější)`,
+    `- průměrná délka ${p.prumerZnaku} znaků (jen orientačně – řiď se pravidly popisků výše)`,
     `- hashtagy v každém postu: ${p.stale.join(" ") || "žádné"}; obvykle ${p.pocetTagu} hashtagů; časté: ${p.hashtagy.slice(0, 15).join(" ")}`,
-    `- emoji: ${p.emojiNaPost} na post${p.emoji.length ? ` (${p.emoji.join(" ")})` : ""}`,
-    p.cta.length ? `- typické výzvy na konci: ${p.cta.slice(0, 6).map((c) => `„${c}“`).join(", ")}` : "",
+    "- emoji ani otázku na konci nepoužívej (nový styl popisků má přednost před starými posty)",
   ].filter(Boolean).join("\n");
 }
 
@@ -676,33 +674,51 @@ function dnes() {
 }
 
 
-// Pravidla copywritingu pro všechny texty: krátce, úderně, s hookem.
-const COPY = `JAK PSÁT PRO @denik_hokeje – krátce, úderně, s hookem. Kratší je vždycky lepší než delší.
+// Pravidla popisků pro všechny texty: vyprávěcí styl účtu (podle vzoru redaktora).
+const COPY = `JAK PSÁT POPISKY PRO @denik_hokeje – vyprávěcí styl „hokejového dokumentu“: věcně, klidně, s kontextem.
 
-HOOK (první řádek) rozhoduje, jestli člověk přestane scrollovat:
-- Max 10 slov / 70 znaků – ve feedu musí být vidět celý. Žádný úvod, rovnou to nejsilnější z celého příběhu.
-- Postav ho na jednom z těchto vzorců:
-  • šokující číslo: „44 zápasů. Ani jedna prohra.“
-  • kontrast / paradox: „V Naganu chytal jako bůh. Doma ho nechtěli.“
-  • konkrétní okamžik: „63. minuta. Zbořil sám před brankou.“
-  • odvážné tvrzení: „Nejlepší sezóna, jakou kdy Čech v NHL odehrál.“
-  • nedokončená zápletka: „Nastoupil se zlomenou rukou. A pak…“
-- Konkrétní jméno, číslo nebo detail místo obecných slov. Nejvýš 1 emoji.
-- ZAKÁZÁNO: „Věděli jste, že…“, „Dnes si připomeneme…“, „Pojďme se podívat“, „Neuvěřitelný příběh“,
-  „legenda“ bez konkrétního důvodu, vykřičníky za každou větou, clickbait, který text nesplní.
+VZOR STYLU (napsal ho redaktor účtu – převezmi FORMU, nikdy obsah):
+"""
+IIHF. Organizace, bez které bychom si dnes už více než 100 let nemohli představit mezinárodní hokej, jak ho dnes vidíme.
+
+Organizace, která vznikla v roce 1908 v Paříži čistě jako evropský projekt, ve kterém bylo zúčastněno 5 zemí – Francie, Belgie, Švýcarsko, Velká Británie a Bohemia (tehdejší část Habsburské říše, ze které se později stalo Československo), až po dnešních 84 členů. To je 84 zemí, které mají svůj hokejový svaz uznávaný mezinárodní federací.
+
+Dnes řídí mezinárodní turnaje mužů, žen, juniorů a řadu dalších věkových kategorií i disciplín ledního hokeje.
+
+Je také součástí rozhodovacího procesu, kdy určuje a schvaluje, který hráč může hrát a kde.
+"""
+
+ZAČÁTEK (první odstavec) – podle vzoru „IIHF. Organizace, bez které…“:
+- Začni PODMĚTEM příběhu a tečkou: jméno hráče, týmu, organizace, turnaje, místa nebo věci
+  („Jaromír Jágr.“, „Kometa Brno.“, „Nagano.“, „Zahnutá čepel.“, „Zimní stadion Štvanice.“).
+- Hned za ním JEDNA definující věta, čím je výjimečný a proč na něm záleží:
+  „Hráč, který…“, „Klub, jenž…“, „Turnaj, na který…“, „Muž, bez kterého by…“, „Gól, po kterém…“.
+- NIKDY nezačínej číslem, letopočtem ani datem („44 zápasů.“, „1998.“, „27. dubna…“, „Před 30 lety…“),
+  otázkou ani emoji. Zakázané začátky: „Věděli jste“, „Dnes si připomeneme“, „Pojďme“, „Neuvěřitelný příběh“, „Legenda“.
+- Žádný clickbait, žádné vykřičníky, žádné basic věty typu „Byl to skvělý hráč.“
 
 TĚLO:
-- Nejvýš 3 krátké odstavce po 1–2 větách. Věta do 15 slov. Jedna věta = jedna informace.
-- Nejsilnější detail hned za hookem. Žádná vata, žádné opakování hooku, nevysvětluj samozřejmosti.
-- Tón: fanoušek, který ví víc – sebevědomě, živě, spisovně, bez patosu a bez zbytečných superlativů.
-- Poslední věta těla = pointa (překvapení, emoce nebo souvislost s dneškem).
+- 2–4 odstavce oddělené prázdným řádkem, každý 1–3 věty.
+- Vyprávěj souvislosti: jak to vzniklo, co se stalo, proč to bylo důležité, co z toho zůstalo dodnes.
+- Fakta (roky, čísla, jména, týmy) zasaď do vět, nevypisuj je jako seznam. Čísla patří dovnitř textu, ne na začátek.
+- Co mladší fanoušek nemusí znát, krátce vysvětli – klidně v závorce („Bohemia (tehdejší část Habsburské říše…)“).
+- Důležité číslo můžeš zopakovat a rozvést („…84 členů. To je 84 zemí, které…“).
+- Tón: znalý vypravěč – spisovně, věcně, plynule, bez patosu, bez superlativů a bez fanouškovského pokřikování.
+- Poslední odstavec příběh uzavře: význam, odkaz nebo souvislost s dneškem.
+- ŽÁDNÁ otázka na fanoušky a žádná výzva („napište do komentářů“, „sdílejte“, „co vy na to“).
 
-VÝZVA: jedna krátká otázka, na kterou jde odpovědět jedním slovem nebo názorem
-(„Lepší gólman: Hašek, nebo Vokoun? 👇“). Nikdy „Co na to říkáte?“.
+EMOJI: žádné.
+DÉLKA bez hashtagů: zhruba 400–800 znaků (podle toho, kolik je ověřených faktů – nic nenatahuj vatou).
+HASHTAGY: 4–6, malými písmeny bez diakritiky: obecný (#hokej), druh (#historie, #rekord…) a konkrétní k tématu
+(#iihf, #jagr, #nhl, #mistrovstvisveta, #kometabrno). Žádné obecné #sport #instagood.`;
 
-HASHTAGY: 3–5 (stálé hashtagy účtu + 1–3 k tématu). Žádné obecné #sport #instagood.
-DÉLKA celého textu bez hashtagů: ideálně 250–450 znaků. Délku z naučeného stylu ber jen jako horní mez.
-EMOJI: celkem 1–3, nikdy na začátku každého řádku.`;
+// Špatný začátek popisku (číslo, datum, otázka, emoji nebo otřepaná fráze)?
+function spatnyZacatek(text) {
+  const prvni = String(text || "").trim().split(/\n/)[0].trim();
+  if (!prvni) return false;
+  return /^[\d„"“(]/.test(prvni) || /^\p{Extended_Pictographic}/u.test(prvni) || /\?\s*$/.test(prvni) ||
+    /^(věděli|dnes|před\s+\d|pojďme|neuvěřiteln|legenda|tohle|víte)/i.test(prvni);
+}
 
 const PRAVIDLA = `Pravidla:
 - Piš česky, přirozeně, bez AI frází („v dnešním příspěvku“, „pojďme se podívat“).
@@ -821,7 +837,7 @@ function staleHashtagy() {
     const p = JSON.parse(localStorage.getItem("dhpf_profil"));
     if (p?.stale?.length) return p.stale;
   } catch { /* nic */ }
-  return ["#denikhokeje", "#hokej"];
+  return ["#hokej"];
 }
 
 function cisteHashtagy(seznam) {
@@ -981,7 +997,7 @@ function nabidniHooky(cil, hooky) {
   const seznam = [...new Set((hooky || []).map((h) => String(h || "").trim()).filter(Boolean))];
   const el = box.querySelector(".tn-hooky");
   el.innerHTML = seznam.length > 1
-    ? `<span class="muted">Hook:</span>${seznam.map((h) => `<button type="button" class="tn-hook" data-tn-hook="${h.replace(/"/g, "&quot;")}">${h.replace(/</g, "&lt;")}</button>`).join("")}`
+    ? `<span class="muted">Úvod:</span>${seznam.map((h) => `<button type="button" class="tn-hook" data-tn-hook="${h.replace(/"/g, "&quot;")}">${h.replace(/</g, "&lt;")}</button>`).join("")}`
     : "";
   zvyrazniHook(ta);
 }
@@ -1010,7 +1026,7 @@ async function upravText(ta, akce, tlacitko) {
     if (akce === "hook") {
       const r = await gemini({
         system,
-        zadani: `TEXT POSTU:\n${obsah.join("\n\n")}\n\nNapiš 5 nových hooků (první řádek) – každý podle jiného vzorce, max 10 slov, nejvýš 1 emoji. Seřaď od nejsilnějšího.`,
+        zadani: `TEXT POSTU:\n${obsah.join("\n\n")}\n\nNapiš 5 nových úvodů (první odstavec) podle pravidel ZAČÁTEK: podmět a tečka, pak jedna definující věta. Každý z jiného úhlu, bez čísla na začátku, bez emoji a bez otázky. Seřaď od nejsilnějšího.`,
         schema: { type: "object", properties: { hooky: { type: "array", items: { type: "string" } } }, required: ["hooky"] },
       });
       const hooky = (r.hooky || []).filter(Boolean);
@@ -1018,14 +1034,14 @@ async function upravText(ta, akce, tlacitko) {
       box.dataset.zpet = ta.value;
       nastavText(ta, slozText([hooky[0], ...obsah.slice(1)], chranene));
       nabidniHooky(ta, [obsah[0], ...hooky]);
-      stav.innerHTML = "Nový hook je nahoře ✓ Další varianty máš tady pod tím.";
+      stav.innerHTML = "Nový úvod je nahoře ✓ Další varianty máš tady pod tím.";
     } else {
       const ukol = akce === "kratsi"
-        ? "Zkrať tenhle text zhruba na polovinu. Zachovej hook (můžeš ho zlepšit), nejsilnější fakta, pointu a výzvu na konci. Vyhoď všechno, co nic nepřidává."
-        : "Přepiš tenhle text tak, aby byl úderný a čtivý podle pravidel výše: silnější hook, kratší věty, žádná vata, pointa, výzva na konci. Nesmí být delší než originál.";
+        ? "Zkrať tenhle text zhruba na polovinu. Zachovej úvod (podmět + definující věta, můžeš ho zlepšit), nejsilnější fakta a závěrečnou souvislost. Vyhoď všechno, co nic nepřidává. Žádná otázka, žádné emoji."
+        : "Přepiš tenhle text podle pravidel popisků výše: úvod podmětem a definující větou, plynulé vyprávění souvislostí, závěr s významem. Žádná otázka, žádné emoji. Nesmí být delší než originál.";
       const r = await gemini({
         system,
-        zadani: `TEXT POSTU:\n${obsah.join("\n\n")}\n\n${ukol}\nOdstavce odděl prázdným řádkem. První odstavec = hook (jeden řádek).`,
+        zadani: `TEXT POSTU:\n${obsah.join("\n\n")}\n\n${ukol}\nOdstavce odděl prázdným řádkem. První odstavec = úvod (podmět + jedna věta).`,
         schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
       });
       const novy = String(r.text || "").replace(/\n\s*#[\p{L}\p{N}_]+(\s+#[\p{L}\p{N}_]+)*\s*$/u, "").trim();
@@ -1052,7 +1068,7 @@ function initNastroje() {
     box.className = "text-nastroje";
     box.dataset.pro = ta.id;
     box.innerHTML = `<div class="tn-radek">
-        <button type="button" class="tn-btn" data-tn="hook" title="AI napíše nové varianty prvního řádku">🔁 Jiný hook</button>
+        <button type="button" class="tn-btn" data-tn="hook" title="AI napíše nové varianty úvodu">🔁 Jiný úvod</button>
         <button type="button" class="tn-btn" data-tn="kratsi" title="Zkrátí text zhruba na polovinu">✂️ Zkrátit</button>
         <button type="button" class="tn-btn" data-tn="udernejsi" title="Přepíše text úderněji, fakta nechá">🔥 Úderněji</button>
         <button type="button" class="tn-btn" data-tn="zpet" hidden>↶ Vrátit</button>
@@ -1153,6 +1169,6 @@ function init() {
   });
 }
 
-window.DHAI = { geminiPrimo, obrazekProAI, generujObrazek, OBR_MODELY, obrModel, obrZdarma, nastavObrModel: (m) => uloz(KLIC_OBR_MODEL, m), COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
+window.DHAI = { geminiPrimo, obrazekProAI, generujObrazek, OBR_MODELY, obrModel, obrZdarma, nastavObrModel: (m) => uloz(KLIC_OBR_MODEL, m), COPY, nabidniHooky, maClaude, maGemini, hledatNaWebuProud, objektyZTextu, hledatNaWebu, jsonZTextu, zdrojeProText, cisteHashtagy, maKlic, gemini, stylDoPromptu, spatnyZacatek, dnes, PRAVIDLA, hledejFotky, nactiWebFoto, vyberFoto, prvniFoto, kredit, AIChyba };
 init();
 })();

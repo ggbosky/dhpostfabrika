@@ -295,7 +295,7 @@ Pravidla:
 - "dotazy" = vyhledávací dotazy na ten konkrétní záběr ve více jazycích (cs, en, ru, sv, fi, de, fr): jména, tým, rok, akce,
   slova jako highlights / goal / footage / 1980s game / interview v daném jazyce. Ne jen jméno hráče.
 - "fakta" = čísla faktů ze seznamu, ze kterých scéna vychází.
-- Popisek pod reel česky: hook (1 řádek, max 10 slov) + 1 krátký odstavec + krátká otázka, celkem max 300 znaků. Hashtagy 3–5.
+- Popisek pod reel česky ve stylu účtu: úvod „Podmět. Definující věta.“ (např. „IIHF. Organizace, bez které…“ – nikdy nezačínej číslem ani datem), pak 1–2 odstavce souvislostí, bez emoji a bez otázky, celkem max 500 znaků. Hashtagy 4–6 malými písmeny.
 Tón: ${TONY[p.ton] || TONY.dokument}.`,
       zadani: `TÉMA: ${p.tema}\n\nOVĚŘENÁ FAKTA (číslo: fakt):\n${fakta.map((f) => `${f.i}: ${f.text}${f.rok ? ` (${f.rok})` : ""}${f.jistota === "nejiste" ? " [nejisté]" : ""}`).join("\n") || "(žádná rešerše – piš opatrně jen obecně známá fakta a vše sporné dej do nejiste)"}\n\nNapiš scénář.`,
       schema: SCHEMA_SCENAR,

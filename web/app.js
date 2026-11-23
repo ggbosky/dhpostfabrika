@@ -27,7 +27,7 @@ let historie = nacti("dhpf_historie", []);
 let typ = "vysledek";
 const hodnotyFormulare = {}; // typ -> {pole: hodnota}
 
-const STALE_VYCHOZI = ["#denikhokeje", "#hokej"];
+const STALE_VYCHOZI = ["#hokej"];
 const DOPLNKOVE_VYCHOZI = ["#ceskyhokej", "#hockey", "#icehockey", "#hokejovyfanousek"];
 const EMOJI = /(?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:️|‍(?:\p{Extended_Pictographic}|\p{Regional_Indicator})|\p{Regional_Indicator})*/gu;
 
@@ -454,11 +454,11 @@ function nastavRadek(prefix, novy) {
 const SCHEMA_POST = {
   type: "object",
   properties: {
-    hook: { type: "string", description: "nejsilnější hook: první řádek, max 10 slov, max 1 emoji" },
-    dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty hooku, každá podle jiného vzorce" },
-    telo: { type: "string", description: "max 3 krátké odstavce (1–2 věty) oddělené prázdným řádkem, celkem max 320 znaků" },
-    cta: { type: "string", description: "jedna krátká otázka pro fanoušky" },
-    hashtagy: { type: "array", items: { type: "string" }, description: "3–5 hashtagů" },
+    hook: { type: "string", description: "úvod (první odstavec): podmět a tečka, pak jedna definující věta – např. „IIHF. Organizace, bez které…“; nikdy nezačíná číslem, datem, otázkou ani emoji" },
+    dalsi_hooky: { type: "array", items: { type: "string" }, description: "3 další varianty úvodu, každá z jiného úhlu (stejný tvar: podmět. definující věta)" },
+    telo: { type: "string", description: "2–4 odstavce (1–3 věty) oddělené prázdným řádkem: souvislosti, fakta ve větách, vysvětlení v závorkách, závěr s významem; bez otázky a bez emoji; celkem cca 300–700 znaků" },
+    cta: { type: "string", description: "vždy prázdný řetězec – popisky účtu nekončí otázkou ani výzvou" },
+    hashtagy: { type: "array", items: { type: "string" }, description: "4–6 hashtagů malými písmeny bez diakritiky (#hokej, druh, konkrétní téma)" },
     titulek: { type: "string", description: "podtitulek do obrázku (pod velký nadpis kategorie): 1–2 krátké věty, celkem 8–16 slov (např. „Ten, kdo přinesl trend zahnuté čepele od Mikity do Evropy.“), bez emoji, neopakuje hook doslova; 2–4 klíčová slova dej do *hvězdiček* (zvýrazní se barvou kategorie)" },
     kategorie: { type: "string", enum: ["zajimavosti", "rekordy", "hraci", "historie", "tymy"], description: "kategorie postu: zajímavosti, rekordy, hráči, historie, týmy" },
     foto_dotazy: { type: "array", items: { type: "string" }, description: "2–3 dotazy pro Wikimedia Commons" },
@@ -490,11 +490,17 @@ async function navrhniPost() {
   aiZprava("AI píše text… (obvykle 5–15 s)");
   try {
     const AI = window.DHAI;
-    const r = await AI.gemini({
-      system: `Jsi nejlepší copywriter Instagram účtu @denik_hokeje (český hokej). Tvoje posty jsou krátké, úderné a lidi je sdílí.\n\n${AI.COPY}\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
+    let r = await AI.gemini({
+      system: `Jsi redaktor Instagram účtu @denik_hokeje (český hokej). Píšeš vyprávěcí popisky jako hokejový dokument – znalé, věcné a čtivé.\n\n${AI.COPY}\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
       zadani: `ZADÁNÍ OD REDAKTORA:\n${zadani}\n\nNapiš nový příspěvek.`,
       schema: SCHEMA_POST,
     });
+    // Úvod nesmí začínat číslem, datem, otázkou ani otřepanou frází – vezmi lepší variantu, jinak nech AI přepsat.
+    if (AI.spatnyZacatek(r.hook)) {
+      const lepsi = (r.dalsi_hooky || []).find((h) => h && !AI.spatnyZacatek(h));
+      if (lepsi) { r.dalsi_hooky = [r.hook, ...(r.dalsi_hooky || []).filter((h) => h !== lepsi)]; r.hook = lepsi; }
+    }
+    r.cta = ""; // nový styl: bez otázky na konci
     const tagy = window.DHAI.cisteHashtagy(r.hashtagy);
     const zdrojeRadek = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
     $("#text").value = [r.hook, r.telo, r.cta, zdrojeRadek, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
@@ -697,7 +703,7 @@ function vykresliProfil() {
   $("#pStyl").textContent = profil ? `Styl: naučený (${profil.pocet} postů)` : "Styl: výchozí";
   $("#pStyl").className = "pill " + (profil ? "ok" : "warn");
   if (!profil) {
-    el.innerHTML = `<p class="muted">Zatím se používá výchozí styl: hashtagy ${STALE_VYCHOZI.join(" ")} + soutěž a týmy, emoji střídmě, na konci otázka na fanoušky.</p>`;
+    el.innerHTML = `<p class="muted">Zatím se používá výchozí styl: hashtagy ${STALE_VYCHOZI.join(" ")} + druh a konkrétní téma, vyprávěcí popisky bez emoji a bez otázky na konci.</p>`;
     return;
   }
   el.innerHTML = `
