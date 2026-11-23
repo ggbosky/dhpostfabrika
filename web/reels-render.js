@@ -719,9 +719,10 @@ function prekryv(a, b) { return a.od < b.do && b.od < a.do; }
 async function kontrola(p) {
   const osa = casovaOsa(p);
   const vysl = [];
-  const pridej = (stav, text) => vysl.push({ stav, text });
+  // tvrda = nejde obejít (bez scén, nepodporovaný formát, nepotvrzená práva); ostatní ⛔ jde vyrenderovat i tak
+  const pridej = (stav, text, tvrda = false) => vysl.push({ stav, text, tvrda });
   const sceny = p.sceny;
-  if (!sceny.length) { pridej("chyba", "Projekt nemá žádné scény – nejdřív napiš scénář."); return { body: vysl, ok: false, osa }; }
+  if (!sceny.length) { pridej("chyba", "Projekt nemá žádné scény – nejdřív napiš scénář.", true); return { body: vysl, ok: false, osa }; }
 
   // 1) pohyblivé video
   let video = 0;
@@ -757,7 +758,7 @@ async function kontrola(p) {
 
   // 3) práva
   const bezPrav = [...new Set(pouziti.map((u) => u.klip))].map((id) => p.klipy[id]).filter((k) => k && !["volna", "prava"].includes(k.licence?.stav));
-  if (bezPrav.length) pridej("chyba", `Chybí potvrzení práv u ${bezPrav.length} záběrů: ${bezPrav.map((k) => `„${k.nazev}“`).join(", ")}. Potvrď je v knihovně záběrů.`);
+  if (bezPrav.length) pridej("chyba", `Chybí potvrzení práv u ${bezPrav.length} záběrů: ${bezPrav.map((k) => `„${k.nazev}“`).join(", ")}. Potvrď je v knihovně záběrů.`, true);
   else if (pouziti.length) pridej("ok", "Všechny záběry mají volnou licenci nebo potvrzená práva.");
 
   // 4) hlas a čeština (upoutávka bez namlouvání tyhle body přeskočí)
@@ -802,7 +803,7 @@ async function kontrola(p) {
   else pridej("ok", `Délka ${osa.celkem.toFixed(0)} s (cíl ${p.delka} s).`);
   if (osa.celkem > 90.5) pridej("chyba", "Reel je delší než 90 s.");
   const format = await zjistiFormat();
-  if (!format.video || !format.audio) pridej("chyba", format.poznamka);
+  if (!format.video || !format.audio) pridej("chyba", format.poznamka, true);
   else pridej(format.audio.mux === "aac" ? "ok" : "varovani", format.audio.mux === "aac" ? "Výstup MP4 · H.264 · 1080×1920 · AAC." : format.poznamka);
 
   // 8) dostupnost záběrů

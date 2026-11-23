@@ -734,7 +734,7 @@
   .koncept-typ { font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; color: var(--yellow); }
   #kPocet { color: var(--muted); font-weight: 600; }
   /* --------------------------------------------------------- Reels Factory */
-  .r-hlavicka { margin-bottom: 14px; }
+  .r-hlavicka { margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
   .r-kroky { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 18px; scrollbar-width: thin; }
   .r-krok { flex: none; border: 1px solid var(--line-2); background: #101010; color: #ccc; border-radius: 999px; padding: 8px 14px; font: 700 13px var(--uzke); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
   .r-krok:hover:not(:disabled) { border-color: var(--red-hot); color: #fff; }
@@ -1239,6 +1239,7 @@
     <div class="r-hlavicka">
       <div><h2 style="margin:0">🎬 Reels Factory <span class="muted">historické dokumenty z autentických záběrů</span></h2>
         <small class="muted"><b id="rNazevProjektu">Žádný otevřený projekt</b> · <span id="rUlozeno"></span> · <span id="rFormat"></span></small></div>
+      <button type="button" class="btn ghost small r-uloz-pozdeji" hidden title="Uloží rozpracovaný reel – dokončíš ho později (Koncepty nebo Reels → Založení)">💾 Uložit na později</button>
     </div>
     <nav class="r-kroky">
       <button type="button" class="r-krok on" data-krok="zalozit">1 · Nový reel</button>
@@ -1387,7 +1388,8 @@
             <h2>Kontrola kvality a export</h2>
             <div class="akce" style="margin-top:0"><button type="button" class="btn ghost" id="rKontrolaBtn">✔ Zkontrolovat</button>
               <button type="button" class="btn" id="rRender" disabled>🎬 Vyrenderovat MP4</button>
-              <button type="button" class="btn ghost" id="rZrusit" hidden>Zrušit</button></div>
+              <button type="button" class="btn ghost" id="rZrusit" hidden>Zrušit</button>
+              <button type="button" class="btn ghost r-uloz-pozdeji" hidden>💾 Uložit na později</button></div>
             <progress id="rPrubeh" max="1" value="0" hidden style="width:100%;margin-top:12px"></progress>
             <div class="zprava" id="rRenderZprava" hidden></div>
             <div id="rKontrola"></div>
@@ -1605,31 +1607,31 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261123a"></script>
-<script src="grafika.js?v=20261123a"></script>
-<script src="koncepty.js?v=20261123a"></script>
-<script src="ai.js?v=20261123a"></script>
-<script src="app.js?v=20261123a"></script>
-<script src="carousel.js?v=20261123a"></script>
-<script src="vyroci.js?v=20261123a"></script>
-<script src="zpravy.js?v=20261123a"></script>
-<script src="reels-ulozeni.js?v=20261123a"></script>
-<script src="reels-hlas.js?v=20261123a"></script>
-<script src="reels-render.js?v=20261123a"></script>
-<script src="reels-zabery.js?v=20261123a"></script>
-<script src="reels.js?v=20261123a"></script>
-<script src="plan.js?v=20261123a"></script>
-<script src="stats.js?v=20261123a"></script>
-<script src="prehled.js?v=20261123a"></script>
-<script src="yt-ulozeni.js?v=20261123a"></script>
-<script src="vyrez.js?v=20261123a"></script>
-<script src="prepis.js?v=20261123a"></script>
-<script src="promo.js?v=20261123a"></script>
-<script src="miniatury.js?v=20261123a"></script>
-<script src="yt-api.js?v=20261123a"></script>
-<script src="yt-studio.js?v=20261123a"></script>
-<script src="yt-analytics.js?v=20261123a"></script>
-<script src="schranka.js?v=20261123a"></script>
-<script src="shell.js?v=20261123a"></script>
+<script src="sablony.js?v=20261123b"></script>
+<script src="grafika.js?v=20261123b"></script>
+<script src="koncepty.js?v=20261123b"></script>
+<script src="ai.js?v=20261123b"></script>
+<script src="app.js?v=20261123b"></script>
+<script src="carousel.js?v=20261123b"></script>
+<script src="vyroci.js?v=20261123b"></script>
+<script src="zpravy.js?v=20261123b"></script>
+<script src="reels-ulozeni.js?v=20261123b"></script>
+<script src="reels-hlas.js?v=20261123b"></script>
+<script src="reels-render.js?v=20261123b"></script>
+<script src="reels-zabery.js?v=20261123b"></script>
+<script src="reels.js?v=20261123b"></script>
+<script src="plan.js?v=20261123b"></script>
+<script src="stats.js?v=20261123b"></script>
+<script src="prehled.js?v=20261123b"></script>
+<script src="yt-ulozeni.js?v=20261123b"></script>
+<script src="vyrez.js?v=20261123b"></script>
+<script src="prepis.js?v=20261123b"></script>
+<script src="promo.js?v=20261123b"></script>
+<script src="miniatury.js?v=20261123b"></script>
+<script src="yt-api.js?v=20261123b"></script>
+<script src="yt-studio.js?v=20261123b"></script>
+<script src="yt-analytics.js?v=20261123b"></script>
+<script src="schranka.js?v=20261123b"></script>
+<script src="shell.js?v=20261123b"></script>
 </body>
 </html>

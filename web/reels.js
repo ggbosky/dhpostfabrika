@@ -36,6 +36,17 @@ function ulozPozdeji() {
   }, 700);
 }
 
+// Uložit hned (bez čekání) – tlačítko „💾 Uložit na později“.
+async function ulozHned() {
+  if (!p) return;
+  clearTimeout(ukladani);
+  p.upraveno = Date.now();
+  await U.uloz("projekty", JSON.parse(JSON.stringify(p)));
+  $("#rUlozeno").textContent = `Uloženo ${new Date().toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}`;
+  vykresliProjekty();
+  window.DHKoncepty?.vykresliSeznam?.();
+}
+
 function stahni(blob, nazev) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = nazev;
@@ -98,6 +109,7 @@ function prepniKrok(k) {
 
 function vykresliVse() {
   $("#rNazevProjektu").textContent = p ? `${p.nazev} · ${p.delka} s` : "Žádný otevřený projekt";
+  $$(".r-uloz-pozdeji").forEach((b) => { b.hidden = !p; });
   $$(".r-krok").forEach((b) => { if (b.dataset.krok !== "zalozit") b.disabled = !p; });
   // upoutávka z videa se nenamlouvá – krok Hlas (a rešerše) zmizí
   $$('.r-krok[data-krok="hlas"], .r-krok[data-krok="vyzkum"]').forEach((b) => { b.hidden = !!p?.bezHlasu; });
@@ -868,8 +880,13 @@ async function obnovKontrolu() {
   const k = await R.kontrola(p);
   const ikona = { ok: "✅", varovani: "⚠️", chyba: "⛔" };
   $("#rKontrola").innerHTML = `<ul class="overeni">${k.body.map((b) => `<li class="r-qc ${b.stav}"><span>${ikona[b.stav]}</span><div>${esc(b.text)}</div></li>`).join("")}</ul>`;
-  $("#rRender").disabled = !k.ok;
-  zprava("#rRenderZprava", k.ok ? "Kontrola prošla – můžeš renderovat." : "Export je zablokovaný, dokud nevyřešíš body označené ⛔. Kvalita a autenticita mají přednost.", k.ok ? "ok" : "chyba");
+  const tvrde = k.body.filter((b) => b.stav === "chyba" && b.tvrda);
+  const tl = $("#rRender");
+  tl.disabled = tvrde.length > 0;
+  tl.textContent = k.ok ? "🎬 Vyrenderovat MP4" : "⚠️ Vyrenderovat i tak";
+  zprava("#rRenderZprava", k.ok ? "Kontrola prošla – můžeš renderovat."
+    : tvrde.length ? "Export teď nejde: body označené ⛔ výše (práva k záběrům / chybějící scény / formát) se musí vyřešit."
+      : "Kontrola našla problémy (⛔). Můžeš je opravit, nebo kliknout na <b>⚠️ Vyrenderovat i tak</b> – video se vytvoří i s nimi.", k.ok ? "ok" : tvrde.length ? "chyba" : "varovani");
   $("#rQcSouhrn").innerHTML = k.body.filter((b) => b.stav !== "ok").length ? `${k.body.filter((b) => b.stav === "chyba").length} ⛔ · ${k.body.filter((b) => b.stav === "varovani").length} ⚠️` : "✅ připraveno";
   return k;
 }
@@ -877,7 +894,12 @@ async function obnovKontrolu() {
 let zrusit = false;
 async function vyrenderuj() {
   const k = await obnovKontrolu();
-  if (!k?.ok) return;
+  if (!k) return;
+  if (!k.ok) {
+    if (k.body.some((x) => x.stav === "chyba" && x.tvrda)) return;
+    const problemy = k.body.filter((x) => x.stav === "chyba").map((x) => `• ${x.text}`).join("\n");
+    if (!confirm(`Kontrola našla tyto problémy:\n\n${problemy}\n\nVyrenderovat video i tak?`)) return;
+  }
   nahled?.zastav();
   zrusit = false;
   const b = $("#rRender"); b.disabled = true;
@@ -900,7 +922,7 @@ async function vyrenderuj() {
     zprava("#rRenderZprava", `Hotovo za ${Math.round((Date.now() - start) / 1000)} s. Reel je uložený i v historii.`, "ok");
     vykresliHistorii();
   } catch (e) { zprava("#rRenderZprava", esc(e.message), "chyba"); }
-  finally { b.disabled = false; $("#rZrusit").hidden = true; $("#rPrubeh").hidden = true; }
+  finally { $("#rZrusit").hidden = true; $("#rPrubeh").hidden = true; await obnovKontrolu(); }
 }
 
 function scenarText() {
@@ -1119,6 +1141,12 @@ function init() {
   $("#rPosuv").addEventListener("input", (e) => { if (!p || nahled.bezi) return; const t = +e.target.value; $("#rCas").textContent = `${cas(t)} / ${cas(R.casovaOsa(p).celkem)}`; nahled.snimek(t); });
   $("#rKontrolaBtn").addEventListener("click", obnovKontrolu);
   $("#rRender").addEventListener("click", vyrenderuj);
+  $$(".r-uloz-pozdeji").forEach((b) => b.addEventListener("click", async () => {
+    try {
+      await ulozHned();
+      window.DHToast?.("💾 Uloženo. Rozpracovaný reel najdeš v <b>Koncepty</b> a v Reels → 1. Založení.", "ok");
+    } catch (e) { window.DHToast?.(`Uložení selhalo: ${esc(e.message)}`, "chyba"); }
+  }));
   $("#rZrusit").addEventListener("click", () => { zrusit = true; });
   $("#rExScenar").addEventListener("click", () => p && stahni(new Blob([scenarText()], { type: "text/plain;charset=utf-8" }), `${slug(p.nazev)}-scenar.txt`));
   $("#rExSrt").addEventListener("click", () => p && stahni(new Blob([R.srt(p)], { type: "text/plain;charset=utf-8" }), `${slug(p.nazev)}.srt`));

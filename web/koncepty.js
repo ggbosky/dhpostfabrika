@@ -216,8 +216,9 @@ async function vykresliSeznam() {
   const rucni = zaznamy.filter((z) => !z.auto).length;
   $("#kPocet").textContent = rucni ? String(rucni) : "";
   document.dispatchEvent(new CustomEvent("dh:koncepty"));
+  const reelsHtml = await reelsKoncepty();
   if (!zaznamy.length) {
-    el.innerHTML = `<p class="muted">Zatím žádné koncepty. V záložce Nový post, Carousel nebo Dnes před lety klikni na <b>💾 Uložit koncept</b>.</p>`;
+    el.innerHTML = reelsHtml || `<p class="muted">Zatím žádné koncepty. V záložce Nový post, Carousel nebo Dnes před lety klikni na <b>💾 Uložit koncept</b>.</p>`;
     return;
   }
   el.innerHTML = zaznamy.map((z) => {
@@ -240,13 +241,41 @@ async function vykresliSeznam() {
         </div>
       </div>
     </article>`;
+  }).join("") + reelsHtml;
+}
+
+// Reels a upoutávky z YouTube – projekty se ukládají samy, tady jdou otevřít a dokončit.
+async function reelsKoncepty() {
+  const U = window.DHReelsUloziste;
+  if (!U) return "";
+  let vse = [];
+  try { vse = await U.vsechny("projekty"); } catch { return ""; }
+  if (!vse.length) return "";
+  vse.sort((a, b) => (b.upraveno || 0) - (a.upraveno || 0));
+  return vse.slice(0, 30).map((x) => {
+    const kdy = new Date(x.upraveno || x.vytvoreno || Date.now()).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    const hotovo = (x.rendery || []).length;
+    return `<article class="koncept">
+      <button type="button" class="koncept-nahled" data-otevri-reel="${esc(x.id)}" title="Otevřít"><span>${x.upoutavka ? "▶️ upoutávka" : "🎬 reel"}</span></button>
+      <div class="koncept-info">
+        <span class="koncept-typ">${x.upoutavka ? "🎬 Upoutávka z YouTube" : "🎬 Reel"} · ${(x.sceny || []).length} úseků · ${x.delka} s${hotovo ? ` · <em class="auto">vyrenderováno ${hotovo}×</em>` : " · <em class=\"auto\">rozpracováno</em>"}</span>
+        <b>${esc(x.nazev)}</b>
+        <small class="muted">upraveno ${kdy}</small>
+        <div class="radek" style="margin-top:8px"><button type="button" class="btn small" data-otevri-reel="${esc(x.id)}">Otevřít a dokončit</button></div>
+      </div>
+    </article>`;
   }).join("");
 }
 
 function init() {
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-uloz-koncept], [data-uloz-novy], [data-otevri], [data-smaz], [data-otevri-koncepty], [data-naplanuj]");
+    const t = e.target.closest("[data-uloz-koncept], [data-uloz-novy], [data-otevri], [data-smaz], [data-otevri-koncepty], [data-naplanuj], [data-otevri-reel]");
     if (!t) return;
+    if (t.dataset.otevriReel) {
+      window.DHShell?.jdi("reels");
+      try { await window.DHReels?.otevri(t.dataset.otevriReel); } catch (err) { alert(err.message); }
+      return;
+    }
     if (t.dataset.naplanuj) { window.DHPlan?.upravit({ format: t.dataset.typ, nazev: t.dataset.nazev, konceptId: t.dataset.naplanuj, stav: "rozpracovano" }); return; }
     if (t.dataset.ulozKoncept) uloz(t.dataset.ulozKoncept);
     else if (t.dataset.ulozNovy) { e.preventDefault(); uloz(t.dataset.ulozNovy, true); }
