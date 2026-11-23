@@ -357,7 +357,8 @@ function kresliPruhYouTube(ctx, p, t) {
   const a = Math.min(1, t / 0.35);
   ctx.save();
   ctx.globalAlpha = a;
-  const x = 70, y = 150;
+  // pod horní bezpečnou zónou Reels/Stories/TikToku (jméno účtu, ikony) – cca 15 % výšky
+  const x = 70, y = 300;
   // ikona přehrávání (červený zaoblený obdélník s bílým trojúhelníkem)
   const iw = 112, ih = 78;
   ctx.fillStyle = "#ff0033"; ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 18;
