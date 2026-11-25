@@ -493,6 +493,7 @@
   #planDialog .dva { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   #planDialog form { display: grid; gap: 12px; }
 
+  .pill:empty { display: none; }
   .pill { font: 700 12px var(--uzke); letter-spacing: .08em; text-transform: uppercase; padding: 6px 11px; border-radius: 999px; background: rgba(0,0,0,.55); border: 1px solid var(--line-2); color: #cfcfcf; backdrop-filter: blur(6px); }
   .pill::before { content: "●"; margin-right: 6px; color: #666; }
   .pill.ok { color: var(--ok-text); border-color: rgba(143, 227, 160, .35); }
@@ -612,6 +613,11 @@
   .filtry.tri { grid-template-columns: repeat(3, 1fr); }
   #tSeznam { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; margin-top: 22px; }
   #tSeznam > p { grid-column: 1 / -1; }
+  #tHotove { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; }
+  #tHotove:not(:empty) { margin-top: 18px; }
+  .tema.hotovy::before { background: linear-gradient(180deg, #36c000, #1b6b00); }
+  .hotovy-titulek { margin: 0 0 8px; font: 800 14px var(--uzke); letter-spacing: .03em; text-transform: uppercase; color: #ffd24d; }
+  .hotovy-text { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: #e4e4e4; max-height: 210px; overflow: auto; }
   .tema { position: relative; background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--line); border-radius: 16px; padding: 20px 20px 18px; display: flex; flex-direction: column; overflow: hidden; transition: border-color .15s, transform .15s; }
   .tema::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--red-hot), var(--red-deep)); }
   .tema:hover { border-color: #3a3a3a; transform: translateY(-2px); }
@@ -959,7 +965,16 @@
   <section id="zalozkaYoutube" hidden data-zalozka="youtube"><div id="youtubeObsah"></div></section>
   <section id="zalozkaYtstats" hidden data-zalozka="ytstats"><div id="ytstatsObsah"></div></section>
   <section id="zalozkaTemata" hidden data-zalozka="temata">
-    <div class="card">
+    <div class="card" id="tHotoveKarta">
+      <h2>🎲 Hotové nápady <span class="muted">AI sama vylosuje téma, najde ho na webu, ověří fakta a napíše hotové posty – ty jen vybereš</span> <span class="pill" id="tHotovePocet"></span></h2>
+      <div class="akce" style="align-items:center">
+        <button type="button" class="btn" id="tPrekvap">🎲 Překvap mě</button>
+        <label class="check" style="margin:0"><input type="checkbox" id="tHotoveAuto"> Připravit nové nápady každý den automaticky (při otevření aplikace)</label>
+      </div>
+      <div class="zprava" id="tHotoveZprava" hidden></div>
+      <div id="tHotove"></div>
+    </div>
+    <div class="card" style="margin-top:18px">
       <h2>🔎 Najdi zajímavost <span class="muted">milníky · rekordy · výročí · příběhy – AI hledá na webu a dává zdroje</span></h2>
       <div class="filtry tri">
         <label>Co hledat<select id="tZamereni">
@@ -1609,31 +1624,31 @@
 </dialog>
 <div class="toasty" id="toasty" aria-live="polite"></div>
 
-<script src="sablony.js?v=20261125a"></script>
-<script src="grafika.js?v=20261125a"></script>
-<script src="koncepty.js?v=20261125a"></script>
-<script src="ai.js?v=20261125a"></script>
-<script src="app.js?v=20261125a"></script>
-<script src="carousel.js?v=20261125a"></script>
-<script src="vyroci.js?v=20261125a"></script>
-<script src="zpravy.js?v=20261125a"></script>
-<script src="reels-ulozeni.js?v=20261125a"></script>
-<script src="reels-hlas.js?v=20261125a"></script>
-<script src="reels-render.js?v=20261125a"></script>
-<script src="reels-zabery.js?v=20261125a"></script>
-<script src="reels.js?v=20261125a"></script>
-<script src="plan.js?v=20261125a"></script>
-<script src="stats.js?v=20261125a"></script>
-<script src="prehled.js?v=20261125a"></script>
-<script src="yt-ulozeni.js?v=20261125a"></script>
-<script src="vyrez.js?v=20261125a"></script>
-<script src="prepis.js?v=20261125a"></script>
-<script src="promo.js?v=20261125a"></script>
-<script src="miniatury.js?v=20261125a"></script>
-<script src="yt-api.js?v=20261125a"></script>
-<script src="yt-studio.js?v=20261125a"></script>
-<script src="yt-analytics.js?v=20261125a"></script>
-<script src="schranka.js?v=20261125a"></script>
-<script src="shell.js?v=20261125b"></script>
+<script src="sablony.js?v=20261125c"></script>
+<script src="grafika.js?v=20261125c"></script>
+<script src="koncepty.js?v=20261125c"></script>
+<script src="ai.js?v=20261125c"></script>
+<script src="app.js?v=20261125c"></script>
+<script src="carousel.js?v=20261125c"></script>
+<script src="vyroci.js?v=20261125c"></script>
+<script src="zpravy.js?v=20261125c"></script>
+<script src="reels-ulozeni.js?v=20261125c"></script>
+<script src="reels-hlas.js?v=20261125c"></script>
+<script src="reels-render.js?v=20261125c"></script>
+<script src="reels-zabery.js?v=20261125c"></script>
+<script src="reels.js?v=20261125c"></script>
+<script src="plan.js?v=20261125c"></script>
+<script src="stats.js?v=20261125c"></script>
+<script src="prehled.js?v=20261125c"></script>
+<script src="yt-ulozeni.js?v=20261125c"></script>
+<script src="vyrez.js?v=20261125c"></script>
+<script src="prepis.js?v=20261125c"></script>
+<script src="promo.js?v=20261125c"></script>
+<script src="miniatury.js?v=20261125c"></script>
+<script src="yt-api.js?v=20261125c"></script>
+<script src="yt-studio.js?v=20261125c"></script>
+<script src="yt-analytics.js?v=20261125c"></script>
+<script src="schranka.js?v=20261125c"></script>
+<script src="shell.js?v=20261125c"></script>
 </body>
 </html>

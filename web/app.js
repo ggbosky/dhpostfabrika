@@ -476,6 +476,24 @@ function aiZprava(text, druh = "") {
   el.hidden = !text;
 }
 
+// Návrh postu od AI (bez UI) – používá ho editor i „🎲 Překvap mě“ (hotové nápady na pozadí).
+async function vytvorNavrhPostu(zadani) {
+  const AI = window.DHAI;
+  const r = await AI.gemini({
+    system: `Jsi redaktor Instagram účtu @denik_hokeje (český hokej). Píšeš vyprávěcí popisky jako hokejový dokument – znalé, věcné a čtivé.\n\n${AI.COPY}\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
+    zadani: `ZADÁNÍ OD REDAKTORA:\n${zadani}\n\nNapiš nový příspěvek.`,
+    schema: SCHEMA_POST,
+  });
+  // Úvod nesmí začínat číslem, datem, otázkou ani otřepanou frází – vezmi lepší variantu.
+  if (AI.spatnyZacatek(r.hook)) {
+    const lepsi = (r.dalsi_hooky || []).find((h) => h && !AI.spatnyZacatek(h));
+    if (lepsi) { r.dalsi_hooky = [r.hook, ...(r.dalsi_hooky || []).filter((h) => h !== lepsi)]; r.hook = lepsi; }
+  }
+  r.cta = ""; // nový styl: bez otázky na konci
+  return r;
+}
+let hotovyNavrh = null; // už napsaný návrh (z hotových nápadů) – editor ho jen převezme
+
 async function navrhniPost() {
   window.DHKoncepty?.zapomen("post");
   const zadani = $("#aiZadani").value.trim();
@@ -490,17 +508,8 @@ async function navrhniPost() {
   aiZprava("AI píše text… (obvykle 5–15 s)");
   try {
     const AI = window.DHAI;
-    let r = await AI.gemini({
-      system: `Jsi redaktor Instagram účtu @denik_hokeje (český hokej). Píšeš vyprávěcí popisky jako hokejový dokument – znalé, věcné a čtivé.\n\n${AI.COPY}\n\n${AI.stylDoPromptu()}\n\n${AI.PRAVIDLA}\n- Dnešní datum: ${AI.dnes()}.`,
-      zadani: `ZADÁNÍ OD REDAKTORA:\n${zadani}\n\nNapiš nový příspěvek.`,
-      schema: SCHEMA_POST,
-    });
-    // Úvod nesmí začínat číslem, datem, otázkou ani otřepanou frází – vezmi lepší variantu, jinak nech AI přepsat.
-    if (AI.spatnyZacatek(r.hook)) {
-      const lepsi = (r.dalsi_hooky || []).find((h) => h && !AI.spatnyZacatek(h));
-      if (lepsi) { r.dalsi_hooky = [r.hook, ...(r.dalsi_hooky || []).filter((h) => h !== lepsi)]; r.hook = lepsi; }
-    }
-    r.cta = ""; // nový styl: bez otázky na konci
+    const r = hotovyNavrh || await vytvorNavrhPostu(zadani);
+    hotovyNavrh = null;
     const tagy = window.DHAI.cisteHashtagy(r.hashtagy);
     const zdrojeRadek = zdrojeNavrhu.length ? `ℹ️ Zdroj: ${zdrojeNavrhu.map((z) => z.titulek).join(", ")}` : "";
     $("#text").value = [r.hook, r.telo, r.cta, zdrojeRadek, tagy.join(" ")].map((x) => (x || "").trim()).filter(Boolean).join("\n\n");
@@ -801,6 +810,12 @@ window.DHPost = {
     zdrojeNavrhu = zdroje;
     window.scrollTo({ top: 0, behavior: "smooth" });
     navrhniPost();
+  },
+  vytvorNavrh: vytvorNavrhPostu,
+  // otevře už hotový návrh (bez dalšího volání AI) – text, titulek do obrázku, kategorie a fotka
+  otevriHotovy(r, zadani, zdroje = []) {
+    hotovyNavrh = JSON.parse(JSON.stringify(r));
+    window.DHPost.navrhni(zadani, zdroje);
   },
 };
 

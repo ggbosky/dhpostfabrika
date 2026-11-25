@@ -106,7 +106,9 @@ function nahodnyUhel() {
 }
 
 let temata = [];
-let hledani = 0; // pořadí hledání – stará kontrola nesmí přepsat nová témata
+let hledani = 0;
+let posledniNova = [];                     // témata z posledního hledání (pro „Překvap mě“)
+let posledniKontrola = Promise.resolve();  // druhá kontrola faktů posledního hledání // pořadí hledání – stará kontrola nesmí přepsat nová témata
 
 function zdrojeHtml(zdroje) {
   if (zdroje === null || zdroje === undefined) return `<span class="muted">⏳ načítám zdroje…</span>`;
@@ -199,6 +201,7 @@ Odpověz POUZE řádky JSON Lines – každé téma jeden řádek s jedním obje
       return { ...t, fakta, zdroje };
     });
     temata = [...zOdkazu, ...nova];
+    posledniNova = nova;
     if (!nova.length) {
       vykresli({});
       if (opakovani) { zprava(`Našel jsem jen témata, která už jsme měli (${opakovani}). Klikni znovu – pokaždé hledám v jiných oblastech – nebo zkus jiný druh / období.`, "varovani"); return; }
@@ -212,7 +215,7 @@ Odpověz POUZE řádky JSON Lines – každé téma jeden řádek s jedním obje
     b.disabled = false;
     b.textContent = "🔎 Najít témata";
     zprava(`${nova.length === 1 ? "Nalezeno" : nova.length < 5 ? "Nalezena" : "Nalezeno"} ${pocetTemat(nova.length)} za ${Math.round((Date.now() - start) / 1000)} s${jenDnes ? `, ${nova.length === 1 ? "z" : "všechna z"} ${dnesniDen()}` : ""}${vyrazeno ? ` (${vyrazeno} s jiným datem vyřazeno)` : ""}${opakovani ? ` (${opakovani} už jsme měli – vyřazeno)` : ""}${r.preruseno ? " (Google odpovídal pomalu, ukazuji, co stihl)" : ""}. Můžeš rovnou tvořit – druhá kontrola faktů běží na pozadí a odznaky se doplní samy.`, "ok");
-    overTemata(r, moje, nova).then(() => { if (moje === hledani) ulozVysledek(klicFiltru, r); }); // na pozadí, neblokuje
+    posledniKontrola = overTemata(r, moje, nova).then(() => { if (moje === hledani) ulozVysledek(klicFiltru, r); }); // na pozadí, neblokuje
   } catch (e) {
     clearInterval(odpocet);
     zprava(esc(e.message), "chyba");
@@ -525,6 +528,137 @@ function initOdkazy() {
   });
 }
 
+
+// ------------------------------------------------------- 🎲 hotové nápady --
+// AI sama zvolí náhodné zaměření, období a oblast, najde nová témata, nezávisle je ověří
+// a z ověřených rovnou napíše hotové posty (text, titulek do obrázku, kategorie). Redaktor jen vybírá.
+const KLIC_HOTOVE = "dhpf_hotove", KLIC_HOTOVE_AUTO = "dhpf_hotove_auto";
+let hotoveBezi = false;
+const nahodne = (pole) => pole[Math.floor(Math.random() * pole.length)];
+const zamichej = (pole) => [...pole].sort(() => Math.random() - 0.5);
+function nactiHotove() { try { return JSON.parse(localStorage.getItem(KLIC_HOTOVE)) || []; } catch { return []; } }
+function ulozHotove(seznam) { try { localStorage.setItem(KLIC_HOTOVE, JSON.stringify(seznam.slice(0, 30))); } catch { /* plné úložiště */ } }
+function hotoveZprava(html, druh = "") {
+  const el = $("#tHotoveZprava");
+  if (!el) return;
+  el.innerHTML = html; el.className = "zprava " + druh; el.hidden = !html;
+}
+const KATEGORIE_NAZVY = { zajimavosti: "🟦 Zajímavosti", rekordy: "🟥 Rekordy", hraci: "🟩 Hráči", historie: "🟨 Historie", tymy: "🟪 Týmy" };
+const textNavrhu = (r) => [r.hook, r.telo].map((x) => String(x || "").trim()).filter(Boolean).join("\n\n");
+
+function vykresliHotove() {
+  const el = $("#tHotove");
+  if (!el) return;
+  const seznam = nactiHotove();
+  el.innerHTML = seznam.map((h, i) => {
+    const t = h.tema, r = h.navrh;
+    const kdy = new Date(h.cas).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    return `<article class="tema hotovy">
+      <div class="tema-hlava"><h3>${esc(t.titulek)}</h3>${t.datum ? `<span class="muted">${esc(t.datum)}</span>` : ""}</div>
+      <p class="kontrola overeno">✅ Fakta ověřena druhým hledáním · ${esc(KATEGORIE_NAZVY[r.kategorie] || "Post")}</p>
+      ${r.titulek ? `<p class="hotovy-titulek">🖼️ ${esc(String(r.titulek).replace(/\*/g, ""))}</p>` : ""}
+      <p class="hotovy-text">${esc(textNavrhu(r)).replace(/\n/g, "<br>")}</p>
+      <p class="zdroje">Zdroje: ${zdrojeHtml(t.zdroje || [])}</p>
+      <small class="muted">připraveno ${kdy}</small>
+      <div class="akce" style="margin-top:10px">
+        <button type="button" class="btn small" data-hotovy-post="${i}">✍️ Otevřít hotový post</button>
+        <button type="button" class="btn small ghost" data-hotovy-carousel="${i}">🎞️ Carousel</button>
+        ${jeDnesniDen(t) ? `<button type="button" class="btn small ghost" data-hotovy-vyroci="${i}">📅 Dnes před lety</button>` : ""}
+        <button type="button" class="btn small ghost" data-hotovy-plan="${i}">📆 Do plánu</button>
+        <button type="button" class="btn small ghost" data-hotovy-kopiruj="${i}">📋 Text</button>
+        <button type="button" class="btn small ghost" data-hotovy-smaz="${i}" title="Zahodit">🗑️</button>
+      </div>
+    </article>`;
+  }).join("");
+  const n = seznam.length;
+  $("#tHotovePocet").textContent = n ? `${n} připraven${n === 1 ? "ý" : n < 5 ? "é" : "ých"}` : "";
+}
+
+async function prekvapMe({ auto = false } = {}) {
+  const AI = window.DHAI;
+  if (hotoveBezi) return;
+  if (!AI.maKlic()) { if (!auto) hotoveZprava('Potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
+  hotoveBezi = true;
+  const b = $("#tPrekvap");
+  b.disabled = true; b.textContent = "🎲 Pracuju…";
+  try {
+    let overena = [];
+    // náhodné zadání; když nic neprojde ověřením, ještě jeden pokus s jiným zadáním
+    for (let pokus = 0; pokus < 2 && !overena.length; pokus++) {
+      const zam = nahodne(Object.keys(ZAMERENI));
+      const los = Math.random();
+      const obd = los < 0.6 ? "historie" : los < 0.85 ? "vyroci" : "aktualne";
+      const kde = Math.random() < 0.7 ? "cz" : "svet";
+      $("#tZamereni").value = zam; $("#tObdobi").value = obd; $("#tKde").value = kde; $("#tVlastni").value = "";
+      const popis = `${$("#tZamereni").selectedOptions[0].textContent.toLowerCase()} · ${$("#tObdobi").selectedOptions[0].textContent.toLowerCase()} · ${$("#tKde").selectedOptions[0].textContent.toLowerCase()}`;
+      hotoveZprava(`🎲 ${pokus ? "Zkouším jiné zadání" : "Losuji"}: <b>${esc(popis)}</b> – hledám nová témata na webu…`);
+      posledniNova = [];
+      await najdiTemata();
+      const nova = posledniNova;
+      if (!nova.length) continue;
+      hotoveZprava(`Našel jsem ${nova.length} témat, teď je ověřuji druhým nezávislým hledáním…`);
+      await posledniKontrola;
+      overena = nova.filter((t) => t.kontrola?.stav === "overeno");
+    }
+    if (!overena.length) { hotoveZprava("Tentokrát se žádné téma nepodařilo spolehlivě ověřit, takže jsem nic nepsal. Zkus <b>🎲 Překvap mě</b> znovu.", "varovani"); return; }
+    const vybrane = zamichej(overena).slice(0, 3);
+    let hotovo = 0;
+    for (const [i, t] of vybrane.entries()) {
+      hotoveZprava(`✍️ Píšu hotový post ${i + 1} z ${vybrane.length}: <b>${esc(t.titulek)}</b>…`);
+      try {
+        const r = await window.DHPost.vytvorNavrh(zadaniZTematu(t));
+        const seznam = nactiHotove();
+        seznam.unshift({ id: `h-${Date.now().toString(36)}-${i}`, cas: Date.now(), tema: t, navrh: r });
+        ulozHotove(seznam);
+        hotovo++;
+        vykresliHotove();
+      } catch (e) { console.warn("Hotový post se nepovedl:", e?.message); }
+    }
+    try { localStorage.setItem(`${KLIC_HOTOVE_AUTO}_posledni`, AI.dnes()); } catch { /* nic */ }
+    hotoveZprava(hotovo ? `Hotovo ✓ ${hotovo} ${hotovo === 1 ? "nový hotový post" : "nové hotové posty"} – fakta ověřená, text napsaný. Klikni na <b>✍️ Otevřít hotový post</b>, doplní se i fotka.` : "Posty se nepodařilo napsat, zkus to znovu.", hotovo ? "ok" : "chyba");
+    if (auto && hotovo) window.DHToast?.(`🎲 Máš ${hotovo} ${hotovo === 1 ? "nový hotový nápad" : "nové hotové nápady"} – najdeš je v Tématech.`, "ok");
+  } catch (e) {
+    hotoveZprava(esc(e.message), "chyba");
+  } finally {
+    hotoveBezi = false;
+    b.disabled = false; b.textContent = "🎲 Překvap mě";
+  }
+}
+
+function initHotove() {
+  vykresliHotove();
+  let auto = false;
+  try { auto = localStorage.getItem(KLIC_HOTOVE_AUTO) === "1"; } catch { /* nic */ }
+  $("#tHotoveAuto").checked = auto;
+  $("#tHotoveAuto").addEventListener("change", (e) => { try { localStorage.setItem(KLIC_HOTOVE_AUTO, e.target.checked ? "1" : "0"); } catch { /* nic */ } });
+  $("#tPrekvap").addEventListener("click", () => prekvapMe());
+  $("#tHotove").addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    const seznam = nactiHotove();
+    const d = b.dataset;
+    const i = Number(d.hotovyPost ?? d.hotovyCarousel ?? d.hotovyVyroci ?? d.hotovyPlan ?? d.hotovyKopiruj ?? d.hotovySmaz);
+    const h = seznam[i];
+    if (!h) return;
+    const t = h.tema;
+    if (d.hotovyPost !== undefined) window.DHPost.otevriHotovy(h.navrh, zadaniZTematu(t), t.zdroje || []);
+    else if (d.hotovyCarousel !== undefined) window.DHCarousel.navrhni(zadaniZTematu(t), t.zdroje || [], Math.min(6, Math.max(3, (t.fakta || []).length)));
+    else if (d.hotovyVyroci !== undefined) window.DHVyroci.navrhni(zadaniZTematu(t), t.zdroje || []);
+    else if (d.hotovyPlan !== undefined) {
+      window.DHPlan?.pridej({ nazev: t.titulek, format: "post", zadani: `${textNavrhu(h.navrh)}\n\n${zadaniZTematu(t)}`, zdroje: t.zdroje || [] });
+      window.DHToast?.("Hotový nápad je v zásobníku 📆 v Plánu.");
+      b.textContent = "✓ V plánu"; b.disabled = true;
+    } else if (d.hotovyKopiruj !== undefined) {
+      const tagy = window.DHAI.cisteHashtagy(h.navrh.hashtagy || []).join(" ");
+      try { await navigator.clipboard.writeText([textNavrhu(h.navrh), tagy].filter(Boolean).join("\n\n")); window.DHToast?.("Text zkopírován ✓"); } catch { /* nic */ }
+    } else if (d.hotovySmaz !== undefined) { seznam.splice(i, 1); ulozHotove(seznam); vykresliHotove(); }
+  });
+  // jednou denně automaticky (když je zapnuto) – chvíli po otevření aplikace
+  let posledni = "";
+  try { posledni = localStorage.getItem(`${KLIC_HOTOVE_AUTO}_posledni`) || ""; } catch { /* nic */ }
+  if (auto && posledni !== window.DHAI.dnes()) setTimeout(() => prekvapMe({ auto: true }), 6000);
+}
+
 // ---------------------------------------------------------- ověření faktů --
 
 async function overFakta(text, cil, tlacitko) {
@@ -574,6 +708,7 @@ function init() {
   $("#tDnesVolba").textContent = `Výročí – stalo se ${dnesniDen()} (v jakémkoli roce)`;
   nactiPosledni();
   initOdkazy();
+  initHotove();
   vykresliPamet();
   $("#tPamet").addEventListener("click", (e) => {
     if (e.target.id !== "tZapomen") return;
