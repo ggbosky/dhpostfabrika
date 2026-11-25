@@ -37,7 +37,7 @@ const STRANKY = {
     popis: "Krátké video 9:16: rešerše se zdroji, český scénář a hlas, legální záběry, střih a kontrola kvality před exportem.",
     kroky: ["Téma", "Rešerše a scénář", "Záběry a hlas", "Střih, kontrola, MP4"] },
   promo: { skupina: "Tvořit", nazev: "Promo hráče", ikona: "promo",
-    popis: "Jednoduchá stylová grafika na oblíbeného hráče (i historického): skutečná fotka, jméno, tým, roky a jedna věta – na sdílení.",
+    popis: "Grafika na oblíbeného hráče (i historického) ve stylu oficiálních grafik NHL – milník s obřím číslem, rekord klubu, narozeniny, titulek – nebo klidná tribute šablona. Ze skutečné fotky, na sdílení.",
     kroky: ["Jméno hráče", "Fotka", "Šablona a texty", "Obrázek nebo video + popisek"] },
   miniatury: { skupina: "YouTube", nazev: "Thumbnail Factory", ikona: "miniatura",
     popis: "Profesionální miniatury 1280×720 pro YouTube. AI kreativní ředitel rozebere téma, navrhne 3–5 různých kompozic, pozadí vznikne ze skutečných fotek nebo AI, texty jsou upravitelné vrstvy.",
