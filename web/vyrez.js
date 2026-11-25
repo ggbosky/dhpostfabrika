@@ -26,6 +26,65 @@ function rgba(res) {
   for (let i = 0; i < n; i++) { out[i * 4] = res.data[i * ch]; out[i * 4 + 1] = res.data[i * ch + 1]; out[i * 4 + 2] = res.data[i * ch + 2]; out[i * 4 + 3] = ch === 4 ? res.data[i * ch + 3] : 255; }
   return out;
 }
+// Dočištění masky: odstraní poloprůhledný „opar“ a zbytky pozadí, které nejsou spojené s postavou
+// (ponechá největší souvislou oblast a další velké části – např. hokejku nebo druhou ruku), zaplní malé díry.
+function docisti(c) {
+  const w = c.width, h = c.height;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  const id = x.getImageData(0, 0, w, h), d = id.data;
+  // zmenšená binární maska pro hledání souvislých oblastí
+  const k = Math.max(1, Math.ceil(Math.max(w, h) / 360));
+  const mw = Math.ceil(w / k), mh = Math.ceil(h / k);
+  const m = new Uint8Array(mw * mh);
+  for (let y = 0; y < mh; y++) for (let xx = 0; xx < mw; xx++) {
+    const a = d[((Math.min(h - 1, y * k)) * w + Math.min(w - 1, xx * k)) * 4 + 3];
+    m[y * mw + xx] = a > 110 ? 1 : 0;
+  }
+  const znacka = new Int32Array(mw * mh).fill(-1), velikosti = [];
+  const fronta = new Int32Array(mw * mh);
+  for (let i = 0; i < m.length; i++) {
+    if (!m[i] || znacka[i] >= 0) continue;
+    const id2 = velikosti.length; let hlava = 0, konec = 0, n = 0;
+    fronta[konec++] = i; znacka[i] = id2;
+    while (hlava < konec) {
+      const p = fronta[hlava++]; n++;
+      const px = p % mw, py = (p / mw) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = px + dx, ny = py + dy;
+        if (nx < 0 || ny < 0 || nx >= mw || ny >= mh) continue;
+        const q = ny * mw + nx;
+        if (m[q] && znacka[q] < 0) { znacka[q] = id2; fronta[konec++] = q; }
+      }
+    }
+    velikosti.push(n);
+  }
+  if (!velikosti.length) return c;
+  const nejvetsi = Math.max(...velikosti);
+  const nechat = velikosti.map((n) => n >= nejvetsi * 0.06);
+  // díry: oblasti pozadí, které se nedotýkají okraje (uvnitř postavy) → zaplnit
+  const venku = new Uint8Array(mw * mh);
+  let hlava = 0, konec = 0;
+  const pridej = (q) => { if (!venku[q] && !(m[q] && nechat[znacka[q]])) { venku[q] = 1; fronta[konec++] = q; } };
+  for (let xx = 0; xx < mw; xx++) { pridej(xx); pridej((mh - 1) * mw + xx); }
+  for (let y = 0; y < mh; y++) { pridej(y * mw); pridej(y * mw + mw - 1); }
+  while (hlava < konec) {
+    const p = fronta[hlava++], px = p % mw, py = (p / mw) | 0;
+    if (px > 0) pridej(p - 1); if (px < mw - 1) pridej(p + 1); if (py > 0) pridej(p - mw); if (py < mh - 1) pridej(p + mw);
+  }
+  const dira = new Uint8Array(mw * mh);
+  for (let i = 0; i < m.length; i++) if (!venku[i] && !(m[i] && nechat[znacka[i]])) dira[i] = 1;
+  // velké díry (např. mezi rukou a tělem) nechat průhledné – zaplnit jen malé
+  for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) {
+    const i = (y * w + xx) * 4;
+    const mi = Math.min(mh - 1, (y / k) | 0) * mw + Math.min(mw - 1, (xx / k) | 0);
+    let a = d[i + 3];
+    if (m[mi] && !nechat[znacka[mi]]) a = 0;                     // odtržený zbytek pozadí
+    else if (!m[mi] && a < 60 && !dira[mi]) a = 0;               // opar kolem postavy
+    d[i + 3] = a;
+  }
+  x.putImageData(id, 0, 0);
+  return c;
+}
 function orizni(c) {
   const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
   let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
@@ -67,7 +126,7 @@ async function vyrizni(zdroj, klic = null, volby = {}) {
       const c = document.createElement("canvas");
       c.width = res.width; c.height = res.height;
       c.getContext("2d").putImageData(new ImageData(rgba(res), res.width, res.height), 0, 0);
-      return orizni(c);
+      return orizni(volby.presne ? docisti(c) : c);
     } finally { uvolni(); }
   })();
   if (k) { cache.set(k, slib); slib.catch(() => cache.delete(k)); }
@@ -88,5 +147,5 @@ function sObrysem(vyrez, { tloustka = 10, barva = "#ffffff", zare = null, zareSi
   return c;
 }
 
-window.DHVyrez = { vyrizni, sObrysem, orizni };
+window.DHVyrez = { vyrizni, sObrysem, orizni, docisti };
 })();

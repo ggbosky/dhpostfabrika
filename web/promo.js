@@ -49,6 +49,7 @@ let foto = null;  // HTMLImageElement
 let vyrez = null; // canvas – hráč bez pozadí
 let foto2 = null, vyrez2 = null; // druhá (akční) fotka – nepovinná
 let vyrezSurovy = null, vyrez2Surovy = null; // výřezy bez vylepšení (vylepšení jde vypnout)
+const VYREZ_VERZE = "ormbg-2"; // přesný model + dočištění masky; starší výřezy se přepočítají
 let kandidati = []; // nalezené fotky seřazené podle kvality
 
 // ------------------------------------------------------- vylepšení výřezu --
@@ -332,6 +333,7 @@ async function vyrizni() {
     const surovy = await window.DHVyrez.vyrizni(await U().obrazekBlob(st.fotoId), null, { presne: true });
     const blob = await new Promise((ok) => surovy.toBlob(ok, "image/png"));
     st.vyrezId = await U().ulozObrazek(blob, { promoVyrez: true });
+    st.vyrezModel = VYREZ_VERZE;
     vyrezSurovy = surovy; vyrez = pripravVyrez(surovy);
     uloz();
     zprava("Hotovo ✓ Hráč je vyříznutý (přesný model – i s hokejkou). Táhnutím v náhledu ho posuneš, posuvníkem zvětšíš.", "ok");
@@ -357,6 +359,7 @@ async function nastavFoto2(blob, kredit = "") {
     vyrez2Surovy = surovy2; vyrez2 = pripravVyrez(surovy2);
     const b = await new Promise((ok) => surovy2.toBlob(ok, "image/png"));
     st.vyrez2Id = await U().ulozObrazek(b, { promoVyrez: true });
+    st.vyrez2Model = VYREZ_VERZE;
     uloz();
     vykresliFormular();
     zprava("Hotovo ✓ Druhá fotka je vyříznutá – v šablonách Milník, Rekord a Narozeniny je hráč dvakrát.", "ok");
@@ -541,7 +544,8 @@ function polohaVyrezu(h, vyskaPodil, stredX = 0.5, spodek = 0) {
   const kamera = anim == null ? 1 : 1 + 0.05 * Math.min(1, anim / DELKA_ANIM);
   let vh = h * vyskaPodil * (st.foto.zoom || 1) * kamera;
   let vw = vh * (vyrez.width / vyrez.height);
-  if (vw > W * 1.1) { vw = W * 1.1; vh = vw * (vyrez.height / vyrez.width); }
+  const maxSirka = W * (vyrez.width / vyrez.height > 0.8 ? 0.98 : 1.1) * (st.foto.zoom || 1);
+  if (vw > maxSirka) { vw = maxSirka; vh = vw * (vyrez.height / vyrez.width); }
   const x = W * stredX - vw / 2 + (st.foto.x || 0) * W * 0.35;
   const y = h - vh - spodek + (st.foto.y || 0) * h * 0.25;
   return { x, y, w: vw, h: vh };
@@ -913,7 +917,14 @@ function boxVyrezu(h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = t
   const kamera = anim == null ? 1 : 1 + 0.05 * Math.min(1, anim / DELKA_ANIM);
   const zoom = hlavni ? (st.foto.zoom || 1) : 1;
   let vh = h * vyska * zoom * kamera, vw = vh * (zdroj.width / zdroj.height);
-  if (vw > W * 1.15) { vw = W * 1.15; vh = vw * (zdroj.height / zdroj.width); }
+  // portrét do pasu (široký výřez) se nezvětšuje přes šířku plátna – jinak by z hráče zbyl jen dres
+  const maxSirka = W * (zdroj.width / zdroj.height > 0.8 ? 0.98 : 1.15) * (hlavni ? (st.foto.zoom || 1) : 1);
+  if (vw > maxSirka) { vw = maxSirka; vh = vw * (zdroj.height / zdroj.width); }
+  // hlava nesmí být uříznutá nahoře (pokud ji uživatel sám nepřetáhne / nepřiblíží)
+  const horniOkraj = h * 0.04;
+  if (odShora == null && h - vh - h * spodek < horniOkraj && zoom <= 1.001) {
+    vh = h - h * spodek - horniOkraj; vw = vh * (zdroj.width / zdroj.height);
+  }
   const x = W * stredX - vw / 2 + (hlavni ? (st.foto.x || 0) * W * 0.35 : 0);
   const y = (odShora != null ? h * odShora : h - vh - h * spodek) + (hlavni ? (st.foto.y || 0) * h * 0.25 : 0);
   return { x, y, w: vw, h: vh };
@@ -1494,6 +1505,7 @@ function init() {
           <label class="check"><input type="checkbox" id="prVyrezZap"> Vyříznutý hráč</label>
           <label class="check"><input type="checkbox" id="prLogo"> Logo Deníku hokeje</label>
           <label class="check"><input type="checkbox" id="prVylepsit"> Vylepšit fotku (ostrost, kontrast)</label>
+          <button type="button" class="btn ghost small" id="prVyrizniZnovu" title="Znovu vyřízne hráče přesným modelem a dočistí okraje">✂️ Vyříznout znovu</button>
           <label class="check"><input type="checkbox" id="prZare"> Záře za hráčem</label>
         </div>
         <div class="akce">
@@ -1522,6 +1534,11 @@ function init() {
   });
   $("#prVylepsit").addEventListener("change", (e) => { st.vylepsit = e.target.checked; uloz(); vyrez = pripravVyrez(vyrezSurovy) || vyrez; vyrez2 = pripravVyrez(vyrez2Surovy) || vyrez2; vykresli(); });
   $("#prZare").addEventListener("change", (e) => { st.zare = e.target.checked; uloz(); vykresli(); });
+  $("#prVyrizniZnovu").addEventListener("click", async () => {
+    if (!foto) { zprava("Nejdřív vyber fotku.", "chyba"); return; }
+    await vyrizni();
+    if (foto2 && st.foto2Id) nastavFoto2(await U().obrazekBlob(st.foto2Id), st.kredit2);
+  });
   $("#prSoubor").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) await nastavFoto(f, ""); });
   $("#prStahnout").addEventListener("click", exportuj);
   $("#prSoubor2").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) await nastavFoto2(f, ""); });
@@ -1557,10 +1574,12 @@ function init() {
   (async () => {
     try {
       if (st.fotoId) foto = await U().obrazekImg(st.fotoId);
+      if (st.vyrezId && st.vyrezModel !== VYREZ_VERZE && foto) st.vyrezId = null; // starý výřez → níž se vyřízne znovu
       if (st.vyrezId) { const img = await U().obrazekImg(st.vyrezId); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrezSurovy = c; vyrez = pripravVyrez(c); }
       else if (foto) vyrizni();
       if (st.foto2Id) foto2 = await U().obrazekImg(st.foto2Id);
-      if (st.vyrez2Id) { const img = await U().obrazekImg(st.vyrez2Id); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrez2Surovy = c; vyrez2 = pripravVyrez(c); }
+      if (st.vyrez2Id && st.vyrez2Model !== VYREZ_VERZE && foto2) { const b2 = await U().obrazekBlob(st.foto2Id); nastavFoto2(b2, st.kredit2); }
+      else if (st.vyrez2Id) { const img = await U().obrazekImg(st.vyrez2Id); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrez2Surovy = c; vyrez2 = pripravVyrez(c); }
       vykresliFormular();
     } catch { /* nic */ }
     if (document.fonts?.ready) await document.fonts.ready;
