@@ -52,7 +52,7 @@ const vyska = () => FORMATY[st.format]?.h || 1350;
 
 // ------------------------------------------------------------------ AI --
 
-async function navrhni() {
+async function navrhni(prilezitost = null) {
   const jmeno = $("#prJmeno").value.trim();
   if (!jmeno) { zprava("Napiš jméno hráče.", "chyba"); return; }
   st.jmeno = jmeno; uloz();
@@ -65,7 +65,9 @@ async function navrhni() {
       system: `Jsi editor českého hokejového Instagramu „Deník hokeje“. Děláš grafiky oblíbených hokejistů (i historických) ve stylu
 oficiálních grafik NHL: milník s obřím číslem, rekord klubu, narozeniny, tribute. Fanoušci je sdílí.
 Fakta (tým, roky, čísla, data, žebříčky) ber JEN z výsledků hledání; když si nejsi jistý, nech pole prázdné. Nic nevymýšlej ani nezaokrouhluj.`,
-      zadani: `Hráč: ${jmeno}
+      zadani: `Hráč: ${jmeno}${prilezitost ? `
+PŘÍLEŽITOST, kvůli které grafiku děláme: ${prilezitost.typ} – ${prilezitost.proc} (${prilezitost.kdy || ""}; ${prilezitost.fakt || ""}).
+Podle ní vyplň hlavně odpovídající část (milnik / rekord / narozen / titulek) – ale jen tím, co potvrdí zdroje.` : ""}
 
 Vrať POUZE JSON:
 {
@@ -116,7 +118,10 @@ Do "rekord.tabulka" dej 3–5 nejlepších v tom rekordu (včetně něj), seřaz
     uloz();
     vykresliFormular();
     vykresli();
-    zprava(`Hotovo ✓ Zkontroluj tým a roky (zdroje jsou pod texty).${foto ? "" : " Teď vyber fotku."}`, "ok");
+    if (prilezitost && SABLONY[TYP_SABLONA[prilezitost.typ]]) st.sablona = TYP_SABLONA[prilezitost.typ];
+    if (prilezitost?.typ === "narozeniny" && !st.data.narozen) st.sablona = "ikona";
+    uloz(); vykresliFormular(); vykresli();
+    zprava(`Hotovo ✓ Zkontroluj údaje (zdroje jsou pod texty).${foto ? "" : " Teď vyber fotku."}`, "ok");
     if (!foto) najdiFoto(true, d.foto_dotaz || `${krestni} ${prijmeni}`);
   } catch (e) { zprava(esc(e.message), "chyba"); predvyplnRucne(jmeno); }
   finally { b.disabled = false; }
@@ -126,6 +131,116 @@ function predvyplnRucne(jmeno) {
   const casti = jmeno.split(/\s+/);
   if (!st.data.prijmeni) { st.data.prijmeni = casti.pop() || ""; st.data.krestni = casti.join(" "); }
   uloz(); vykresliFormular(); vykresli();
+}
+
+
+// -------------------------------------------------- 🎲 návrhy hráčů a událostí --
+// AI sama najde, koho a proč udělat: narozeniny tento týden, čerstvé milníky, výročí rekordů a událostí,
+// oblíbené legendy. Každý návrh ověří druhým hledáním; jedním klikem z něj vznikne hotová grafika.
+const KLIC_NAVRHY = "dhpf_promo_navrhy", KLIC_NAVRHY_HIST = "dhpf_promo_navrhy_hist", KLIC_NAVRHY_AUTO = "dhpf_promo_navrhy_auto";
+const TYP_SABLONA = { narozeniny: "narozeniny", milnik: "milnik", rekord: "rekord", vyroci: "titulek", titulek: "titulek", tribute: "ikona" };
+const TYP_POPIS = { narozeniny: "🎂 Narozeniny", milnik: "🏁 Milník", rekord: "🏆 Rekord", vyroci: "📅 Výročí", titulek: "📅 Výročí", tribute: "❤️ Tribute" };
+const UHLY_LEGEND = ["brankáři 90. let", "čeští útočníci v NHL 2000–2010", "obránci, kteří psali historii", "hráči Nagana 1998", "slovenské legendy NHL",
+  "kanadské ikony 80. let", "švédští a finští hráči NHL", "kapitáni, kteří zvedli Stanley Cup", "hráči extraligy 90. let", "legendy MS 70. a 80. let",
+  "zapomenuté hvězdy NHL", "rváči a tvrdí obránci", "hokejoví otcové a synové", "hvězdy KHL"];
+let navrhyBezi = false;
+const nactiJson = (k, v) => { try { return JSON.parse(localStorage.getItem(k)) ?? v; } catch { return v; } };
+const ulozJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* nic */ } };
+
+function navrhyZprava(t, druh = "") {
+  const el = $("#prNavrhyZprava");
+  if (!el) return;
+  el.innerHTML = t; el.className = `zprava ${druh}`; el.hidden = !t;
+}
+
+function vykresliNavrhy() {
+  const el = $("#prNavrhy");
+  if (!el) return;
+  const { seznam = [], cas = 0 } = nactiJson(KLIC_NAVRHY, {});
+  el.innerHTML = seznam.length ? seznam.map((n, i) => `
+    <div class="pr-navrh${n.pouzito ? " pouzito" : ""}">
+      <div class="pr-navrh-info">
+        <span class="pr-navrh-typ">${esc(TYP_POPIS[n.typ] || n.typ)}${n.kdy ? ` · ${esc(n.kdy)}` : ""} · ${n.kontrola === "overeno" ? "✅ ověřeno" : "⚠️ ověř ručně"}</span>
+        <b>${esc(n.jmeno)}</b>
+        <small>${esc(n.proc || "")}${n.problem ? ` <em class="muted">(${esc(n.problem)})</em>` : ""}</small>
+      </div>
+      <button type="button" class="btn small${n.pouzito ? " ghost" : ""}" data-pr-navrh="${i}">${n.pouzito ? "↻ Znovu" : "✨ Vytvořit grafiku"}</button>
+    </div>`).join("") + `<p class="muted" style="font-size:12px;margin:8px 0 0">Navrženo ${new Date(cas).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</p>` : "";
+}
+
+async function navrhniHrace({ auto = false } = {}) {
+  if (navrhyBezi) return;
+  if (!AI()?.maKlic()) { if (!auto) navrhyZprava('Potřebuje AI klíč (Claude nebo Gemini). <a href="#" data-jdi-na-ai>Nastavit klíč</a>', "chyba"); return; }
+  navrhyBezi = true;
+  const b = $("#prNavrhyBtn");
+  if (b) { b.disabled = true; b.textContent = "🎲 Hledám…"; }
+  const start = Date.now();
+  const odpocet = setInterval(() => navrhyZprava(`AI hledá, koho a proč teď udělat (narozeniny, milníky, výročí, legendy)… ${Math.round((Date.now() - start) / 1000)} s`), 1000);
+  try {
+    const hist = nactiJson(KLIC_NAVRHY_HIST, []);
+    const uhel = UHLY_LEGEND[Math.floor(Math.random() * UHLY_LEGEND.length)];
+    const r = await AI().hledatNaWebu({
+      casovyLimit: 90000,
+      system: `Jsi editor českého hokejového Instagramu „Deník hokeje“. Hledáš příležitosti na grafiku hráče, kterou fanoušci sdílí:
+narozeniny známých hráčů, čerstvé kulaté milníky, výročí rekordů a slavných událostí, oblíbené legendy. Dnešní datum: ${AI().dnes()}.
+Data, čísla a jména ber JEN z výsledků hledání. Co nemáš potvrzené, nenavrhuj.`,
+      zadani: `Najdi 6 příležitostí, pestrý mix:
+- 2× NAROZENINY: známí hráči (čeští a slovenští hráči, legendy NHL), kteří mají narozeniny DNES nebo v příštích 7 dnech – i ti, co už nežijí (nedožité narozeniny). Uveď přesné datum narození.
+- 1–2× MILNÍK: hráč, který v posledních 14 dnech dosáhl kulatého milníku (zápasy, body, góly, výhry, nuly) – nejlépe Čech nebo Slovák v NHL/KHL/extralize.
+- 1× VÝROČÍ: slavný rekord nebo událost s hráčem, která má výročí tento týden (ideálně kulaté).
+- 1× TRIBUTE: oblíbená legenda – tentokrát z okruhu „${uhel}“.
+${hist.length ? `Tyto hráče už jsme nedávno navrhovali, NENAVRHUJ je: ${hist.slice(0, 50).join(", ")}.` : ""}
+
+Odpověz POUZE řádky JSON Lines – každý návrh jeden řádek s jedním objektem, žádný jiný text:
+{"jmeno": "celé jméno hráče s diakritikou", "typ": "narozeniny" | "milnik" | "vyroci" | "tribute", "proc": "1 krátká věta česky, proč právě teď", "kdy": "datum události (D. M. RRRR) nebo prázdné", "fakt": "klíčové ověřitelné tvrzení s čísly a daty (např. ‚Jaromír Jágr se narodil 15. 2. 1972‘)"}`,
+    });
+    let seznam = AI().objektyZTextu(r.text).filter((n) => n?.jmeno && n?.typ).slice(0, 8);
+    if (!seznam.length) { navrhyZprava("AI tentokrát nic nenašla, zkus to znovu.", "varovani"); return; }
+    clearInterval(odpocet);
+    navrhyZprava(`Našel jsem ${seznam.length} návrhů, ověřuji je druhým hledáním…`);
+    try {
+      const k = await AI().hledatNaWebu({
+        casovyLimit: 60000,
+        system: `Jsi přísný fact-checker hokejové redakce. Nezávisle ověř tvrzení vyhledáváním. Dnešní datum: ${AI().dnes()}.
+"overeno" jen když sedí jména, data i čísla. Když cokoliv nesedí, je to "rozpor" a napiš, jak je to správně.`,
+        zadani: `Ověř:\n${JSON.stringify(seznam.map((n, id) => ({ id, jmeno: n.jmeno, typ: n.typ, kdy: n.kdy, fakt: n.fakt })), null, 1)}
+
+Odpověz POUZE blokem \`\`\`json s polem: [{"id": 0, "stav": "overeno" | "rozpor" | "nejiste", "problem": "co nesedí / co se nepodařilo potvrdit, jinak prázdné"}]`,
+      });
+      const v = AI().jsonZTextu(k.text);
+      (Array.isArray(v) ? v : []).forEach((x) => { const n = seznam[Number(x.id)]; if (n) { n.kontrola = x.stav; n.problem = x.problem || ""; } });
+    } catch { seznam.forEach((n) => { n.kontrola = n.kontrola || "nejiste"; }); }
+    const vsech = seznam.length;
+    seznam = seznam.filter((n) => n.kontrola !== "rozpor");
+    seznam.forEach((n) => { if (n.kontrola !== "overeno") { n.kontrola = "nejiste"; } });
+    seznam.sort((a, b2) => (a.kontrola === "overeno" ? 0 : 1) - (b2.kontrola === "overeno" ? 0 : 1));
+    ulozJson(KLIC_NAVRHY, { seznam, cas: Date.now() });
+    ulozJson(KLIC_NAVRHY_HIST, [...new Set([...seznam.map((n) => n.jmeno), ...hist])].slice(0, 80));
+    try { localStorage.setItem(`${KLIC_NAVRHY_AUTO}_posledni`, AI().dnes()); } catch { /* nic */ }
+    vykresliNavrhy();
+    const ok = seznam.filter((n) => n.kontrola === "overeno").length;
+    navrhyZprava(`Hotovo ✓ ${seznam.length} ${seznam.length === 1 ? "návrh" : seznam.length < 5 ? "návrhy" : "návrhů"} (${ok} ověřených${vsech > seznam.length ? `, ${vsech - seznam.length} s rozporem vyřazeno` : ""}). Klikni na <b>✨ Vytvořit grafiku</b> – AI doplní údaje, vybere šablonu a najde fotku.`, "ok");
+    if (auto) toast(`🎲 Promo hráče: ${seznam.length} ${seznam.length < 5 ? "nové návrhy" : "nových návrhů"} (narozeniny, milníky, výročí).`);
+  } catch (e) { navrhyZprava(esc(e.message), "chyba"); }
+  finally {
+    clearInterval(odpocet);
+    navrhyBezi = false;
+    if (b) { b.disabled = false; b.textContent = "🎲 Navrhni hráče a události"; }
+  }
+}
+
+async function pouzijNavrh(i) {
+  const data = nactiJson(KLIC_NAVRHY, {});
+  const n = data.seznam?.[i];
+  if (!n) return;
+  st = { ...prazdna(), format: st.format, logo: st.logo, cb: n.typ === "tribute" || n.typ === "vyroci" ? st.cb : false };
+  foto = null; vyrez = null; foto2 = null; vyrez2 = null;
+  st.jmeno = n.jmeno; st.sablona = TYP_SABLONA[n.typ] || "ikona";
+  $("#prJmeno").value = n.jmeno;
+  uloz(); vykresliFormular(); vykresli();
+  n.pouzito = true; ulozJson(KLIC_NAVRHY, data); vykresliNavrhy();
+  $("#prJmeno").scrollIntoView({ behavior: "smooth", block: "center" });
+  await navrhni(n);
 }
 
 // ---------------------------------------------------------------- fotka --
@@ -993,6 +1108,15 @@ function init() {
   <div class="pr-mrizka">
     <div>
       <div class="card">
+        <h2>🎲 Koho udělat? <span class="muted">AI sama navrhne hráče a důvod – narozeniny, milníky, výročí, legendy – a ověří to</span></h2>
+        <div class="akce" style="margin-top:0;align-items:center">
+          <button type="button" class="btn" id="prNavrhyBtn">🎲 Navrhni hráče a události</button>
+          <label class="check" style="margin:0"><input type="checkbox" id="prNavrhyAuto"> Navrhovat každý den automaticky</label>
+        </div>
+        <div class="zprava" id="prNavrhyZprava" hidden></div>
+        <div id="prNavrhy"></div>
+      </div>
+      <div class="card">
         <h2>🔥 Promo hráče</h2>
         <p class="muted" style="margin-top:0">Grafika na oblíbeného hráče – i historického (Jágr, Modano, Hašek…) – ve stylu oficiálních grafik NHL: <b>Milník</b> s obřím číslem, <b>Rekord</b> klubu, <b>Narozeniny</b>, <b>Titulek</b>, nebo klidné tribute šablony. AI dohledá tým, barvy, milník, rekord i datum narození.</p>
         <div class="filtry">
@@ -1050,7 +1174,13 @@ function init() {
     </div>
   </div>`;
 
-  $("#prNavrhni").addEventListener("click", navrhni);
+  $("#prNavrhni").addEventListener("click", () => navrhni());
+  $("#prNavrhyBtn").addEventListener("click", () => navrhniHrace());
+  $("#prNavrhy").addEventListener("click", (e) => { const t = e.target.closest("[data-pr-navrh]"); if (t) pouzijNavrh(+t.dataset.prNavrh); });
+  $("#prNavrhyAuto").checked = nactiJson(KLIC_NAVRHY_AUTO, false) === true;
+  $("#prNavrhyAuto").addEventListener("change", (e) => ulozJson(KLIC_NAVRHY_AUTO, e.target.checked));
+  vykresliNavrhy();
+  if ($("#prNavrhyAuto").checked && (localStorage.getItem(`${KLIC_NAVRHY_AUTO}_posledni`) || "") !== AI()?.dnes?.()) setTimeout(() => navrhniHrace({ auto: true }), 8000);
   $("#prJmeno").addEventListener("keydown", (e) => { if (e.key === "Enter") navrhni(); });
   $("#prNajdiFoto").addEventListener("click", () => najdiFoto(false));
   $("#prSoubor").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) await nastavFoto(f, ""); });
