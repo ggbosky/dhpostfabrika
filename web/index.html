@@ -709,6 +709,14 @@
   .pr-navrh.pouzito { opacity: .6; }
   .pr-navrh .btn { flex: none; }
   #prNavrhy:not(:empty) { margin-top: 12px; }
+  .pr-fotky { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 2px; align-items: center; }
+  .pr-fotky:not(:empty) { margin-top: 12px; }
+  .pr-fotka { position: relative; flex: none; width: 74px; height: 92px; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: #111; }
+  .pr-fotka img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; display: block; }
+  .pr-fotka.on { border-color: var(--cervena, #e01e26); }
+  .pr-fotka.druha { border-color: #ffd24d; }
+  .pr-fotka button { position: absolute; right: 3px; bottom: 3px; border: 0; border-radius: 6px; background: rgba(0,0,0,.75); color: #fff; font: 700 11px var(--uzke, sans-serif); padding: 2px 5px; cursor: pointer; }
+  .pr-fotky .btn { flex: none; }
   .pr-platno { cursor: grab; touch-action: none; }
   .pr-sablona.on { border-color: var(--cervena, #e01e26); box-shadow: 0 0 0 3px rgba(224,30,38,.25); }
   .pr-staty { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -1635,7 +1643,7 @@
 <script src="sablony.js?v=20261125c"></script>
 <script src="grafika.js?v=20261125c"></script>
 <script src="koncepty.js?v=20261125c"></script>
-<script src="ai.js?v=20261125c"></script>
+<script src="ai.js?v=20261126a"></script>
 <script src="app.js?v=20261125c"></script>
 <script src="carousel.js?v=20261125c"></script>
 <script src="vyroci.js?v=20261125c"></script>
@@ -1649,9 +1657,9 @@
 <script src="stats.js?v=20261125c"></script>
 <script src="prehled.js?v=20261125c"></script>
 <script src="yt-ulozeni.js?v=20261125c"></script>
-<script src="vyrez.js?v=20261125c"></script>
+<script src="vyrez.js?v=20261126a"></script>
 <script src="prepis.js?v=20261125c"></script>
-<script src="promo.js?v=20261125d"></script>
+<script src="promo.js?v=20261126a"></script>
 <script src="miniatury.js?v=20261125c"></script>
 <script src="yt-api.js?v=20261125c"></script>
 <script src="yt-studio.js?v=20261125c"></script>

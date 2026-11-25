@@ -1,10 +1,23 @@
-// Výřez osoby z fotky (odstranění pozadí) přímo v prohlížeči – MODNet (Apache-2.0) přes transformers.js.
-// Model (~25 MB) se stáhne jednou, pak ho prohlížeč drží v mezipaměti. Fotka nikam neodchází.
+// Výřez osoby z fotky (odstranění pozadí) přímo v prohlížeči přes transformers.js. Fotka nikam neodchází.
+// rychlý: MODNet (Apache-2.0, ~25 MB) – portrétní matting, pár sekund.
+// přesný: ORMBG (Apache-2.0, ~44 MB, int8) – celá postava i s hokejkou a čistšími okraji, ~10–20 s.
+// Modely se stáhnou jednou, pak je prohlížeč drží v mezipaměti.
 (() => {
 "use strict";
 const TRANSFORMERS = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2";
-const MODEL = "Xenova/modnet";
-let model = null;
+const MODELY = {
+  rychly: { id: "Xenova/modnet", dtype: "fp32" },
+  presny: { id: "onnx-community/ormbg-ONNX", dtype: "q8" },
+};
+const modely = {}; // druh → Promise<pipeline>
+function nactiModel(druh) {
+  if (!modely[druh]) {
+    const m = MODELY[druh];
+    modely[druh] = import(TRANSFORMERS).then(({ pipeline }) => pipeline("background-removal", m.id, { dtype: m.dtype, device: "wasm" }));
+    modely[druh].catch(() => { delete modely[druh]; });
+  }
+  return modely[druh];
+}
 const cache = new Map(); // klíč → Promise<canvas>
 
 function rgba(res) {
@@ -39,14 +52,14 @@ async function naUrl(zdroj) {
 }
 
 // zdroj: Blob | HTMLImageElement | canvas | URL → canvas s průhledným pozadím (oříznutý na postavu)
-async function vyrizni(zdroj, klic = null) {
-  if (klic && cache.has(klic)) return cache.get(klic);
+// volby.presne = přesný model (při chybě se použije rychlý)
+async function vyrizni(zdroj, klic = null, volby = {}) {
+  const druh = volby.presne ? "presny" : "rychly";
+  const k = klic ? `${druh}|${klic}` : null;
+  if (k && cache.has(k)) return cache.get(k);
   const slib = (async () => {
-    if (!model) {
-      model = import(TRANSFORMERS).then(({ pipeline }) => pipeline("background-removal", MODEL, { dtype: "fp32", device: "wasm" }));
-      model.catch(() => { model = null; });
-    }
-    const seg = await model;
+    let seg;
+    try { seg = await nactiModel(druh); } catch (e) { if (druh === "rychly") throw e; seg = await nactiModel("rychly"); }
     const { url, uvolni } = await naUrl(zdroj);
     try {
       const out = await seg(url);
@@ -57,7 +70,7 @@ async function vyrizni(zdroj, klic = null) {
       return orizni(c);
     } finally { uvolni(); }
   })();
-  if (klic) { cache.set(klic, slib); slib.catch(() => cache.delete(klic)); }
+  if (k) { cache.set(k, slib); slib.catch(() => cache.delete(k)); }
   return slib;
 }
 

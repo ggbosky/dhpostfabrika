@@ -34,7 +34,7 @@ const prazdna = () => ({
   data: { krestni: "", prijmeni: "", nahore: "", roky: "", veta: "", popisek: "", hashtagy: [], zdroje: [],
     dres: "", cislo: "", co: "", dole: "", nadpis: "", stitek: "", tabulka: "", narozen: "", zemrel: false, nadpisTitulek: "", podnadpis: "" },
   fotoId: null, vyrezId: null, kredit: "", foto: { zoom: 1, x: 0, y: 0 },
-  foto2Id: null, vyrez2Id: null, kredit2: "",
+  foto2Id: null, vyrez2Id: null, kredit2: "", vylepsit: true, zare: true,
 });
 let st = prazdna();
 try {
@@ -48,6 +48,67 @@ const uloz = () => { try { localStorage.setItem(KLIC, JSON.stringify(st)); } cat
 let foto = null;  // HTMLImageElement
 let vyrez = null; // canvas – hráč bez pozadí
 let foto2 = null, vyrez2 = null; // druhá (akční) fotka – nepovinná
+let vyrezSurovy = null, vyrez2Surovy = null; // výřezy bez vylepšení (vylepšení jde vypnout)
+let kandidati = []; // nalezené fotky seřazené podle kvality
+
+// ------------------------------------------------------- vylepšení výřezu --
+// Čisté okraje (bez šedého lemu), automatické úrovně, sytost a doostření – hlavně pro malé fotky z Commons.
+function pripravVyrez(zdroj) {
+  if (!zdroj) return null;
+  if (st.vylepsit === false) return zdroj;
+  const w = zdroj.width, h = zdroj.height;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(zdroj, 0, 0);
+  const id = x.getImageData(0, 0, w, h), d = id.data;
+  // histogram jasu postavy → 2. a 98. percentil
+  const hist = new Uint32Array(256); let n = 0;
+  for (let i = 0; i < d.length; i += 16) if (d[i + 3] > 160) { hist[(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0]++; n++; }
+  let lo = 0, hi = 255, acc = 0;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.02) { lo = v; break; } }
+  acc = 0;
+  for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= n * 0.02) { hi = v; break; } }
+  const roz = Math.max(60, hi - lo), k = 0.65; // jen část korekce, ať to nevypadá přepáleně
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3];
+    // okraj: tvrdší náběh alfy = bez šedého lemu z pozadí
+    d[i + 3] = Math.max(0, Math.min(255, ((a - 28) * 255) / 200));
+    if (!a) continue;
+    let r = d[i], g = d[i + 1], b = d[i + 2];
+    const r2 = ((r - lo) * 255) / roz, g2 = ((g - lo) * 255) / roz, b2 = ((b - lo) * 255) / roz;
+    r = r + (r2 - r) * k; g = g + (g2 - g) * k; b = b + (b2 - b) * k;
+    const l = 0.299 * r + 0.587 * g + 0.114 * b, sat = 1.1;
+    d[i] = l + (r - l) * sat; d[i + 1] = l + (g - l) * sat; d[i + 2] = l + (b - l) * sat;
+  }
+  // doostření (unsharp 3×3), silnější u malých fotek
+  const sila = w < 900 ? 0.45 : 0.25;
+  const src = new Uint8ClampedArray(d);
+  for (let y = 1; y < h - 1; y++) {
+    for (let xx = 1; xx < w - 1; xx++) {
+      const i = (y * w + xx) * 4;
+      if (src[i + 3] < 20) continue;
+      for (let ch = 0; ch < 3; ch++) {
+        const st0 = src[i + ch];
+        const okoli = (src[i + ch - 4] + src[i + ch + 4] + src[i + ch - w * 4] + src[i + ch + w * 4]) / 4;
+        d[i + ch] = st0 + (st0 - okoli) * sila * 2;
+      }
+    }
+  }
+  x.putImageData(id, 0, 0);
+  return c;
+}
+const silCache = new WeakMap();
+// silueta výřezu v jedné barvě (pro záři za hráčem)
+function silueta(zdroj, barva) {
+  let m = silCache.get(zdroj);
+  if (!m) { m = new Map(); silCache.set(zdroj, m); }
+  if (!m.has(barva)) {
+    const c = document.createElement("canvas"); c.width = zdroj.width; c.height = zdroj.height;
+    const x = c.getContext("2d"); x.drawImage(zdroj, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = barva; x.fillRect(0, 0, c.width, c.height);
+    m.set(barva, c);
+  }
+  return m.get(barva);
+}
 const vyska = () => FORMATY[st.format]?.h || 1350;
 
 // ------------------------------------------------------------------ AI --
@@ -78,7 +139,7 @@ Vrať POUZE JSON:
  "barva": "#hex hlavní barva toho týmu (tmavší, ať je čitelná)",
  "barva2": "#hex druhá (akcentní) barva toho týmu",
  "veta": "JEDNA krátká věta česky (max 9 slov), proč ho lidi milovali – jeho styl, charakter nebo ikonický moment. Bez čísel, bez klišé typu ‚legenda neumírá‘. Např. ‚Elegance, kterou si Dallas pamatuje dodnes.‘",
- "popisek": "popisek pod post česky: 1. řádek krátký nostalgický háček, pak 1–2 krátké řádky o něm (bez čísel), pak ‚Pošli to někomu, kdo ho taky miloval 🫡‘ a otázka do komentářů (např. jaký moment s ním si pamatují). Emoji střídmě.",
+ "popisek": "popisek pod post česky ve stylu účtu: začni ‚Jméno. Definující věta.‘ (např. ‚Mike Modano. Hráč, který naučil Texas milovat hokej.‘ – nikdy číslem ani datem), pak 1–2 krátké odstavce s kontextem příležitosti (milník / narozeniny / rekord / co ho dělalo výjimečným), na konci jedna věta ke sdílení bez emoji (např. ‚Pošli to někomu, kdo ho taky pamatuje.‘). Žádná otázka, žádné emoji.",
  "hashtagy": ["#denikhokeje", "…3–4 další relevantní"],
  "foto_dotaz": "anglický dotaz na Wikimedia Commons pro jeho fotku (celé jméno + tým), bez diakritiky",
  "dres": "číslo dresu, se kterým je nejvíc spojený (jen číslo), jinak prázdné",
@@ -144,6 +205,13 @@ const UHLY_LEGEND = ["brankáři 90. let", "čeští útočníci v NHL 2000–20
   "kanadské ikony 80. let", "švédští a finští hráči NHL", "kapitáni, kteří zvedli Stanley Cup", "hráči extraligy 90. let", "legendy MS 70. a 80. let",
   "zapomenuté hvězdy NHL", "rváči a tvrdí obránci", "hokejoví otcové a synové", "hvězdy KHL"];
 let navrhyBezi = false;
+const KOHO = {
+  mix: "Hráči: mix českých a slovenských hráčů a světových legend NHL.",
+  cz: "Hráči: jen čeští a slovenští hráči (NHL, reprezentace, extraliga – současní i legendy).",
+  legendy: "Hráči: jen legendy NHL, které už nehrají (Gretzky, Lemieux, Modano, Shanahan, Hašek, Jágr…).",
+  hvezdy: "Hráči: jen současné hvězdy NHL (aktivní hráči).",
+  extraliga: "Hráči: hráči a legendy české extraligy.",
+};
 const nactiJson = (k, v) => { try { return JSON.parse(localStorage.getItem(k)) ?? v; } catch { return v; } };
 const ulozJson = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* nic */ } };
 
@@ -184,7 +252,8 @@ async function navrhniHrace({ auto = false } = {}) {
       system: `Jsi editor českého hokejového Instagramu „Deník hokeje“. Hledáš příležitosti na grafiku hráče, kterou fanoušci sdílí:
 narozeniny známých hráčů, čerstvé kulaté milníky, výročí rekordů a slavných událostí, oblíbené legendy. Dnešní datum: ${AI().dnes()}.
 Data, čísla a jména ber JEN z výsledků hledání. Co nemáš potvrzené, nenavrhuj.`,
-      zadani: `Najdi 6 příležitostí, pestrý mix:
+      zadani: `Najdi 8 příležitostí, pestrý mix. ${KOHO[$("#prKoho")?.value] || KOHO.mix}
+Navrhuj jen hráče, které fanoušci opravdu znají a mají rádi (velká fanouškovská základna, ikonické momenty) – žádné neznámé jméno jen kvůli datu.
 - 2× NAROZENINY: známí hráči (čeští a slovenští hráči, legendy NHL), kteří mají narozeniny DNES nebo v příštích 7 dnech – i ti, co už nežijí (nedožité narozeniny). Uveď přesné datum narození.
 - 1–2× MILNÍK: hráč, který v posledních 14 dnech dosáhl kulatého milníku (zápasy, body, góly, výhry, nuly) – nejlépe Čech nebo Slovák v NHL/KHL/extralize.
 - 1× VÝROČÍ: slavný rekord nebo událost s hráčem, která má výročí tento týden (ideálně kulaté).
@@ -192,7 +261,7 @@ Data, čísla a jména ber JEN z výsledků hledání. Co nemáš potvrzené, ne
 ${hist.length ? `Tyto hráče už jsme nedávno navrhovali, NENAVRHUJ je: ${hist.slice(0, 50).join(", ")}.` : ""}
 
 Odpověz POUZE řádky JSON Lines – každý návrh jeden řádek s jedním objektem, žádný jiný text:
-{"jmeno": "celé jméno hráče s diakritikou", "typ": "narozeniny" | "milnik" | "vyroci" | "tribute", "proc": "1 krátká věta česky, proč právě teď", "kdy": "datum události (D. M. RRRR) nebo prázdné", "fakt": "klíčové ověřitelné tvrzení s čísly a daty (např. ‚Jaromír Jágr se narodil 15. 2. 1972‘)"}`,
+{"jmeno": "celé jméno hráče s diakritikou", "typ": "narozeniny" | "milnik" | "vyroci" | "tribute", "proc": "1 krátká věta česky, proč právě teď", "kdy": "datum události (D. M. RRRR) nebo prázdné", "fakt": "klíčové ověřitelné tvrzení s čísly a daty (např. ‚Jaromír Jágr se narodil 15. 2. 1972‘)", "popularita": 1–10 (jak moc ho fanoušci znají a sdílí)}`,
     });
     let seznam = AI().objektyZTextu(r.text).filter((n) => n?.jmeno && n?.typ).slice(0, 8);
     if (!seznam.length) { navrhyZprava("AI tentokrát nic nenašla, zkus to znovu.", "varovani"); return; }
@@ -213,7 +282,7 @@ Odpověz POUZE blokem \`\`\`json s polem: [{"id": 0, "stav": "overeno" | "rozpor
     const vsech = seznam.length;
     seznam = seznam.filter((n) => n.kontrola !== "rozpor");
     seznam.forEach((n) => { if (n.kontrola !== "overeno") { n.kontrola = "nejiste"; } });
-    seznam.sort((a, b2) => (a.kontrola === "overeno" ? 0 : 1) - (b2.kontrola === "overeno" ? 0 : 1));
+    seznam.sort((a, b2) => (a.kontrola === "overeno" ? 0 : 1) - (b2.kontrola === "overeno" ? 0 : 1) || (+b2.popularita || 0) - (+a.popularita || 0));
     ulozJson(KLIC_NAVRHY, { seznam, cas: Date.now() });
     ulozJson(KLIC_NAVRHY_HIST, [...new Set([...seznam.map((n) => n.jmeno), ...hist])].slice(0, 80));
     try { localStorage.setItem(`${KLIC_NAVRHY_AUTO}_posledni`, AI().dnes()); } catch { /* nic */ }
@@ -234,7 +303,7 @@ async function pouzijNavrh(i) {
   const n = data.seznam?.[i];
   if (!n) return;
   st = { ...prazdna(), format: st.format, logo: st.logo, cb: n.typ === "tribute" || n.typ === "vyroci" ? st.cb : false };
-  foto = null; vyrez = null; foto2 = null; vyrez2 = null;
+  foto = null; vyrez = null; foto2 = null; vyrez2 = null; vyrezSurovy = null; vyrez2Surovy = null; kandidati = []; vykresliKandidaty();
   st.jmeno = n.jmeno; st.sablona = TYP_SABLONA[n.typ] || "ikona";
   $("#prJmeno").value = n.jmeno;
   uloz(); vykresliFormular(); vykresli();
@@ -258,13 +327,14 @@ async function nastavFoto(blob, kredit = "") {
 
 async function vyrizni() {
   if (!foto || !window.DHVyrez) return;
-  zprava("✂️ Vyřezávám hráče z fotky… (poprvé se stáhne model ~25 MB, pak pár sekund)");
+  zprava("✂️ Vyřezávám hráče z fotky přesným modelem… (poprvé se stáhne ~45 MB, pak 10–20 s)");
   try {
-    vyrez = await window.DHVyrez.vyrizni(await U().obrazekBlob(st.fotoId));
-    const blob = await new Promise((ok) => vyrez.toBlob(ok, "image/png"));
+    const surovy = await window.DHVyrez.vyrizni(await U().obrazekBlob(st.fotoId), null, { presne: true });
+    const blob = await new Promise((ok) => surovy.toBlob(ok, "image/png"));
     st.vyrezId = await U().ulozObrazek(blob, { promoVyrez: true });
+    vyrezSurovy = surovy; vyrez = pripravVyrez(surovy);
     uloz();
-    zprava("Hotovo ✓ Hráč je vyříznutý. Táhnutím v náhledu ho posuneš, posuvníkem zvětšíš.", "ok");
+    zprava("Hotovo ✓ Hráč je vyříznutý (přesný model – i s hokejkou). Táhnutím v náhledu ho posuneš, posuvníkem zvětšíš.", "ok");
   } catch (e) {
     vyrez = null;
     zprava(`Hráče se nepodařilo vyříznout (${esc(e.message)}) – šablony použijí celou fotku.`, "varovani");
@@ -283,10 +353,12 @@ async function nastavFoto2(blob, kredit = "") {
   if (!window.DHVyrez) return;
   zprava("✂️ Vyřezávám hráče z druhé fotky…");
   try {
-    vyrez2 = await window.DHVyrez.vyrizni(await U().obrazekBlob(st.foto2Id));
-    const b = await new Promise((ok) => vyrez2.toBlob(ok, "image/png"));
+    const surovy2 = await window.DHVyrez.vyrizni(await U().obrazekBlob(st.foto2Id), null, { presne: true });
+    vyrez2Surovy = surovy2; vyrez2 = pripravVyrez(surovy2);
+    const b = await new Promise((ok) => surovy2.toBlob(ok, "image/png"));
     st.vyrez2Id = await U().ulozObrazek(b, { promoVyrez: true });
     uloz();
+    vykresliFormular();
     zprava("Hotovo ✓ Druhá fotka je vyříznutá – v šablonách Milník, Rekord a Narozeniny je hráč dvakrát.", "ok");
   } catch (e) { vyrez2 = null; zprava(`Druhou fotku se nepodařilo vyříznout (${esc(e.message)}).`, "varovani"); }
   vykresli();
@@ -294,6 +366,9 @@ async function nastavFoto2(blob, kredit = "") {
 async function najdiFoto2() {
   const q = [st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ") || st.jmeno;
   if (!q) { zprava("Nejdřív napiš jméno hráče.", "chyba"); return; }
+  if (!kandidati.length) await hledejKandidaty();
+  const dalsi = kandidati.findIndex((f) => f.url !== st.fotoUrl && f.url !== st.foto2Url);
+  if (dalsi >= 0) { await pouzijKandidata(dalsi, true); return; }
   try {
     const v = await AI().vyberFoto(`${q} ice hockey action`);
     if (!v) return;
@@ -302,7 +377,69 @@ async function najdiFoto2() {
   } catch (e) { zprava(esc(e.message), "chyba"); }
 }
 
+// Hledání fotek: víc dotazů najednou (jméno + tým, jméno + hokej, jméno), výsledky seřazené podle kvality:
+// v názvu je příjmení hráče, vysoké rozlišení, na výšku, bez podpisů/karet/hrobů/soch. Nejlepší se použije hned,
+// ostatní jsou v pásu pod tlačítky – kliknutím se přepne (bez dialogu).
+const normT = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const ZLE_FOTKY = /(signature|signed|autograph|card|logo|grave|hrob|tomb|statue|socha|ticket|banner|poster|stamp|coin|map|plaque|mural|wax|figurine|bobblehead|draft day|press conference|conference|suit|award ceremony)/i;
+async function hledejKandidaty(dotaz = "") {
+  const jm = [st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ") || st.jmeno || $("#prJmeno").value.trim();
+  if (!jm && !dotaz) return [];
+  const prijmeni = normT(st.data.prijmeni || jm.split(/\s+/).pop());
+  const tym = (st.data.nahore || "").toLowerCase();
+  const bez = normT(jm);
+  const dotazy = [...new Set([dotaz, tym ? `${bez} ${tym}` : "", `${bez} ice hockey`, bez].filter(Boolean))];
+  const vse = new Map();
+  for (const q of dotazy) {
+    try { for (const f of await AI().hledejFotky(q, 20)) if (!vse.has(f.url)) vse.set(f.url, f); } catch { /* další dotaz */ }
+    if (vse.size >= 40) break;
+  }
+  kandidati = [...vse.values()].map((f) => {
+    const n = normT(`${f.nazev}`);
+    let sk = 0;
+    if (prijmeni && n.includes(prijmeni)) sk += 50; else sk -= 40;
+    if (ZLE_FOTKY.test(n)) sk -= 35;
+    if (tym && tym.split(/\s+/).some((w) => w.length > 3 && n.includes(normT(w)))) sk += 10;
+    if (/(hockey|game|vs\.?|match|nhl|iihf|extraliga|playoff)/i.test(n)) sk += 8;
+    const sir = f.sirka || 0, vys = f.vyska || 0;
+    if (sir && vys) { sk += Math.min(16, Math.min(sir, vys) / 150); if (vys >= sir * 0.95) sk += 8; }
+    return { ...f, skore: sk };
+  }).sort((a, b) => b.skore - a.skore).slice(0, 14);
+  vykresliKandidaty();
+  return kandidati;
+}
+function vykresliKandidaty() {
+  const el = $("#prFotky");
+  if (!el) return;
+  el.innerHTML = kandidati.length ? kandidati.map((f, i) => `
+    <div class="pr-fotka${f.url === st.fotoUrl ? " on" : ""}${f.url === st.foto2Url ? " druha" : ""}" title="${esc(f.nazev)} · ${esc(f.autor)} (${esc(f.licence)})">
+      <img src="${esc(f.nahled)}" alt="" loading="lazy" data-pr-fotka="${i}">
+      <button type="button" data-pr-fotka2="${i}" title="Použít jako druhou (akční) fotku">+2</button>
+    </div>`).join("") + `<button type="button" class="btn ghost small" id="prGalerie">Víc fotek…</button>` : "";
+}
+async function pouzijKandidata(i, druha = false) {
+  const f = kandidati[i];
+  if (!f) return;
+  zprava(`Načítám fotku „${esc(f.nazev)}“…`);
+  try {
+    const img = await AI().nactiWebFoto(f.url);
+    const blob = await new Promise((ok) => { const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); c.toBlob(ok, "image/jpeg", 0.95); });
+    if (druha) { st.foto2Url = f.url; await nastavFoto2(blob, AI().kredit(f)); }
+    else { st.fotoUrl = f.url; await nastavFoto(blob, AI().kredit(f)); }
+    vykresliKandidaty();
+  } catch (e) { zprava(`Fotku se nepodařilo načíst (${esc(e.message)}) – zkus jinou z pásu.`, "chyba"); }
+}
+
 async function najdiFoto(tiche = false, dotaz = "") {
+  try {
+    zprava("🔍 Hledám nejlepší volně použitelné fotky…");
+    const k = await hledejKandidaty(dotaz);
+    if (k.length) { await pouzijKandidata(0); if (kandidati.length > 1) zprava("Vybral jsem nejlepší fotku ✓ Nesedí? Klikni na jinou v pásu pod tlačítky (+2 = druhá akční fotka).", "ok"); return; }
+    if (!tiche) zprava("Žádnou vhodnou volnou fotku jsem nenašel – nahraj vlastní nebo zkus „Víc fotek…“.", "varovani");
+  } catch (e) { if (!tiche) zprava(esc(e.message), "chyba"); }
+}
+
+async function najdiFotoGalerie(tiche = false, dotaz = "") {
   const q = dotaz || [st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ") || st.jmeno || $("#prJmeno").value.trim();
   if (!q) return;
   try {
@@ -701,6 +838,23 @@ function pozadiTym(ctx, h, { svetle = false } = {}) {
     ctx.drawImage(foto, (W - iw * m) / 2, (h - ih * m) / 2, iw * m, ih * m);
     ctx.restore();
   }
+  // bokeh – rozostřená světla haly (stejná při každém vykreslení)
+  if (!svetle) {
+    let sem = 7;
+    const rnd = () => { sem = (sem * 16807) % 2147483647; return sem / 2147483647; };
+    ctx.save(); ctx.globalCompositeOperation = "screen";
+    for (let i = 0; i < 16; i++) {
+      const bx = rnd() * W, by = rnd() * h * 0.7, r = 18 + rnd() * 70;
+      const gb = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+      gb.addColorStop(0, hex(paleta().akc, 0.09 + rnd() * 0.08)); gb.addColorStop(1, hex(paleta().akc, 0));
+      ctx.fillStyle = gb; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // světlo za hráčem
+    const sv = ctx.createRadialGradient(W * 0.5, h * 0.45, 10, W * 0.5, h * 0.45, W * 0.6);
+    sv.addColorStop(0, "rgba(255,255,255,0.16)"); sv.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sv; ctx.fillRect(0, 0, W, h);
+  }
   // šikmé světelné pruhy
   ctx.save();
   for (const [x, sirka, a] of [[0.18, 260, 0.08], [0.62, 140, 0.06], [0.86, 320, 0.05]]) {
@@ -718,7 +872,7 @@ function pozadiTym(ctx, h, { svetle = false } = {}) {
 }
 
 // Vyříznutý hráč se stínem. box = {stredX, spodek, vyska} (podíly), posun/zoom z tažení jen u hlavního.
-function kresliVyrez(ctx, h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = true, alfa = 1, oriznout = null, odShora = null } = {}) {
+function kresliVyrez(ctx, h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = true, alfa = 1, oriznout = null, odShora = null, zare = null } = {}) {
   const kamera = anim == null ? 1 : 1 + 0.05 * Math.min(1, anim / DELKA_ANIM);
   const zoom = hlavni ? (st.foto.zoom || 1) : 1;
   let vh = h * vyska * zoom * kamera, vw = vh * (zdroj.width / zdroj.height);
@@ -728,6 +882,16 @@ function kresliVyrez(ctx, h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hla
   ctx.save();
   ctx.globalAlpha = alfa;
   if (oriznout) { ctx.beginPath(); ctx.rect(0, 0, W, oriznout); ctx.clip(); }
+  // záře za hráčem v akcentní barvě (rim light jako na grafikách NHL)
+  const barvaZare = zare ?? (hlavni && st.zare !== false ? akcent2() : null);
+  if (barvaZare) {
+    ctx.save();
+    ctx.globalAlpha = alfa * 0.75;
+    ctx.shadowColor = barvaZare; ctx.shadowBlur = Math.max(30, vw * 0.07);
+    ctx.drawImage(silueta(zdroj, barvaZare), x, y, vw, vh);
+    ctx.drawImage(silueta(zdroj, barvaZare), x, y, vw, vh);
+    ctx.restore();
+  }
   ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 45; ctx.shadowOffsetY = 16;
   ctx.filter = st.cb ? "grayscale(1) contrast(1.1)" : "contrast(1.07) saturate(1.08)";
   ctx.drawImage(zdroj, x, y, vw, vh);
@@ -758,8 +922,16 @@ function obriCislo(ctx, text, { y, maxV, sirka, x = W / 2, zarovnani = "center" 
   else { g.addColorStop(0, svetlejsi(a2, 0.35)); g.addColorStop(0.5, a2); g.addColorStop(1, tmavsi(a2, 0.25)); }
   ctx.save();
   ctx.globalAlpha = vidim(0.1, 0.7);
-  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+  // plastická hloubka: tmavé vrstvy posunuté dolů vpravo
+  const hloubka = Math.max(6, Math.round(v * 0.03));
+  ctx.fillStyle = tmavsi(paleta().bg, 0.6);
+  ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 34; ctx.shadowOffsetY = 12;
+  ctx.fillText(text, x + hloubka, zaklad + hloubka);
+  ctx.shadowColor = "transparent";
+  for (let i = hloubka - 1; i > 0; i--) ctx.fillText(text, x + i, zaklad + i);
   ctx.fillStyle = g; ctx.fillText(text, x, zaklad);
+  // jemná světlá hrana nahoře
+  ctx.lineWidth = Math.max(2, v * 0.006); ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.strokeText(text, x, zaklad);
   ctx.shadowColor = "transparent";
   // jemné vodorovné linky přes číslo (textura jako na grafikách NHL)
   ctx.globalCompositeOperation = "source-atop";
@@ -906,7 +1078,7 @@ function sablonaNarozeniny(ctx, h) {
   ctx.save(); ctx.globalAlpha = 0.9; ctx.fillStyle = c;
   ctx.beginPath(); ctx.moveTo(W * 0.62, 0); ctx.lineTo(W, 0); ctx.lineTo(W, h * 0.42); ctx.closePath(); ctx.fill(); ctx.restore();
   // velký portrét nahoře (oříznutý), akční výřez vpravo dole
-  if (maVyrez()) kresliVyrez(ctx, h, vyrez, { stredX: 0.4, odShora: 0.04, vyska: 1.0, hlavni: true, oriznout: h * 0.8 });
+  if (maVyrez()) kresliVyrez(ctx, h, vyrez, { stredX: 0.4, odShora: 0.04, vyska: 1.0, hlavni: true, oriznout: h * 0.8, zare: false });
   else { ctx.save(); kresliFoto(ctx, 0, 0, W, h * 0.66, st.cb); ctx.restore(); }
   // čitelnost textu vlevo dole
   const g = ctx.createLinearGradient(0, h * 0.5, 0, h);
@@ -1070,6 +1242,7 @@ function vykresliFormular() {
   $("#prBarva").value = st.barva; $("#prBarva2").value = st.barva2 || "#ffffff"; $("#prVyrezZap").checked = st.vyrezZap !== false;
   $("#prFormat").value = st.format; $("#prLogo").checked = st.logo; $("#prCb").checked = !!st.cb;
   $("#prZoom").value = st.foto.zoom;
+  $("#prVylepsit").checked = st.vylepsit !== false; $("#prZare").checked = st.zare !== false;
   $$("[data-pr-sablona]").forEach((b) => b.classList.toggle("on", b.dataset.prSablona === st.sablona));
 }
 
@@ -1111,6 +1284,7 @@ function init() {
         <h2>🎲 Koho udělat? <span class="muted">AI sama navrhne hráče a důvod – narozeniny, milníky, výročí, legendy – a ověří to</span></h2>
         <div class="akce" style="margin-top:0;align-items:center">
           <button type="button" class="btn" id="prNavrhyBtn">🎲 Navrhni hráče a události</button>
+          <label style="margin:0;min-width:200px">Koho<select id="prKoho"><option value="mix">Mix (Češi + legendy NHL)</option><option value="cz">Čeští a slovenští hráči</option><option value="legendy">Legendy NHL</option><option value="hvezdy">Současné hvězdy NHL</option><option value="extraliga">Extraliga</option></select></label>
           <label class="check" style="margin:0"><input type="checkbox" id="prNavrhyAuto"> Navrhovat každý den automaticky</label>
         </div>
         <div class="zprava" id="prNavrhyZprava" hidden></div>
@@ -1128,6 +1302,7 @@ function init() {
           <label class="btn ghost">📷 Nahrát fotku<input type="file" id="prSoubor" accept="image/*"></label>
           <button type="button" class="btn ghost" data-vlozit-fotku title="Vložit fotku zkopírovanou do schránky (na počítači stačí Ctrl+V)">📋 Vložit</button>
         </div>
+        <div id="prFotky" class="pr-fotky"></div>
         <div class="radek pr-foto2">
           <span class="muted" style="font-size:13px">Druhá fotka (akční, nepovinná):</span>
           <label class="btn ghost small">📷 Nahrát<input type="file" id="prSoubor2" accept="image/*"></label>
@@ -1164,6 +1339,8 @@ function init() {
           <label class="check"><input type="checkbox" id="prCb"> Černobílá fotka</label>
           <label class="check"><input type="checkbox" id="prVyrezZap"> Vyříznutý hráč</label>
           <label class="check"><input type="checkbox" id="prLogo"> Logo Deníku hokeje</label>
+          <label class="check"><input type="checkbox" id="prVylepsit"> Vylepšit fotku (ostrost, kontrast)</label>
+          <label class="check"><input type="checkbox" id="prZare"> Záře za hráčem</label>
         </div>
         <div class="akce">
           <button type="button" class="btn" id="prStahnout">⬇️ Stáhnout obrázek</button>
@@ -1183,13 +1360,21 @@ function init() {
   if ($("#prNavrhyAuto").checked && (localStorage.getItem(`${KLIC_NAVRHY_AUTO}_posledni`) || "") !== AI()?.dnes?.()) setTimeout(() => navrhniHrace({ auto: true }), 8000);
   $("#prJmeno").addEventListener("keydown", (e) => { if (e.key === "Enter") navrhni(); });
   $("#prNajdiFoto").addEventListener("click", () => najdiFoto(false));
+  $("#prFotky").addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.id === "prGalerie") { najdiFotoGalerie(false); return; }
+    if (t.dataset.prFotka2 !== undefined) { pouzijKandidata(+t.dataset.prFotka2, true); return; }
+    if (t.dataset.prFotka !== undefined) pouzijKandidata(+t.dataset.prFotka);
+  });
+  $("#prVylepsit").addEventListener("change", (e) => { st.vylepsit = e.target.checked; uloz(); vyrez = pripravVyrez(vyrezSurovy) || vyrez; vyrez2 = pripravVyrez(vyrez2Surovy) || vyrez2; vykresli(); });
+  $("#prZare").addEventListener("change", (e) => { st.zare = e.target.checked; uloz(); vykresli(); });
   $("#prSoubor").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) await nastavFoto(f, ""); });
   $("#prStahnout").addEventListener("click", exportuj);
   $("#prSoubor2").addEventListener("change", async (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) await nastavFoto2(f, ""); });
   $("#prNajdiFoto2").addEventListener("click", najdiFoto2);
   $("#prBezFoto2").addEventListener("click", () => { st.foto2Id = null; st.vyrez2Id = null; st.kredit2 = ""; foto2 = null; vyrez2 = null; uloz(); vykresliFormular(); vykresli(); });
   $("#prVideo").addEventListener("click", exportujVideo);
-  $("#prNovy").addEventListener("click", () => { if (!confirm("Začít s novým hráčem?")) return; st = prazdna(); foto = null; vyrez = null; uloz(); $("#prJmeno").value = ""; vykresliFormular(); vykresli(); zprava(""); });
+  $("#prNovy").addEventListener("click", () => { if (!confirm("Začít s novým hráčem?")) return; st = prazdna(); foto = null; vyrez = null; foto2 = null; vyrez2 = null; vyrezSurovy = null; vyrez2Surovy = null; kandidati = []; vykresliKandidaty(); uloz(); $("#prJmeno").value = ""; vykresliFormular(); vykresli(); zprava(""); });
   $("#prKopiruj").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("#prPopisek").value); toast("Popisek zkopírován ✓"); } catch { $("#prPopisek").select(); } });
   $("#prPlan").addEventListener("click", () => {
     window.DHPlan?.pridej({ nazev: `Promo: ${[st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ") || st.jmeno}`, format: "post", zadani: $("#prPopisek").value });
@@ -1218,10 +1403,10 @@ function init() {
   (async () => {
     try {
       if (st.fotoId) foto = await U().obrazekImg(st.fotoId);
-      if (st.vyrezId) { const img = await U().obrazekImg(st.vyrezId); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrez = c; }
+      if (st.vyrezId) { const img = await U().obrazekImg(st.vyrezId); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrezSurovy = c; vyrez = pripravVyrez(c); }
       else if (foto) vyrizni();
       if (st.foto2Id) foto2 = await U().obrazekImg(st.foto2Id);
-      if (st.vyrez2Id) { const img = await U().obrazekImg(st.vyrez2Id); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrez2 = c; }
+      if (st.vyrez2Id) { const img = await U().obrazekImg(st.vyrez2Id); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrez2Surovy = c; vyrez2 = pripravVyrez(c); }
       vykresliFormular();
     } catch { /* nic */ }
     if (document.fonts?.ready) await document.fonts.ready;

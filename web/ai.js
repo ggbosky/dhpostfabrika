@@ -768,6 +768,7 @@ async function hledejWikimedia(q, pocet) {
       licence: textZHtml(m.LicenseShortName?.value) || "viz Wikimedia",
       zdroj: "Wikimedia Commons",
       nazev: s.title.replace(/^File:/, "").replace(/\.[a-z]+$/i, ""),
+      sirka: ii.width, vyska: ii.height,
     };
   }).filter(Boolean);
 }
@@ -795,6 +796,7 @@ async function hledejOpenverse(q, pocet) {
       licence: licenceOpenverse(x),
       zdroj: x.source === "wikimedia" || x.provider === "wikimedia" ? "Wikimedia Commons" : (x.source || x.provider || "Openverse").replace(/^./, (c) => c.toUpperCase()),
       nazev: x.title || "fotka",
+      sirka: x.width || 0, vyska: x.height || 0,
     }));
 }
 
