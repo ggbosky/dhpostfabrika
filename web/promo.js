@@ -598,39 +598,42 @@ function textBlok(ctx, { spodek, zarovnani = "center", L = 76, maxJmeno = 120, b
   return y;
 }
 
-// 1) IKONA – hráč (výřez) před obřím příjmením, pozadí v barvách týmu
+// 1) IKONA – hráč (výřez) před obřím příjmením, pozadí v barvách týmu.
+// Příjmení musí zůstat čitelné: hráč se zmenší tak, aby zakryl nanejvýš spodní okraj nápisu.
 function sablonaIkona(ctx, h) {
-  const d = st.data, c = st.barva;
+  const d = st.data, c = paleta().bg;
   const bg = ctx.createRadialGradient(W / 2, h * 0.32, 20, W / 2, h * 0.45, h * 0.85);
   bg.addColorStop(0, svetlejsi(c, 0.18)); bg.addColorStop(0.45, c); bg.addColorStop(1, tmavsi(c, 0.7));
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, h);
-  // jemný světelný pruh
   ctx.save(); ctx.translate(W * 0.2, 0); ctx.rotate(0.35);
   const pruh = ctx.createLinearGradient(-200, 0, 200, 0);
   pruh.addColorStop(0, "rgba(255,255,255,0)"); pruh.addColorStop(0.5, "rgba(255,255,255,0.07)"); pruh.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = pruh; ctx.fillRect(-200, -h, 400, h * 3); ctx.restore();
-  // obří příjmení za hráčem
   const prijmeni = (d.prijmeni || "").toUpperCase();
+  let obdelnik = null, yJ = 0, vJ = 0;
   if (prijmeni) {
-    ctx.save(); ctx.globalAlpha = vidim(0.1, 0.8);
-    const v = vejdeSe(ctx, prijmeni, (q) => `${q}px ${P_JMENO}`, h * 0.36, W * 0.94, 60);
-    ctx.font = `${v}px ${P_JMENO}`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    const yJ = h * 0.155 + (ctx.measureText(prijmeni).actualBoundingBoxAscent || v * 0.8);
-    ctx.fillStyle = "rgba(255,255,255,0.16)"; ctx.fillText(prijmeni, W / 2, yJ);
-    ctx.lineWidth = 2.5; ctx.strokeStyle = "rgba(255,255,255,0.42)"; ctx.strokeText(prijmeni, W / 2, yJ);
+    vJ = vejdeSe(ctx, prijmeni, (q) => `${q}px ${P_JMENO}`, h * 0.3, W * 0.94, 60);
+    ctx.font = `${vJ}px ${P_JMENO}`;
+    const m = ctx.measureText(prijmeni), asc = m.actualBoundingBoxAscent || vJ * 0.8;
+    yJ = h * 0.12 + asc;
+    obdelnik = { x: W / 2 - m.width / 2, y: yJ - asc, w: m.width, h: asc };
+    ctx.save(); ctx.globalAlpha = vidim(0.1, 0.8); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const svetle = jas(c) > 0.55;
+    ctx.fillStyle = svetle ? "rgba(0,0,0,0.16)" : "rgba(255,255,255,0.24)"; ctx.fillText(prijmeni, W / 2, yJ);
+    ctx.lineWidth = 3; ctx.strokeStyle = svetle ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.6)"; ctx.strokeText(prijmeni, W / 2, yJ);
     ctx.restore();
   }
   if (maVyrez()) {
-    const r = polohaVyrezu(h, 0.84);
-    ctx.save(); ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 50; ctx.shadowOffsetY = 18;
-    ctx.filter = st.cb ? "grayscale(1) contrast(1.1)" : "contrast(1.06) saturate(1.05)";
-    ctx.drawImage(vyrez, r.x, r.y, r.w, r.h); ctx.restore();
+    // hráč smí zakrýt jen spodní čtvrtinu příjmení
+    const cil = obdelnik ? [{ ...obdelnik, h: obdelnik.h * 0.75 }] : [];
+    const vy = vyskaBezPrekryvu(h, vyrez, { stredX: 0.5, spodek: 0, hlavni: true }, cil, 0.84, 0.56, 0.06);
+    kresliVyrez(ctx, h, vyrez, { stredX: 0.5, spodek: 0, vyska: vy, hlavni: true });
   } else {
     ctx.save(); ctx.globalAlpha = 0.9; kresliFoto(ctx, 0, h * 0.2, W, h * 0.8, st.cb); ctx.restore();
   }
-  const g = ctx.createLinearGradient(0, h * 0.62, 0, h);
-  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.55, "rgba(0,0,0,0.7)"); g.addColorStop(1, "rgba(0,0,0,0.92)");
-  ctx.fillStyle = g; ctx.fillRect(0, h * 0.62, W, h * 0.38);
+  const g = ctx.createLinearGradient(0, h * 0.58, 0, h);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.5, "rgba(0,0,0,0.72)"); g.addColorStop(1, "rgba(0,0,0,0.94)");
+  ctx.fillStyle = g; ctx.fillRect(0, h * 0.58, W, h * 0.42);
   kresliZrno(ctx, W, h, 0.06);
   textBlok(ctx, { spodek: h - (h > 1500 ? 140 : 84), maxJmeno: 110 });
   ctx.fillStyle = st.barva2 && jas(st.barva2) > 0.15 ? st.barva2 : "#ffffff";
@@ -871,14 +874,71 @@ function pozadiTym(ctx, h, { svetle = false } = {}) {
   }
 }
 
-// Vyříznutý hráč se stínem. box = {stredX, spodek, vyska} (podíly), posun/zoom z tažení jen u hlavního.
-function kresliVyrez(ctx, h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = true, alfa = 1, oriznout = null, odShora = null, zare = null } = {}) {
+// ------------------------------------------------ rozložení bez překrývání --
+// Obrys hráče (průhlednost výřezu) se zmenší na malou masku. Texty se pak umisťují tam, kde hráč není,
+// případně se hráč zmenší. Když to jinak nejde (hráč přetažený přes text), dostane text tmavý podklad.
+let obsazeno = []; // [{zdroj, box, oriznout}] – hráči vykreslení v aktuálním snímku
+const maskCache = new WeakMap();
+function maska(zdroj) {
+  if (maskCache.has(zdroj)) return maskCache.get(zdroj);
+  const mw = 160, mh = Math.max(1, Math.round((mw * zdroj.height) / zdroj.width));
+  const c = document.createElement("canvas"); c.width = mw; c.height = mh;
+  const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(zdroj, 0, 0, mw, mh);
+  const d = x.getImageData(0, 0, mw, mh).data, a = new Uint8Array(mw * mh);
+  for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+  const m = { mw, mh, a };
+  maskCache.set(zdroj, m);
+  return m;
+}
+// podíl obdélníku r, který zakrývá některý z hráčů
+function prekryvS(seznam, r) {
+  if (!r || r.w <= 0 || r.h <= 0) return 0;
+  let zasah = 0, n = 0;
+  const NX = 18, NY = 8;
+  for (let iy = 0; iy < NY; iy++) for (let ix = 0; ix < NX; ix++) {
+    const px = r.x + ((ix + 0.5) * r.w) / NX, py = r.y + ((iy + 0.5) * r.h) / NY;
+    n++;
+    for (const o of seznam) {
+      if (o.oriznout && py > o.oriznout) continue;
+      const b = o.box;
+      if (px < b.x || px >= b.x + b.w || py < b.y || py >= b.y + b.h) continue;
+      const m = maska(o.zdroj);
+      if (m.a[(((py - b.y) / b.h) * m.mh | 0) * m.mw + (((px - b.x) / b.w) * m.mw | 0)] > 70) { zasah++; break; }
+    }
+  }
+  return zasah / n;
+}
+const prekryv = (r) => prekryvS(obsazeno, r);
+function boxVyrezu(h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = true, odShora = null } = {}) {
   const kamera = anim == null ? 1 : 1 + 0.05 * Math.min(1, anim / DELKA_ANIM);
   const zoom = hlavni ? (st.foto.zoom || 1) : 1;
   let vh = h * vyska * zoom * kamera, vw = vh * (zdroj.width / zdroj.height);
   if (vw > W * 1.15) { vw = W * 1.15; vh = vw * (zdroj.height / zdroj.width); }
   const x = W * stredX - vw / 2 + (hlavni ? (st.foto.x || 0) * W * 0.35 : 0);
   const y = (odShora != null ? h * odShora : h - vh - h * spodek) + (hlavni ? (st.foto.y || 0) * h * 0.25 : 0);
+  return { x, y, w: vw, h: vh };
+}
+// největší výška hráče (podíl plátna), při které nezakryje texty víc než o toleranci
+function vyskaBezPrekryvu(h, zdroj, volby, obdelniky, max, min = 0.5, tolerance = 0.03) {
+  if (!obdelniky.length) return max;
+  for (let v = max; v >= min; v -= 0.02) {
+    const box = boxVyrezu(h, zdroj, { ...volby, vyska: v });
+    if (obdelniky.every((r) => prekryvS([{ zdroj, box, oriznout: volby.oriznout }], r) <= tolerance)) return v;
+  }
+  return min;
+}
+// měkký tmavý podklad pod text, který leží přes hráče
+function podklad(ctx, r, sila = 0.6) {
+  ctx.save();
+  const POSUN = 20000;
+  ctx.fillStyle = "#000"; ctx.shadowColor = `rgba(0,0,0,${Math.min(0.95, sila + 0.25)})`; ctx.shadowBlur = 60; ctx.shadowOffsetX = POSUN;
+  ctx.beginPath(); ctx.roundRect(r.x - 20 - POSUN, r.y - 14, r.w + 40, r.h + 28, 30); ctx.fill();
+  ctx.restore();
+}
+
+// Vyříznutý hráč se stínem (a září). Poloha z boxVyrezu; zapíše se do „obsazeno“.
+function kresliVyrez(ctx, h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = true, alfa = 1, oriznout = null, odShora = null, zare = null } = {}) {
+  const { x, y, w: vw, h: vh } = boxVyrezu(h, zdroj, { stredX, spodek, vyska, hlavni, odShora });
   ctx.save();
   ctx.globalAlpha = alfa;
   if (oriznout) { ctx.beginPath(); ctx.rect(0, 0, W, oriznout); ctx.clip(); }
@@ -896,7 +956,9 @@ function kresliVyrez(ctx, h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hla
   ctx.filter = st.cb ? "grayscale(1) contrast(1.1)" : "contrast(1.07) saturate(1.08)";
   ctx.drawImage(zdroj, x, y, vw, vh);
   ctx.restore();
-  return { x, y, w: vw, h: vh };
+  const box = { x, y, w: vw, h: vh };
+  obsazeno.push({ zdroj, box, oriznout });
+  return box;
 }
 // hlavní a druhý hráč; bez výřezu aspoň fotka
 function hraci(ctx, h, hlavniBox, druhyBox) {
@@ -960,12 +1022,18 @@ function spodniRadek(ctx, h, text, barva = "rgba(255,255,255,0.92)") {
   ctx.font = `700 30px ${P_STITEK}`; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = barva;
   ctx.letterSpacing = "4px";
   const radky = zalom(ctx, text.toUpperCase(), W - 160).slice(0, 2);
-  radky.forEach((r, i) => ctx.fillText(r, W / 2, h - (h > 1500 ? 120 : 58) - (radky.length - 1 - i) * 42));
+  const yP = h - (h > 1500 ? 120 : 58);
+  const sirka = Math.max(...radky.map((r) => ctx.measureText(r).width));
+  const r0 = { x: W / 2 - sirka / 2, y: yP - (radky.length - 1) * 42 - 26, w: sirka, h: (radky.length - 1) * 42 + 32 };
+  if (prekryv(r0) > 0.04) { podklad(ctx, r0, 0.55); ctx.fillStyle = barva; }
+  ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 10;
+  radky.forEach((r, i) => ctx.fillText(r, W / 2, yP - (radky.length - 1 - i) * 42));
   ctx.letterSpacing = "0px";
   ctx.restore();
 }
 
-// 5) MILNÍK – obří číslo za hráčem, jméno nahoře, popis čísla vpravo dole, řádek dole
+// 5) MILNÍK – obří číslo za hráčem (hráč smí zakrýt jen spodní část čísla), jméno nahoře,
+// popis čísla tam, kde je volno (vpravo / vlevo vedle hráče), řádek dole.
 function sablonaMilnik(ctx, h) {
   const d = st.data;
   pozadiTym(ctx, h);
@@ -973,93 +1041,134 @@ function sablonaMilnik(ctx, h) {
   stitekSCarami(ctx, nahore, h * 0.05, "rgba(255,255,255,0.7)", 24);
   stitekSCarami(ctx, cele(), h * 0.095, "#ffffff", 40);
   const cislo = formatCislo(d.cislo) || "—";
-  const spodekCisla = obriCislo(ctx, cislo, { y: h * 0.13, maxV: h * 0.4, sirka: W * 0.92 });
-  hraci(ctx, h, { stredX: 0.44, spodek: 0.0, vyska: 0.74 }, { stredX: 0.2, spodek: 0.06, vyska: 0.5 });
-  // popis čísla vpravo dole (dva řádky, Anton) se šipkou
+  const yCisla = h * 0.13;
+  const spodekCisla = obriCislo(ctx, cislo, { y: yCisla, maxV: h * 0.4, sirka: W * 0.92 });
+  ctx.font = `${vejdeSe(ctx, cislo, (q) => `${q}px ${P_CISLO}`, h * 0.4, W * 0.92, 80)}px ${P_CISLO}`;
+  const sirkaCisla = ctx.measureText(cislo).width;
+  const hlavni = { stredX: 0.44, spodek: 0.0, hlavni: true };
+  if (maVyrez()) {
+    // horních 60 % čísla musí zůstat vidět
+    const vrch = { x: W / 2 - sirkaCisla / 2, y: yCisla, w: sirkaCisla, h: (spodekCisla - yCisla) * 0.6 };
+    hlavni.vyska = vyskaBezPrekryvu(h, vyrez, hlavni, [vrch], 0.74, 0.5, 0.06);
+  } else hlavni.vyska = 0.74;
+  hraci(ctx, h, hlavni, { stredX: 0.2, spodek: 0.06, vyska: 0.5 });
   if (d.co) {
-    ctx.save(); ctx.globalAlpha = vidim(0.9);
     const slova = d.co.split(/\s+/);
     const radky = slova.length > 1 ? [slova.slice(0, Math.ceil(slova.length / 2)).join(" "), slova.slice(Math.ceil(slova.length / 2)).join(" ")] : [d.co];
-    let v = 104;
-    ctx.font = `${v}px ${P_CISLO}`;
-    while (v > 50 && Math.max(...radky.map((r) => ctx.measureText(r).width)) > W * 0.4) { v -= 4; ctx.font = `${v}px ${P_CISLO}`; }
-    ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
-    const yZ = Math.max(spodekCisla + v * 1.6, h * 0.66);
-    ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 18;
-    ctx.fillStyle = "#ffffff";
-    radky.forEach((r, i) => ctx.fillText(r, W - 56, yZ + i * v * 0.98));
-    const sirka1 = ctx.measureText(radky[0]).width;
-    ctx.fillStyle = akcent2() === "#ffffff" ? "#ffffff" : akcent2();
-    const tx = W - 56 - sirka1 - 26, ty = yZ - v * 0.36;
-    ctx.beginPath(); ctx.moveTo(tx - 22, ty - 20); ctx.lineTo(tx, ty); ctx.lineTo(tx - 22, ty + 20); ctx.closePath(); ctx.fill();
-    ctx.restore();
+    let nej = null;
+    for (let v = 110; v >= 50; v -= 6) {
+      ctx.font = `${v}px ${P_CISLO}`;
+      const sir = Math.max(...radky.map((r) => ctx.measureText(r).width));
+      if (sir > W * 0.46) continue;
+      const vys = (radky.length - 1) * v * 0.98 + v * 0.78;
+      for (const strana of ["vpravo", "vlevo"]) {
+        for (let yz = Math.max(spodekCisla + 40 + v * 0.78, h * 0.4); yz + vys - v * 0.78 <= h * 0.84; yz += h * 0.025) {
+          const x0 = strana === "vpravo" ? W - 56 - sir - 40 : 56;
+          const r = { x: x0, y: yz - v * 0.78, w: sir + 40, h: vys };
+          const pk = prekryv(r);
+          const skore = pk * 100 + (strana === "vlevo" ? 0.4 : 0) + Math.abs(yz - h * 0.66) / h - v / 400;
+          if (!nej || skore < nej.skore) nej = { v, strana, yz, sir, pk, skore, r };
+        }
+      }
+      if (nej && nej.pk <= 0.02) break;
+    }
+    if (nej) {
+      ctx.save(); ctx.globalAlpha = vidim(0.9);
+      if (nej.pk > 0.02) podklad(ctx, nej.r, 0.55);
+      ctx.font = `${nej.v}px ${P_CISLO}`; ctx.textBaseline = "alphabetic";
+      ctx.textAlign = nej.strana === "vpravo" ? "right" : "left";
+      const xT = nej.strana === "vpravo" ? W - 56 : 56 + 40;
+      ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 18; ctx.fillStyle = "#ffffff";
+      radky.forEach((r, i) => ctx.fillText(r, xT, nej.yz + i * nej.v * 0.98));
+      // šipka ukazující na hráče
+      ctx.fillStyle = akcent2();
+      const s1 = ctx.measureText(radky[0]).width, ty = nej.yz - nej.v * 0.36;
+      ctx.beginPath();
+      if (nej.strana === "vpravo") { const tx = W - 56 - s1 - 22; ctx.moveTo(tx - 22, ty - 20); ctx.lineTo(tx, ty); ctx.lineTo(tx - 22, ty + 20); }
+      else { const tx = 56 + 24; ctx.moveTo(tx, ty - 20); ctx.lineTo(tx - 22, ty); ctx.lineTo(tx, ty + 20); }
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
   }
   spodniRadek(ctx, h, d.dole);
   kresliZrno(ctx, W, h, 0.05);
   logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
 }
 
-// 6) REKORD – nadpis vpravo nahoře, hráč(i), žebříček vlevo dole
+// 6) REKORD – vpravo nahoře štítek, nadpis a jméno; hráč pod nimi (zmenší se, aby je nezakryl);
+// druhý výřez vlevo; žebříček vlevo dole na tmavém panelu.
 function sablonaRekord(ctx, h) {
   const d = st.data;
   pozadiTym(ctx, h);
-  hraci(ctx, h, { stredX: 0.6, spodek: 0, vyska: 0.78 }, { stredX: 0.86, spodek: 0.02, vyska: 0.55 });
-  // tmavší levý dolní roh pro žebříček
-  const g = ctx.createLinearGradient(0, h * 0.55, 0, h);
-  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,0.65)");
-  ctx.fillStyle = g; ctx.fillRect(0, h * 0.55, W, h * 0.45);
-  // štítek + nadpis vpravo nahoře
   const R = W - 56;
-  ctx.save(); ctx.globalAlpha = vidim(0.2);
-  ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+  // 1) rozvržení textů vpravo nahoře (měření, kreslí se až po hráčích)
+  const texty = [];
   let y = h * 0.075;
-  if (d.stitek) {
-    ctx.font = `700 30px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = akcent2();
-    ctx.fillText(d.stitek, R, y); ctx.letterSpacing = "0px"; y += 44;
-  }
-  const slova = String(d.nadpis || cele()).split(/\s+/).filter(Boolean);
+  if (d.stitek) { texty.push({ typ: "stitek", text: d.stitek, y }); y += 44; }
+  const slova = String(d.nadpis || "").split(/\s+/).filter(Boolean);
   const radky = slova.length > 2 ? [slova.slice(0, Math.ceil(slova.length / 2)).join(" "), slova.slice(Math.ceil(slova.length / 2)).join(" ")] : slova;
   let v = 150; ctx.font = `${v}px ${P_CISLO}`;
-  while (v > 60 && Math.max(...radky.map((r) => ctx.measureText(r).width)) > W * 0.62) { v -= 4; ctx.font = `${v}px ${P_CISLO}`; }
-  ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 20; ctx.fillStyle = "#ffffff";
-  radky.forEach((r) => { y += v * 0.95; ctx.fillText(r, R, y); });
-  ctx.restore();
-  // žebříček
-  const L = 56;
+  while (v > 60 && radky.length && Math.max(...radky.map((r) => ctx.measureText(r).width)) > W * 0.62) { v -= 4; ctx.font = `${v}px ${P_CISLO}`; }
+  const sirkaNadpisu = radky.length ? Math.max(...radky.map((r) => ctx.measureText(r).width)) : 0;
+  radky.forEach((r) => { y += v * 0.95; texty.push({ typ: "nadpis", text: r, y }); });
+  y += 50;
+  const prj = (d.prijmeni || "").toUpperCase();
+  const vPr = prj ? vejdeSe(ctx, prj, (q) => `${q}px ${P_CISLO}`, 84, W * 0.5, 48) : 0;
+  ctx.font = `700 28px ${P_STITEK}`;
+  if (d.krestni) { texty.push({ typ: "krestni", text: d.krestni.toUpperCase(), y }); y += 16; }
+  if (prj) { y += vPr * 0.86; texty.push({ typ: "prijmeni", text: prj, y }); }
+  const sirkaBloku = Math.max(sirkaNadpisu, W * 0.3);
+  const blok = { x: R - sirkaBloku, y: h * 0.075 - 30, w: sirkaBloku, h: y - h * 0.075 + 40 };
+  // 2) žebříček vlevo dole
   const tab = String(d.tabulka || "").split("\n").map((r) => r.split("|").map((x) => x.trim())).filter((r) => r[0]).slice(0, 5);
-  let yT = h - (h > 1500 ? 140 : 70) - tab.length * 50;
+  const L = 56, sirkaTab = 400;
+  const spodekTab = h - (h > 1500 ? 140 : 70);
+  const vrchTab = tab.length ? spodekTab - tab.length * 50 - 60 : spodekTab - 150;
+  // 3) hráči: hlavní vpravo pod textem, druhý vlevo nad žebříčkem
+  const hlavni = { stredX: 0.62, spodek: 0, hlavni: true };
+  hlavni.vyska = maVyrez() ? vyskaBezPrekryvu(h, vyrez, hlavni, [blok], 0.8, 0.5, 0.03) : 0.78;
+  const druhy = { stredX: 0.22, spodek: Math.max(0.02, (h - vrchTab + 30) / h), vyska: 0.4 };
+  hraci(ctx, h, hlavni, druhy);
+  const g = ctx.createLinearGradient(0, h * 0.6, 0, h);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,0.6)");
+  ctx.fillStyle = g; ctx.fillRect(0, h * 0.6, W, h * 0.4);
+  // 4) texty vpravo nahoře (když je přes ně hráč přetažený, dostanou podklad)
+  ctx.save(); ctx.globalAlpha = vidim(0.2); ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+  if (prekryv(blok) > 0.03) podklad(ctx, blok, 0.5);
+  ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 18;
+  for (const t of texty) {
+    if (t.typ === "stitek") { ctx.font = `700 30px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = akcent2(); ctx.fillText(t.text, R, t.y); ctx.letterSpacing = "0px"; }
+    if (t.typ === "nadpis") { ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; ctx.fillText(t.text, R, t.y); }
+    if (t.typ === "krestni") { ctx.font = `700 28px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillText(t.text, R + 4, t.y); ctx.letterSpacing = "0px"; }
+    if (t.typ === "prijmeni") { ctx.font = `${vPr}px ${P_CISLO}`; ctx.fillStyle = akcent2(); ctx.fillText(t.text, R, t.y); }
+  }
+  ctx.restore();
+  // 5) žebříček na tmavém panelu
   if (tab.length) {
     ctx.save(); ctx.globalAlpha = vidim(0.9);
+    const panel = { x: L, y: vrchTab, w: sirkaTab, h: spodekTab - vrchTab + 10 };
+    ctx.fillStyle = "rgba(0,0,0,0.62)"; ctx.beginPath(); ctx.roundRect(panel.x - 22, panel.y - 18, panel.w + 44, panel.h + 30, 18); ctx.fill();
+    ctx.fillStyle = akcent2(); ctx.fillRect(panel.x - 22, panel.y - 18, panel.w + 44, 5);
     ctx.textBaseline = "alphabetic";
-    ctx.font = `700 26px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = akcent2(); ctx.textAlign = "left";
-    ctx.fillText((d.nahore || "ŽEBŘÍČEK").toUpperCase(), L, yT - 22); ctx.letterSpacing = "0px";
-    ctx.fillRect(L, yT - 8, 380, 3);
-    const prijmeni = (d.prijmeni || "").toLowerCase();
+    ctx.font = `700 24px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = akcent2(); ctx.textAlign = "left";
+    ctx.fillText((d.nahore || "ŽEBŘÍČEK").toUpperCase(), L, vrchTab + 26, sirkaTab); ctx.letterSpacing = "0px";
+    const pr = (d.prijmeni || "").toLowerCase();
     tab.forEach(([jm, hod], i) => {
-      const on = prijmeni && jm.toLowerCase().includes(prijmeni);
-      const yy = yT + 38 + i * 50;
-      ctx.font = `${on ? 800 : 600} 32px ${P_UZKE}`; ctx.fillStyle = on ? "#ffffff" : "rgba(255,255,255,0.6)";
-      ctx.textAlign = "left"; ctx.fillText(jm.toUpperCase(), L, yy);
-      ctx.textAlign = "right"; ctx.fillText(hod || "", L + 380, yy);
+      const on = pr && jm.toLowerCase().includes(pr);
+      const yy = vrchTab + 78 + i * 50;
+      ctx.font = `${on ? 800 : 600} 32px ${P_UZKE}`; ctx.fillStyle = on ? "#ffffff" : "rgba(255,255,255,0.62)";
+      ctx.textAlign = "left"; ctx.fillText(`${i + 1}. ${jm.toUpperCase()}`, L, yy, sirkaTab - 90);
+      ctx.textAlign = "right"; ctx.fillText(hod || "", L + sirkaTab, yy);
     });
     ctx.restore();
   } else if (d.cislo) {
     ctx.save(); ctx.globalAlpha = vidim(0.9); ctx.textAlign = "left";
-    ctx.font = `150px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; ctx.fillText(formatCislo(d.cislo), L, h - (h > 1500 ? 150 : 90));
-    ctx.font = `700 30px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = akcent2(); ctx.fillText(d.co || "", L, h - (h > 1500 ? 110 : 50)); ctx.letterSpacing = "0px";
+    const r0 = { x: L, y: spodekTab - 150, w: 420, h: 170 };
+    if (prekryv(r0) > 0.03) podklad(ctx, r0, 0.55);
+    ctx.font = `140px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; ctx.fillText(formatCislo(d.cislo), L, spodekTab - 40);
+    ctx.font = `700 30px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = akcent2(); ctx.fillText(d.co || "", L, spodekTab); ctx.letterSpacing = "0px";
     ctx.restore();
   }
-  // jméno vpravo dole
-  ctx.save(); ctx.globalAlpha = vidim(0.6); ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
-  const yPr = h - (h > 1500 ? 110 : 44);
-  const prj = (d.prijmeni || "").toUpperCase();
-  const vPr = vejdeSe(ctx, prj, (q) => `${q}px ${P_CISLO}`, 92, W * 0.42, 48);
-  ctx.font = `${vPr}px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 16;
-  ctx.fillText(prj, W - 56, yPr);
-  const vrch = yPr - (ctx.measureText(prj).actualBoundingBoxAscent || vPr * 0.8);
-  ctx.font = `700 30px ${P_STITEK}`; ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.letterSpacing = "4px";
-  ctx.fillText((d.krestni || "").toUpperCase(), W - 52, vrch - 16); ctx.letterSpacing = "0px";
-  ctx.restore();
   kresliZrno(ctx, W, h, 0.05);
   logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
 }
@@ -1070,65 +1179,109 @@ function vekLetos(narozen) {
   return m ? new Date().getFullYear() - +m[1] : null;
 }
 
-// 7) NAROZENINY – světlé pozadí, velký portrét + akční výřez, velké jméno vlevo dole
+// 7) NAROZENINY – světlé pozadí, velký portrét + akční výřez, velké jméno vlevo dole.
+// Portrét končí nad textem (plynule se rozplyne do bílé), akční výřez je vpravo vedle jména.
 function sablonaNarozeniny(ctx, h) {
   const d = st.data, c = st.barva;
   pozadiTym(ctx, h, { svetle: true });
-  // šikmý pás v barvě týmu
   ctx.save(); ctx.globalAlpha = 0.9; ctx.fillStyle = c;
   ctx.beginPath(); ctx.moveTo(W * 0.62, 0); ctx.lineTo(W, 0); ctx.lineTo(W, h * 0.42); ctx.closePath(); ctx.fill(); ctx.restore();
-  // velký portrét nahoře (oříznutý), akční výřez vpravo dole
-  if (maVyrez()) kresliVyrez(ctx, h, vyrez, { stredX: 0.4, odShora: 0.04, vyska: 1.0, hlavni: true, oriznout: h * 0.8, zare: false });
-  else { ctx.save(); kresliFoto(ctx, 0, 0, W, h * 0.66, st.cb); ctx.restore(); }
-  // čitelnost textu vlevo dole
-  const g = ctx.createLinearGradient(0, h * 0.5, 0, h);
-  g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.5, "rgba(255,255,255,0.8)"); g.addColorStop(1, "rgba(255,255,255,0.96)");
-  ctx.fillStyle = g; ctx.fillRect(0, h * 0.5, W, h * 0.5);
-  // akční výřez až po přechodu, ať je celý vidět
-  if (vyrez2) kresliVyrez(ctx, h, vyrez2, { stredX: 0.83, spodek: 0.0, vyska: 0.44, hlavni: false });
+  // rozvržení textu odspodu (měření)
   const L = 60, barvaTextu = jas(c) > 0.62 ? (jas(st.barva2 || "#000") < 0.4 ? st.barva2 : "#111111") : c;
   const vek = vekLetos(d.narozen);
   const kicker = d.zemrel ? (vek ? `NEDOŽITÉ ${vek}. NAROZENINY` : "VZPOMÍNÁME") : "VŠECHNO NEJLEPŠÍ";
-  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  let y = h - (h > 1500 ? 140 : 70);
-  ctx.globalAlpha = vidim(0.9);
-  if (!d.zemrel && vek) { ctx.font = `700 30px ${P_STITEK}`; ctx.fillStyle = "#333"; ctx.letterSpacing = "4px"; ctx.fillText(`K ${vek}. NAROZENINÁM`, L, y); ctx.letterSpacing = "0px"; y -= 46; }
-  ctx.globalAlpha = vidim(0.6);
   const pr = (d.prijmeni || "").toUpperCase(), kr = (d.krestni || "").toUpperCase();
   const v = Math.min(vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 170, W * 0.56, 60), vejdeSe(ctx, kr, (q) => `${q}px ${P_CISLO}`, 170, W * 0.56, 60));
+  let y = h - (h > 1500 ? 140 : 70);
+  const yVek = !d.zemrel && vek ? y : null;
+  if (yVek) y -= 46;
+  const yPr = y; y -= v * 0.95;
+  const yKr = y; y -= v * 0.95 + 4;
+  const yKick = y;
+  const vrchTextu = yKick - 46;
+  ctx.font = `${v}px ${P_CISLO}`;
+  const sirkaTextu = Math.max(ctx.measureText(pr).width, ctx.measureText(kr).width, 420);
+  const textObd = { x: L, y: vrchTextu, w: sirkaTextu, h: h - vrchTextu };
+  // portrét: končí nad textem
+  if (maVyrez()) kresliVyrez(ctx, h, vyrez, { stredX: 0.4, odShora: 0.04, vyska: 1.0, hlavni: true, oriznout: vrchTextu - 10, zare: false });
+  else { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, vrchTextu - 10); ctx.clip(); kresliFoto(ctx, 0, 0, W, h * 0.7, st.cb); ctx.restore(); }
+  const g = ctx.createLinearGradient(0, vrchTextu - 220, 0, vrchTextu);
+  g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(1, "rgba(255,255,255,0.97)");
+  ctx.fillStyle = g; ctx.fillRect(0, vrchTextu - 220, W, 220);
+  ctx.fillStyle = "rgba(255,255,255,0.97)"; ctx.fillRect(0, vrchTextu - 1, W, h - vrchTextu + 1);
+  // akční výřez vpravo – posune se, aby nezakryl jméno
+  if (vyrez2) {
+    let sx = 0.83;
+    for (; sx <= 0.98; sx += 0.03) {
+      const box = boxVyrezu(h, vyrez2, { stredX: sx, spodek: 0, vyska: 0.44, hlavni: false });
+      if (prekryvS([{ zdroj: vyrez2, box }], textObd) <= 0.02) break;
+    }
+    kresliVyrez(ctx, h, vyrez2, { stredX: Math.min(sx, 0.98), spodek: 0.0, vyska: 0.44, hlavni: false });
+  }
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.globalAlpha = vidim(0.9);
+  if (yVek) { ctx.font = `700 30px ${P_STITEK}`; ctx.fillStyle = "#333"; ctx.letterSpacing = "4px"; ctx.fillText(`K ${vek}. NAROZENINÁM`, L, yVek); ctx.letterSpacing = "0px"; }
+  ctx.globalAlpha = vidim(0.6);
   ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = barvaTextu;
-  ctx.fillText(pr, L, y); y -= v * 0.95;
-  ctx.fillText(kr, L, y); y -= v * 0.95 + 4;
+  ctx.fillText(pr, L, yPr);
+  ctx.fillText(kr, L, yKr);
   ctx.globalAlpha = vidim(0.3);
   ctx.font = `700 46px ${P_STITEK}`; ctx.fillStyle = jas(c) > 0.62 ? tmavsi(c, 0.35) : c;
-  ctx.fillText(kicker, L, y);
+  ctx.fillText(kicker, L, yKick);
   ctx.restore();
   logo(ctx, "cerna", { x: 46, y: 40, sirka: 110 });
 }
 
-// 8) TITULEK – fotka přes celou plochu (nebo hráč na pozadí týmu), velký dvouřádkový nápis vpravo dole
+// 8) TITULEK – velký dvouřádkový nápis vpravo dole; hráč vlevo se zmenší/posune, aby ho nezakryl.
 function sablonaTitulek(ctx, h) {
   const d = st.data;
-  if (maVyrez()) { pozadiTym(ctx, h); hraci(ctx, h, { stredX: 0.42, spodek: 0, vyska: 0.86 }, { stredX: 0.82, spodek: 0.3, vyska: 0.38 }); }
-  else kresliFoto(ctx, 0, 0, W, h, st.cb);
-  const g = ctx.createLinearGradient(0, h * 0.5, 0, h);
-  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.6, "rgba(0,0,0,0.55)"); g.addColorStop(1, "rgba(0,0,0,0.85)");
-  ctx.fillStyle = g; ctx.fillRect(0, h * 0.5, W, h * 0.5);
   const R = W - 56;
   const slova = String(d.nadpisTitulek || d.nadpis || cele()).split(/\s+/).filter(Boolean);
   const pul = Math.ceil(slova.length / 2);
   const radky = slova.length > 1 ? [slova.slice(0, pul).join(" "), slova.slice(pul).join(" ")] : slova;
-  ctx.save(); ctx.globalAlpha = vidim(0.5); ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
-  let v = 200; ctx.font = `${v}px ${P_CISLO}`;
-  while (v > 70 && Math.max(...radky.map((r) => ctx.measureText(r).width)) > W * 0.86) { v -= 4; ctx.font = `${v}px ${P_CISLO}`; }
-  let y = h - (h > 1500 ? 170 : 100) - (radky.length - 1) * v * 0.95;
-  ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 24;
-  radky.forEach((r, i) => { ctx.fillStyle = i === 0 ? "#ffffff" : (akcent2() === "#ffffff" ? "#ffffff" : akcent2()); ctx.fillText(r, R, y + i * v * 0.95); });
-  ctx.shadowBlur = 0;
   const pod = d.podnadpis || d.veta;
+  const rozvrh = (v) => {
+    ctx.font = `${v}px ${P_CISLO}`;
+    const sirka = Math.max(...radky.map((r) => ctx.measureText(r).width));
+    const yPrvni = h - (h > 1500 ? 170 : 100) - (radky.length - 1) * v * 0.95;
+    return { v, yPrvni, obd: { x: R - sirka, y: yPrvni - v * 0.8, w: sirka, h: (radky.length - 1) * v * 0.95 + v * 0.8 + 10 } };
+  };
+  let vMax = 200;
+  ctx.font = `${vMax}px ${P_CISLO}`;
+  while (vMax > 70 && Math.max(...radky.map((r) => ctx.measureText(r).width)) > W * 0.86) { vMax -= 4; ctx.font = `${vMax}px ${P_CISLO}`; }
+  let plan = rozvrh(vMax), volby = { stredX: 0.4, spodek: 0, hlavni: true, vyska: 0.86 };
+  if (maVyrez()) {
+    // největší nápis a největší hráč, kteří se nepřekrývají (hráč se může posunout doleva a zmenšit)
+    let nej = null;
+    for (let v = vMax; v >= 90; v -= 8) {
+      const pl = rozvrh(v);
+      for (const sx of [0.4, 0.34, 0.28]) {
+        const vo = { stredX: sx, spodek: 0, hlavni: true };
+        const vy = vyskaBezPrekryvu(h, vyrez, vo, [pl.obd], 0.86, 0.56, 0.03);
+        const pk = prekryvS([{ zdroj: vyrez, box: boxVyrezu(h, vyrez, { ...vo, vyska: vy }) }], pl.obd);
+        const skore = (pk > 0.03 ? 1000 : 0) + (0.86 - vy) * 300 + (vMax - v) * 1.2 + (0.4 - sx) * 60;
+        if (!nej || skore < nej.skore) nej = { skore, pl, vo: { ...vo, vyska: vy } };
+      }
+      if (nej && nej.skore < 1000 && nej.pl.v === v) break;
+    }
+    plan = nej.pl; volby = nej.vo;
+    pozadiTym(ctx, h);
+    hraci(ctx, h, volby, { stredX: 0.8, odShora: 0.06, vyska: 0.36 });
+  } else kresliFoto(ctx, 0, 0, W, h, st.cb);
+  const { v, yPrvni } = plan;
+  const nadpisObd = plan.obd;
+  const g = ctx.createLinearGradient(0, h * 0.5, 0, h);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.6, "rgba(0,0,0,0.55)"); g.addColorStop(1, "rgba(0,0,0,0.85)");
+  ctx.fillStyle = g; ctx.fillRect(0, h * 0.5, W, h * 0.5);
+  ctx.save(); ctx.globalAlpha = vidim(0.5); ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+  if (prekryv(nadpisObd) > 0.04) podklad(ctx, nadpisObd, 0.5);
+  ctx.font = `${v}px ${P_CISLO}`;
+  ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 24;
+  radky.forEach((r, i) => { ctx.fillStyle = i === 0 ? "#ffffff" : akcent2(); ctx.fillText(r, R, yPrvni + i * v * 0.95); });
+  ctx.shadowBlur = 0;
   if (pod) {
     ctx.globalAlpha = vidim(1.1);
-    ctx.font = `700 28px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = "rgba(255,255,255,0.88)";
+    ctx.font = `700 28px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.fillText(pod.toUpperCase(), R, h - (h > 1500 ? 120 : 52), W - 120); ctx.letterSpacing = "0px";
   }
   ctx.restore();
@@ -1141,6 +1294,7 @@ function kresliDo(c, sablona = st.sablona) {
   c.width = W; c.height = h;
   const ctx = c.getContext("2d");
   ctx.textBaseline = "alphabetic";
+  obsazeno = [];
   ({ ikona: sablonaIkona, plakat: sablonaPlakat, vertikal: sablonaVertikal, karta: sablonaKarta,
     milnik: sablonaMilnik, rekord: sablonaRekord, narozeniny: sablonaNarozeniny, titulek: sablonaTitulek }[sablona] || sablonaIkona)(ctx, h);
 }
