@@ -168,8 +168,8 @@ Do "rekord.tabulka" dej 3–5 nejlepších v tom rekordu (včetně něj), seřaz
     const krestni = d.krestni || jmeno.split(/\s+/).slice(0, -1).join(" ");
     const prijmeni = d.prijmeni || jmeno.split(/\s+/).pop();
     st.data = {
-      krestni, prijmeni,
-      nahore: d.tym ? String(d.tym).toUpperCase() : "",
+      krestni: bezTecky(krestni), prijmeni: bezTecky(prijmeni),
+      nahore: d.tym ? bezTecky(d.tym).toUpperCase() : "",
       roky: d.roky || "",
       veta: d.veta || "",
       popisek: d.popisek || "",
@@ -899,7 +899,8 @@ function sablonaKarta(ctx, h) {
 // ================================================== NHL styl (milník, rekord, narozeniny, titulek) ==
 const P_CISLO = '"Anton", "Oswald", Impact, sans-serif';
 const P_STITEK = '"Oswald", "Roboto Condensed", Arial, sans-serif';
-const cele = () => [st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ").toUpperCase();
+const bezTecky = (t) => String(t || "").trim().replace(/[.,;:\s]+$/u, "");
+const cele = () => [bezTecky(st.data.krestni), bezTecky(st.data.prijmeni)].filter(Boolean).join(" ").toUpperCase();
 const formatCislo = (c) => String(c || "").replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 // Paleta pro NHL šablony: pozadí musí být tmavé dost na bílý text, akcent světlý.
 // Světlá týmová barva (zlatá, žlutá) jde do akcentu a pozadí je z tmavé druhé barvy.
@@ -1032,6 +1033,8 @@ function vytvorPozadi(h, svetle) {
   return c;
 }
 function pozadiTym(ctx, h, { svetle = false } = {}) {
+  // bez výřezu je pozadím celá fotka (texty se pak kreslí přes ni, nic je nepřekryje)
+  if (!svetle && foto && !maVyrez()) { fotkaPresCelou(ctx, h); return; }
   const klic = [st.fotoId, st.barva, st.barva2, h, svetle, st.pozadi || "arena", st.data.prijmeni, foto ? foto.naturalWidth : 0].join("|");
   if (bgCache.klic !== klic) { bgCache.c = vytvorPozadi(h, svetle); bgCache.klic = klic; }
   ctx.drawImage(bgCache.c, 0, 0);
@@ -1168,8 +1171,7 @@ function kresliVyrez(ctx, h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hla
 function hraci(ctx, h, hlavniBox, druhyBox) {
   if (vyrez2 && druhyBox) kresliVyrez(ctx, h, vyrez2, { ...druhyBox, hlavni: false });
   if (maVyrez()) return kresliVyrez(ctx, h, vyrez, hlavniBox);
-  fotkaPresCelou(ctx, h);
-  return null;
+  return null; // fotka už je v pozadí (pozadiTym)
 }
 
 // Obří číslo s kovovou / akcentní výplní, vrací spodní hranu.
@@ -1242,7 +1244,8 @@ function sablonaMilnik(ctx, h) {
   stitekSCarami(ctx, nahore, h * 0.05, "rgba(255,255,255,0.7)", 24);
   stitekSCarami(ctx, cele(), h * 0.095, "#ffffff", 40);
   const cislo = formatCislo(d.cislo);
-  const yCisla = h * 0.13;
+  let yCisla = h * 0.13;
+  const minVrch = h * 0.095 + 20 + 24; // spodek řádku se jménem + mezera
   // číslo + popis vedle něj na jednom „řádku“ (jako „200 WINS“); popis ve dvou řádcích vpravo od čísla
   const slova = String(d.co || "").split(/\s+/).filter(Boolean);
   const radky = slova.length > 1 ? [slova.slice(0, Math.ceil(slova.length / 2)).join(" "), slova.slice(Math.ceil(slova.length / 2)).join(" ")] : slova;
@@ -1258,6 +1261,14 @@ function sablonaMilnik(ctx, h) {
     sirL = Math.max(...radky.map((r) => ctx.measureText(r).width));
     if (sirC + mezera + sirL <= sirkaVse) break;
   }
+  // popis i s diakritikou (Ý, Č…) nesmí narazit do jména nad ním → posunout číslo i popis níž
+  if (radky.length) {
+    ctx.font = `${vL}px ${P_CISLO}`;
+    const ascL = Math.max(...radky.slice(0, 1).map((r) => ctx.measureText(r).actualBoundingBoxAscent || vL * 0.8));
+    const vrchL = yCisla + vL * 0.8 - ascL;
+    if (vrchL < minVrch) yCisla += minVrch - vrchL;
+  }
+  if (yCisla < minVrch) yCisla = minVrch;
   const celkem = sirC + (radky.length ? mezera + sirL : 0);
   const xC = W / 2 - celkem / 2;
   const spodekCisla = cislo ? obriCislo(ctx, cislo, { y: yCisla, maxV: vC, sirka: W, x: xC, zarovnani: "left" }) : yCisla;
@@ -1276,7 +1287,9 @@ function sablonaMilnik(ctx, h) {
     if (prekryv(popisObd) > 0.05) podklad(ctx, popisObd, 0.5);
     ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 16;
     const yPrvni = yCisla + vL * 0.8;
-    radky.forEach((r, i) => { ctx.fillStyle = i === 0 ? "#ffffff" : akcent2(); ctx.fillText(r, xL, yPrvni + i * vL * 0.95); });
+    // druhý řádek s háčky/kroužky (Ů, Č, Ž…) potřebuje víc místa
+    const rozestup = /[ÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(radky[1] || "") ? 1.08 : 0.98;
+    radky.forEach((r, i) => { ctx.fillStyle = i === 0 ? "#ffffff" : akcent2(); ctx.fillText(r, xL, yPrvni + i * vL * rozestup); });
     ctx.restore();
   }
   spodniRadek(ctx, h, d.dole);
