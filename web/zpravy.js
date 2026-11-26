@@ -645,7 +645,7 @@ function initHotove() {
     else if (d.hotovyCarousel !== undefined) window.DHCarousel.navrhni(zadaniZTematu(t), t.zdroje || [], Math.min(6, Math.max(3, (t.fakta || []).length)));
     else if (d.hotovyVyroci !== undefined) window.DHVyroci.navrhni(zadaniZTematu(t), t.zdroje || []);
     else if (d.hotovyPlan !== undefined) {
-      window.DHPlan?.pridej({ nazev: t.titulek, format: "post", zadani: `${textNavrhu(h.navrh)}\n\n${zadaniZTematu(t)}`, zdroje: t.zdroje || [] });
+      window.DHPlan?.pridej({ nazev: t.titulek, format: "post", zadani: zadaniZTematu(t), zdroje: t.zdroje || [], navrh: h.navrh });
       window.DHToast?.("Hotový nápad je v zásobníku 📆 v Plánu.");
       b.textContent = "✓ V plánu"; b.disabled = true;
     } else if (d.hotovyKopiruj !== undefined) {

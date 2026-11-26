@@ -15,6 +15,7 @@ const FORMATY = {
   vyroci: { nazev: "Dnes před lety", barva: "#4da3ff" },
   reels: { nazev: "Reel", barva: "#b26bff" },
   youtube: { nazev: "YouTube video", barva: "#ff4e45" },
+  promo: { nazev: "Promo hráče", barva: "#ff7a00" },
   jine: { nazev: "Jiné", barva: "#8a8a8a" },
 };
 const DNY = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
@@ -210,15 +211,37 @@ function ulozFormular() {
   return p;
 }
 
+// Položka plánu otevřená v editoru – až ji uložíš jako koncept, plán si ho zapamatuje
+// a „Otevřít“ příště vrátí přesně tenhle rozpracovaný post (i s fotkou a úpravami).
+let cekaNaKoncept = null;
+function propojKoncept(typ, konceptId) {
+  if (!cekaNaKoncept || cekaNaKoncept.typ !== typ) return;
+  const p = polozky.find((x) => x.id === cekaNaKoncept.id);
+  if (p && p.konceptId !== konceptId) {
+    zmen(p.id, { konceptId });
+    window.DHToast?.(`📆 Plán je propojený s konceptem – „${esc(p.nazev)}“ se příště otevře přesně takhle.`);
+  }
+  cekaNaKoncept = null;
+}
+
 async function vytvor(p) {
   if (!p) return;
   if (p.stav === "napad") zmen(p.id, { stav: "rozpracovano" });
   if (p.konceptId) {
-    try { await window.DHKoncepty.otevri(p.konceptId); return; }
-    catch { window.DHToast?.("Propojený koncept už neexistuje – otevírám nový.", "info"); }
+    try {
+      const ok = await window.DHKoncepty.otevri(p.konceptId);
+      cekaNaKoncept = { id: p.id, typ: p.format === "jine" ? "post" : p.format };
+      return ok;
+    } catch { window.DHToast?.("Propojený koncept už neexistuje – otevírám nový.", "info"); }
   }
+  const typ = p.format === "jine" ? "post" : p.format;
+  cekaNaKoncept = { id: p.id, typ };
   const zadani = [p.nazev, p.zadani].filter(Boolean).join("\n\n");
-  window.DHShell?.tvor(p.format === "jine" ? "post" : p.format, zadani, p.zdroje || []);
+  // hotový návrh (z 🎲 Hotových nápadů) se otevře rovnou – bez nového psaní AI
+  if (typ === "promo") { window.DHShell?.jdi("promo"); return; }
+  if (p.navrh && typ === "post" && window.DHPost?.otevriHotovy) window.DHPost.otevriHotovy(p.navrh, zadani, p.zdroje || []);
+  else window.DHShell?.tvor(typ, zadani, p.zdroje || []);
+  window.DHToast?.("Až to doladíš, dej <b>💾 Uložit koncept</b> – plán si ho zapamatuje a příště otevře přesně tvoji verzi.", "info");
 }
 
 function textTydne() {
@@ -295,6 +318,6 @@ function init() {
   vykresli();
 }
 
-window.DHPlan = { pridej, upravit, polozky: () => polozky.slice(), nadchazejici, STAVY, FORMATY };
+window.DHPlan = { pridej, upravit, propojKoncept, polozky: () => polozky.slice(), nadchazejici, STAVY, FORMATY };
 init();
 })();

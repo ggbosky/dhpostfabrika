@@ -9,6 +9,7 @@ const TYPY = {
   post: { nazev: "Post", ikona: "✍️" },
   carousel: { nazev: "Carousel", ikona: "🎞️" },
   vyroci: { nazev: "Dnes před lety", ikona: "📅" },
+  promo: { nazev: "Promo hráče", ikona: "🔥" },
 };
 const moduly = {};      // typ → { ziskej, obnov }
 const aktualni = {};    // typ → id otevřeného konceptu
@@ -130,6 +131,7 @@ async function uloz(typ, jakoNovy = false) {
     const cas = new Date().toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
     stav(typ, `Uloženo ${cas} ✓${vynechano ? ` (${vynechano} fotku z webu nešlo uložit – po otevření ji najdi znovu)` : ""} → <a href="#" data-otevri-koncepty>Koncepty</a>`);
     vykresliSeznam();
+    window.DHPlan?.propojKoncept?.(typ, id); // otevřeno z plánu → plán si koncept zapamatuje
     return id;
   } catch (e) {
     stav(typ, `Uložení se nepovedlo: ${esc(e.message)}`, "chyba");
@@ -195,7 +197,7 @@ async function otevri(id) {
   for (const [klic, blob] of Object.entries(z.obrazky || {})) {
     try { obrazky[klic] = await blobNaObrazek(blob); } catch { /* fotka chybí */ }
   }
-  window.DHPost.prepniZalozku(z.typ);
+  if (window.DHShell?.jdi) window.DHShell.jdi(z.typ); else window.DHPost.prepniZalozku(z.typ);
   await m.obnov(z.data, obrazky);
   if (z.auto) { delete aktualni[z.typ]; stav(z.typ, "Obnovena automaticky uložená práce.", ""); }
   else { aktualni[z.typ] = z.id; stav(z.typ, `Otevřeno: <b>${esc(z.nazev)}</b> – „Uložit koncept“ přepíše tuhle verzi.`, ""); }
@@ -288,7 +290,7 @@ function init() {
     } else if (t.dataset.otevriKoncepty !== undefined) { e.preventDefault(); window.DHPost.prepniZalozku("koncepty"); }
   });
   // aktivita v záložce = je co automaticky ukládat
-  const zalozky = { zalozkaPost: "post", zalozkaCarousel: "carousel", zalozkaVyroci: "vyroci" };
+  const zalozky = { zalozkaPost: "post", zalozkaCarousel: "carousel", zalozkaVyroci: "vyroci", zalozkaPromo: "promo" };
   for (const [id, typ] of Object.entries(zalozky)) {
     const el = document.getElementById(id);
     if (!el) continue;

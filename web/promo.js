@@ -1728,6 +1728,11 @@ function init() {
           <label>Pozadí<select id="prPozadi"><option value="arena">Aréna z fotky</option><option value="textura">Textura (jméno + rastr)</option><option value="cista">Čisté barvy týmu</option></select></label>
         </div>
         <div class="akce">
+          <button type="button" class="btn ghost" data-uloz-koncept="promo">💾 Uložit koncept</button>
+          <button type="button" class="btn ghost" data-uloz-novy="promo" title="Uložit jako další, samostatný koncept">＋ Jako nový</button>
+        </div>
+        <p class="koncept-stav" data-koncept-stav="promo"></p>
+        <div class="akce">
           <button type="button" class="btn" id="prStahnout">⬇️ Stáhnout obrázek</button>
           <button type="button" class="btn ghost" id="prVideo" title="6 s: pomalý nájezd na fotku a postupné objevení textů – do Reels a Stories">🎬 Video 6 s</button>
           <button type="button" class="btn ghost" id="prNovy">↺ Nový hráč</button>
@@ -1763,9 +1768,11 @@ function init() {
   $("#prVideo").addEventListener("click", exportujVideo);
   $("#prNovy").addEventListener("click", () => { if (!confirm("Začít s novým hráčem?")) return; st = prazdna(); foto = null; vyrez = null; foto2 = null; vyrez2 = null; vyrezSurovy = null; vyrez2Surovy = null; kandidati = []; vykresliKandidaty(); uloz(); $("#prJmeno").value = ""; vykresliFormular(); vykresli(); zprava(""); });
   $("#prKopiruj").addEventListener("click", async () => { try { await navigator.clipboard.writeText($("#prPopisek").value); toast("Popisek zkopírován ✓"); } catch { $("#prPopisek").select(); } });
-  $("#prPlan").addEventListener("click", () => {
-    window.DHPlan?.pridej({ nazev: `Promo: ${[st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ") || st.jmeno}`, format: "post", zadani: $("#prPopisek").value });
-    toast("Přidáno do plánu ✓");
+  $("#prPlan").addEventListener("click", async () => {
+    // nejdřív uložit koncept, ať jde grafika z plánu znovu otevřít a upravit
+    const konceptId = await window.DHKoncepty?.uloz("promo");
+    window.DHPlan?.pridej({ nazev: `Promo: ${[st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ") || st.jmeno}`, format: "promo", zadani: $("#prPopisek").value, konceptId: konceptId || "" });
+    toast("Přidáno do plánu ✓ – v Plánu se otevře přesně tahle grafika.");
   });
   $("#prPopisek").addEventListener("input", (e) => { st.data.popisek = e.target.value; uloz(); });
   $("#prBarva").addEventListener("input", (e) => { st.barva = e.target.value; uloz(); vykresli(); });
@@ -1803,6 +1810,28 @@ function init() {
   })();
   document.addEventListener("dh:zalozka", (e) => { if (e.detail === "promo") vykresli(); });
 }
+
+window.DHKoncepty?.registruj("promo", {
+  async ziskej() {
+    const c = document.createElement("canvas");
+    try { kresliDo(c); } catch { /* nic */ }
+    return { nazev: `Promo: ${[st.data.krestni, st.data.prijmeni].filter(Boolean).join(" ") || st.jmeno || "hráč"}`, data: JSON.parse(JSON.stringify(st)), obrazky: {}, platno: c };
+  },
+  async obnov(d) {
+    st = { ...prazdna(), ...d, data: { ...prazdna().data, ...(d.data || {}) } };
+    uloz();
+    foto = null; vyrez = null; foto2 = null; vyrez2 = null; vyrezSurovy = null; vyrez2Surovy = null; kandidati = []; vykresliKandidaty();
+    if ($("#prJmeno")) $("#prJmeno").value = st.jmeno || "";
+    try {
+      if (st.fotoId) foto = await U().obrazekImg(st.fotoId);
+      if (st.vyrezId) { const img = await U().obrazekImg(st.vyrezId); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrezSurovy = c; vyrez = pripravVyrez(c); }
+      else if (foto) vyrizni();
+      if (st.foto2Id) foto2 = await U().obrazekImg(st.foto2Id);
+      if (st.vyrez2Id) { const img = await U().obrazekImg(st.vyrez2Id); const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); vyrez2Surovy = c; vyrez2 = pripravVyrez(c); }
+    } catch { zprava("Některou uloženou fotku se nepodařilo načíst – vyber ji prosím znovu.", "varovani"); }
+    vykresliFormular(); vykresli();
+  },
+});
 
 window.DHPromo = { get stav() { return st; }, vykresli, nastavFoto, nastavFoto2, kresliDo, exportujVideo };
 init();
