@@ -60,7 +60,7 @@ function docisti(c) {
   }
   if (!velikosti.length) return c;
   const nejvetsi = Math.max(...velikosti);
-  const nechat = velikosti.map((n) => n >= nejvetsi * 0.06);
+  const nechat = velikosti.map((n) => n >= nejvetsi * 0.1);
   // díry: oblasti pozadí, které se nedotýkají okraje (uvnitř postavy) → zaplnit
   const venku = new Uint8Array(mw * mh);
   let hlava = 0, konec = 0;
@@ -129,9 +129,112 @@ async function naUrl(zdroj) {
   return { url, uvolni: () => URL.revokeObjectURL(url) };
 }
 
+// ------------------------------------------------- SAM: výřez podle bodů --
+// SlimSAM (Apache-2.0, ~40 MB) vyřízne objekt, na který ukazují body (+ hráč, − branka/okolí).
+// Přesný režim: ORMBG dá jemné okraje, MODNet najde postavu → z ní se spočítají body pro SAM,
+// SAM pak oddělí jen hráče (bez branky, mantinelu, rozhodčího). Body jde upravit ručně.
+let sam = null;
+function nactiSam() {
+  if (!sam) {
+    sam = import(TRANSFORMERS).then(async ({ SamModel, AutoProcessor, RawImage }) => ({
+      model: await SamModel.from_pretrained("Xenova/slimsam-77-uniform", { dtype: "fp32", device: "wasm" }),
+      processor: await AutoProcessor.from_pretrained("Xenova/slimsam-77-uniform"),
+      RawImage,
+    }));
+    sam.catch(() => { sam = null; });
+  }
+  return sam;
+}
+async function samMaska(url, plus, minus) {
+  const { model, processor, RawImage } = await nactiSam();
+  const img = await RawImage.read(url);
+  const body = [...plus, ...minus];
+  const inputs = await processor(img, { input_points: [body], input_labels: [[...plus.map(() => 1), ...minus.map(() => 0)]] });
+  const out = await model(inputs);
+  const masky = await processor.post_process_masks(out.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
+  const skore = Array.from(out.iou_scores.data);
+  const m = masky[0], [, , H, Wd] = m.dims;
+  const nej = skore.indexOf(Math.max(...skore));
+  const vys = new Uint8Array(Wd * H);
+  const off = nej * Wd * H;
+  for (let i = 0; i < Wd * H; i++) vys[i] = m.data[off + i] ? 1 : 0;
+  return { maska: vys, w: Wd, h: H, skore: skore[nej] };
+}
+const alfaZ = (res) => {
+  const n = res.width * res.height, ch = res.channels, a = new Uint8Array(n);
+  for (let i = 0; i < n; i++) a[i] = ch === 4 ? res.data[i * 4 + 3] : res.data[i * ch];
+  return a;
+};
+// automatické body: + na postavě (MODNet), − na věcech, které nejsou člověk (ORMBG ano, MODNet ne, daleko od postavy)
+function autoBody(ao, am, w, h) {
+  const krok = Math.max(2, Math.round(Math.max(w, h) / 160));
+  const osoba = [];
+  for (let y = 0; y < h; y += krok) for (let x = 0; x < w; x += krok) if (am[y * w + x] > 200) osoba.push([x, y]);
+  if (osoba.length < 20) for (let y = 0; y < h; y += krok) for (let x = 0; x < w; x += krok) if (ao[y * w + x] > 200) osoba.push([x, y]);
+  if (!osoba.length) return { plus: [[w / 2, h / 2]], minus: [] };
+  const plus = [];
+  const ys = osoba.map((b) => b[1]), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  // body ve 4 výškách postavy (hlava, hrudník, pás, nohy) – vždy na nejdelším úseku řádku
+  for (const t of [0.08, 0.3, 0.55, 0.8]) {
+    const cilY = y0 + (y1 - y0) * t;
+    const radek = osoba.filter((b) => Math.abs(b[1] - cilY) <= krok);
+    if (!radek.length) continue;
+    radek.sort((a, b) => a[0] - b[0]);
+    let nej = [radek[0]], akt = [radek[0]];
+    for (let i = 1; i < radek.length; i++) {
+      if (radek[i][0] - radek[i - 1][0] <= krok * 1.5) akt.push(radek[i]); else akt = [radek[i]];
+      if (akt.length > nej.length) nej = [...akt];
+    }
+    plus.push(nej[Math.floor(nej.length / 2)]);
+  }
+  const diag = Math.hypot(w, h), minus = [];
+  // pro vzdálenost bereme i méně jisté části postavy (MODNet občas nepozná betony / výstroj)
+  const vzorek = [];
+  for (let y = 0; y < h; y += krok * 2) for (let x = 0; x < w; x += krok * 2) if (am[y * w + x] > 60) vzorek.push([x, y]);
+  const kandidati = [];
+  const k2 = krok * 3;
+  for (let y = 0; y < h; y += k2) for (let x = 0; x < w; x += k2) {
+    if (ao[y * w + x] < 180 || am[y * w + x] > 20) continue;
+    let d = Infinity;
+    for (const [px, py] of vzorek) { const q = Math.hypot(px - x, py - y); if (q < d) d = q; }
+    if (d > diag * 0.14) kandidati.push({ x, y, d });
+  }
+  kandidati.sort((a, b) => b.d - a.d);
+  for (const k of kandidati) {
+    if (minus.length >= 4) break;
+    if (minus.every(([mx, my]) => Math.hypot(mx - k.x, my - k.y) > diag * 0.15)) minus.push([k.x, k.y]);
+  }
+  return { plus, minus };
+}
+// spojení: uvnitř SAM masky plná postava, na okraji jemná alfa z ORMBG, mimo nic
+function kombinuj(ao, sm, w, h) {
+  const r = Math.max(1, Math.round(Math.max(w, h) / 500));
+  const er = new Uint8Array(w * h), dil = new Uint8Array(w * h);
+  // eroze / dilatace čtvercem (r) – dvakrát průchod řádky a sloupci
+  const filtr = (src, dst, jeMax) => {
+    const tmp = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = jeMax ? 0 : 1;
+      for (let d = -r; d <= r; d++) { const q = Math.min(w - 1, Math.max(0, x + d)); v = jeMax ? Math.max(v, src[y * w + q]) : Math.min(v, src[y * w + q]); }
+      tmp[y * w + x] = v;
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = jeMax ? 0 : 1;
+      for (let d = -r; d <= r; d++) { const q = Math.min(h - 1, Math.max(0, y + d)); v = jeMax ? Math.max(v, tmp[q * w + x]) : Math.min(v, tmp[q * w + x]); }
+      dst[y * w + x] = v;
+    }
+  };
+  filtr(sm, er, false); filtr(sm, dil, true);
+  const a = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) a[i] = er[i] ? 255 : dil[i] ? Math.max(ao[i], sm[i] ? 170 : 0) : 0;
+  return a;
+}
+
 // zdroj: Blob | HTMLImageElement | canvas | URL → canvas s průhledným pozadím (oříznutý na postavu)
-// volby.presne = přesný model (při chybě se použije rychlý)
+// volby.presne = přesný model (při chybě se použije rychlý); volby.body = {plus, minus} ruční body pro SAM.
+// Výsledný canvas má vlastnost .body (použité body) a .sam (true, když se použil SAM).
 async function vyrizni(zdroj, klic = null, volby = {}) {
+  if (volby.presne) return vyrizniPresne(zdroj, volby);
   const druh = volby.presne ? "presny" : "rychly";
   const k = klic ? `${druh}|${klic}` : null;
   if (k && cache.has(k)) return cache.get(k);
@@ -164,6 +267,38 @@ function sObrysem(vyrez, { tloustka = 10, barva = "#ffffff", zare = null, zareSi
   for (let a = 0; a < 24; a++) { const u = (a / 24) * Math.PI * 2; x.drawImage(sil, okraj + Math.cos(u) * tloustka, okraj + Math.sin(u) * tloustka); }
   x.drawImage(vyrez, okraj, okraj);
   return c;
+}
+
+async function vyrizniPresne(zdroj, volby) {
+  const { url, uvolni } = await naUrl(zdroj);
+  try {
+    const presny = await nactiModel("presny").catch(() => null);
+    const rychly = await nactiModel("rychly");
+    const resO = presny ? (await presny(url)) : null;
+    const ro = resO ? (Array.isArray(resO) ? resO[0] : resO) : null;
+    const resM = await rychly(url);
+    const rm = Array.isArray(resM) ? resM[0] : resM;
+    const zaklad = ro || rm;
+    const w = zaklad.width, h = zaklad.height;
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const px = rgba(zaklad);
+    const ao = ro ? alfaZ(ro) : alfaZ(rm), am = alfaZ(rm);
+    let body = volby.body && volby.body.plus?.length ? volby.body : autoBody(ao, am, w, h);
+    let pouzitSam = false;
+    try {
+      const sm = await samMaska(url, body.plus, body.minus);
+      const plocha = sm.maska.reduce((s, v) => s + v, 0);
+      if (sm.w === w && sm.h === h && plocha > w * h * 0.01) {
+        const a = kombinuj(ao, sm.maska, w, h);
+        for (let i = 0; i < w * h; i++) px[i * 4 + 3] = a[i];
+        pouzitSam = true;
+      }
+    } catch (e) { console.warn("SAM výřez se nepovedl, použiji jen ORMBG:", e?.message); }
+    c.getContext("2d").putImageData(new ImageData(px, w, h), 0, 0);
+    const vysl = orizni(docisti(c));
+    vysl.body = body; vysl.sam = pouzitSam;
+    return vysl;
+  } finally { uvolni(); }
 }
 
 window.DHVyrez = { vyrizni, sObrysem, orizni, docisti };
