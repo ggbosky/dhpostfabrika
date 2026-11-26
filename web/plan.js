@@ -211,6 +211,15 @@ function ulozFormular() {
   return p;
 }
 
+// Z položky plánu vytáhne už napsaný text postu (hotové nápady ukládaly text před „Ověřená fakta“).
+function textZPlanu(z) {
+  z = String(z || "");
+  const i = z.indexOf("\nOvěřená fakta");
+  if (i < 0) return "";
+  const j = z.lastIndexOf("\n\n", i);
+  return j > 0 ? z.slice(0, j).trim() : "";
+}
+
 // Položka plánu otevřená v editoru – až ji uložíš jako koncept, plán si ho zapamatuje
 // a „Otevřít“ příště vrátí přesně tenhle rozpracovaný post (i s fotkou a úpravami).
 let cekaNaKoncept = null;
@@ -239,6 +248,19 @@ async function vytvor(p) {
   const zadani = [p.nazev, p.zadani].filter(Boolean).join("\n\n");
   // hotový návrh (z 🎲 Hotových nápadů) se otevře rovnou – bez nového psaní AI
   if (typ === "promo") { window.DHShell?.jdi("promo"); return; }
+  // starší položky (uložené ještě bez hotového návrhu): když už v plánu je napsaný text, otevři ho k úpravám
+  if (!p.navrh && typ === "post") {
+    const hotovy = textZPlanu(p.zadani);
+    if (hotovy && confirm(`„${p.nazev}“ už má v plánu napsaný text.\n\nOK = otevřít ho a upravit podle sebe\nZrušit = nechat AI napsat nový`)) {
+      const tagy = (hotovy.match(/#[\p{L}\p{N}_]+/gu) || []);
+      const odstavce = hotovy.replace(/#[\p{L}\p{N}_]+/gu, "").split(/\n{2,}/).map((x) => x.trim()).filter(Boolean);
+      const navrh = { hook: odstavce[0] || p.nazev, telo: odstavce.slice(1).join("\n\n"), cta: "", hashtagy: tagy, titulek: p.nazev, dalsi_hooky: [], foto_dotazy: [p.nazev.split(":")[0]], k_overeni: [] };
+      zmen(p.id, { navrh });
+      window.DHPost.otevriHotovy(navrh, zadani, p.zdroje || []);
+      window.DHToast?.("Text z plánu je v editoru – uprav ho a dej <b>💾 Uložit koncept</b>, plán si tvoji verzi zapamatuje.", "info");
+      return;
+    }
+  }
   if (p.navrh && typ === "post" && window.DHPost?.otevriHotovy) window.DHPost.otevriHotovy(p.navrh, zadani, p.zdroje || []);
   else window.DHShell?.tvor(typ, zadani, p.zdroje || []);
   window.DHToast?.("Až to doladíš, dej <b>💾 Uložit koncept</b> – plán si ho zapamatuje a příště otevře přesně tvoji verzi.", "info");
