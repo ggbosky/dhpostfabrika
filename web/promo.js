@@ -49,7 +49,7 @@ let foto = null;  // HTMLImageElement
 let vyrez = null; // canvas – hráč bez pozadí
 let foto2 = null, vyrez2 = null; // druhá (akční) fotka – nepovinná
 let vyrezSurovy = null, vyrez2Surovy = null; // výřezy bez vylepšení (vylepšení jde vypnout)
-const VYREZ_VERZE = "sam-1"; // přesný model + dočištění masky; starší výřezy se přepočítají
+const VYREZ_VERZE = "sam-3"; // přesný model + dočištění masky; starší výřezy se přepočítají
 let kandidati = []; // nalezené fotky seřazené podle kvality
 
 // ------------------------------------------------------- vylepšení výřezu --
@@ -105,7 +105,12 @@ function silueta(zdroj, barva) {
   if (!m) { m = new Map(); silCache.set(zdroj, m); }
   if (!m.has(barva)) {
     const c = document.createElement("canvas"); c.width = zdroj.width; c.height = zdroj.height;
-    const x = c.getContext("2d"); x.drawImage(zdroj, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = barva; x.fillRect(0, 0, c.width, c.height);
+    const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(zdroj, 0, 0);
+    // záře jen z pevné části postavy – slabé zbytky by se zářením zviditelnily
+    const id = x.getImageData(0, 0, c.width, c.height), d = id.data;
+    for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 150 ? 255 : 0;
+    x.putImageData(id, 0, 0);
+    x.globalCompositeOperation = "source-in"; x.fillStyle = barva; x.fillRect(0, 0, c.width, c.height);
     m.set(barva, c);
   }
   return m.get(barva);
@@ -117,6 +122,13 @@ const vyska = () => FORMATY[st.format]?.h || 1350;
 async function navrhni(prilezitost = null) {
   const jmeno = $("#prJmeno").value.trim();
   if (!jmeno) { zprava("Napiš jméno hráče.", "chyba"); return; }
+  // jiný hráč → pryč fotky, výřezy i údaje předchozího (jinak by tam zůstal např. druhý výřez jiného hráče)
+  if (st.jmeno && normT(st.jmeno) !== normT(jmeno)) {
+    const zachovat = { format: st.format, logo: st.logo, pozadi: st.pozadi, vylepsit: st.vylepsit, zare: st.zare, sablona: st.sablona };
+    st = { ...prazdna(), ...zachovat };
+    foto = null; vyrez = null; foto2 = null; vyrez2 = null; vyrezSurovy = null; vyrez2Surovy = null; kandidati = []; vykresliKandidaty();
+    vykresliFormular(); vykresli();
+  }
   st.jmeno = jmeno; uloz();
   if (!AI()?.maKlic()) { predvyplnRucne(jmeno); zprava("Bez AI klíče doplň tým, roky a větu ručně níž (AI klíč: Můj styl → AI pomocník).", "varovani"); if (!foto) najdiFoto(true, jmeno); return; }
   const b = $("#prNavrhni"); b.disabled = true;

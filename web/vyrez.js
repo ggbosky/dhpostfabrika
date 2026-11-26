@@ -151,14 +151,15 @@ async function samMaska(url, plus, minus) {
   const body = [...plus, ...minus];
   const inputs = await processor(img, { input_points: [body], input_labels: [[...plus.map(() => 1), ...minus.map(() => 0)]] });
   const out = await model(inputs);
-  const masky = await processor.post_process_masks(out.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
+  // měkká maska: logity zvětšené bilineárně → pravděpodobnost (hladké okraje místo zubatých schodů)
+  const masky = await processor.post_process_masks(out.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes, { binarize: false });
   const skore = Array.from(out.iou_scores.data);
   const m = masky[0], [, , H, Wd] = m.dims;
   const nej = skore.indexOf(Math.max(...skore));
-  const vys = new Uint8Array(Wd * H);
+  const vys = new Uint8Array(Wd * H), mekka = new Float32Array(Wd * H);
   const off = nej * Wd * H;
-  for (let i = 0; i < Wd * H; i++) vys[i] = m.data[off + i] ? 1 : 0;
-  return { maska: vys, w: Wd, h: H, skore: skore[nej] };
+  for (let i = 0; i < Wd * H; i++) { const p = 1 / (1 + Math.exp(-m.data[off + i])); mekka[i] = p; vys[i] = p > 0.5 ? 1 : 0; }
+  return { maska: vys, mekka, w: Wd, h: H, skore: skore[nej] };
 }
 const alfaZ = (res) => {
   const n = res.width * res.height, ch = res.channels, a = new Uint8Array(n);
@@ -206,8 +207,8 @@ function autoBody(ao, am, w, h) {
   }
   return { plus, minus };
 }
-// spojení: uvnitř SAM masky plná postava, na okraji jemná alfa z ORMBG, mimo nic
-function kombinuj(ao, sm, w, h) {
+// spojení: jádro postavy (SAM si je jistý) plné, okraj = jemná alfa ORMBG vážená měkkou pravděpodobností SAM
+function kombinuj(ao, sm, w, h, mekka = null) {
   const r = Math.max(1, Math.round(Math.max(w, h) / 500));
   const er = new Uint8Array(w * h), dil = new Uint8Array(w * h);
   // eroze / dilatace čtvercem (r) – dvakrát průchod řádky a sloupci
@@ -226,7 +227,15 @@ function kombinuj(ao, sm, w, h) {
   };
   filtr(sm, er, false); filtr(sm, dil, true);
   const a = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) a[i] = er[i] ? 255 : dil[i] ? Math.max(ao[i], sm[i] ? 170 : 0) : 0;
+  const ss = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+  for (let i = 0; i < w * h; i++) {
+    const p = mekka ? mekka[i] : sm[i];
+    if (er[i] && p > 0.85) { a[i] = 255; continue; }          // jisté jádro postavy
+    const vaha = ss((p - 0.2) / 0.6);                           // měkký přechod podle SAM
+    // na okraji jemná alfa ORMBG; kde ORMBG postavu nevidí (bílé betony), vezmi aspoň SAM
+    const v = Math.round(Math.max(ao[i] * vaha, p > 0.6 ? 255 * ss((p - 0.6) / 0.35) : 0));
+    a[i] = v < 48 ? 0 : v; // slabé zbytky (síť, opar) pryč
+  }
   return a;
 }
 
@@ -289,7 +298,7 @@ async function vyrizniPresne(zdroj, volby) {
       const sm = await samMaska(url, body.plus, body.minus);
       const plocha = sm.maska.reduce((s, v) => s + v, 0);
       if (sm.w === w && sm.h === h && plocha > w * h * 0.01) {
-        const a = kombinuj(ao, sm.maska, w, h);
+        const a = kombinuj(ao, sm.maska, w, h, sm.mekka);
         for (let i = 0; i < w * h; i++) px[i * 4 + 3] = a[i];
         pouzitSam = true;
       }
