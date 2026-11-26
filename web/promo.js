@@ -329,7 +329,7 @@ async function pouzijNavrh(i) {
 
 async function nastavFoto(blob, kredit = "") {
   st.fotoId = await U().ulozObrazek(blob, { kredit, promo: true });
-  st.kredit = kredit; st.foto = { zoom: 1, x: 0, y: 0 }; st.vyrezId = null; st.vyrezBody = null;
+  st.kredit = kredit; st.foto = { zoom: 1, x: 0, y: 0 }; st.vyrezId = null; st.vyrezBody = null; st.vyrezPlnyId = null; st.vyrezGumaId = null; st.vyrezDoplnId = null;
   uloz();
   foto = await U().obrazekImg(st.fotoId);
   vyrez = null;
@@ -340,36 +340,112 @@ async function nastavFoto(blob, kredit = "") {
 }
 
 let vyrezava = false;
-// Ruční úprava výřezu: na fotce se klikne na hráče (+) a na to, co k němu nepatří (−); SAM vyřízne znovu.
-function upravVyrez() {
+const naPng = (c) => new Promise((ok) => c.toBlob(ok, "image/png"));
+async function canvasZId(id) {
+  const img = await U().obrazekImg(id);
+  const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext("2d").drawImage(img, 0, 0);
+  return c;
+}
+// Štětec: guma (smazat) a doplnění (vrátit část hráče) – masky v rozlišení fotky, uložené v úložišti.
+async function aplikujStetec(plna) {
+  if (!st.vyrezGumaId && !st.vyrezDoplnId) return plna;
+  const w = plna.width, h = plna.height;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(plna, 0, 0);
+  const id = x.getImageData(0, 0, w, h), d = id.data;
+  const nactiMasku = async (mid) => {
+    if (!mid) return null;
+    const m = await canvasZId(mid), t = document.createElement("canvas"); t.width = w; t.height = h;
+    const tx = t.getContext("2d", { willReadFrequently: true }); tx.drawImage(m, 0, 0, w, h);
+    return tx.getImageData(0, 0, w, h).data;
+  };
+  const guma = await nactiMasku(st.vyrezGumaId), dopln = await nactiMasku(st.vyrezDoplnId);
+  // doplnění bere barvy z původní fotky (výřez je má i tam, kde je průhledný)
+  for (let i = 0; i < w * h; i++) {
+    let a = d[i * 4 + 3];
+    if (dopln && dopln[i * 4 + 3]) a = Math.max(a, dopln[i * 4 + 3]);
+    if (guma && guma[i * 4 + 3]) a = Math.round(a * (1 - guma[i * 4 + 3] / 255));
+    d[i * 4 + 3] = a;
+  }
+  x.putImageData(id, 0, 0);
+  return c;
+}
+async function ulozHotovyVyrez(plnaPoStetci) {
+  const oriz = window.DHVyrez.orizni(plnaPoStetci);
+  st.vyrezId = await U().ulozObrazek(await naPng(oriz), { promoVyrez: true });
+  vyrezSurovy = oriz; vyrez = pripravVyrez(oriz);
+  silCache.delete?.(oriz);
+}
+// Ruční úprava výřezu. Body (+ hráč / − nepatří) → SAM vyřízne znovu. Štětec (🧽 gumovat / 🖌️ doplnit)
+// upraví výřez přesně podle tebe. Na fotce je vidět, co se vyřízne (normálně) a co je pryč (ztmavené do červena).
+async function upravVyrez() {
   if (!foto) { zprava("Nejdřív vyber fotku.", "chyba"); return; }
+  if (!st.vyrezPlnyId) { zprava("Nejdřív se hráč vyřízne automaticky, pak ho můžeš doladit…"); await vyrizni(); if (!st.vyrezPlnyId) return; }
   let dlg = $("#prVyrezDlg");
   if (!dlg) {
     dlg = document.createElement("dialog");
     dlg.id = "prVyrezDlg"; dlg.className = "pr-vyrez-dlg";
     dlg.innerHTML = `
       <h3 style="margin:0 0 6px">✂️ Upravit výřez</h3>
-      <p class="muted" style="margin:0 0 10px;font-size:13.5px">Klikni na <b style="color:#3ddc84">hráče</b> (víc bodů = jistější – helma, dres, betony, hokejka).
-        S režimem <b style="color:#ff5a5f">− Nepatří</b> (nebo se Shiftem) klikni na to, co se vyřízlo navíc: branka, mantinel, rozhodčí, jiný hráč.</p>
-      <div class="radek" style="gap:6px;margin-bottom:8px">
-        <button type="button" class="btn small" data-rezim="plus">＋ Hráč</button>
+      <p class="muted" style="margin:0 0 10px;font-size:13.5px">Co je <b>normálně</b>, zůstane ve výřezu. Co je <b style="color:#ff5a5f">ztmavené do červena</b>, je pryč.
+        <b>🧽 Gumovat</b> = přetáhni přes to, co tam nemá být (síť, mantinel, cizí ruka). <b>🖌️ Doplnit</b> = přetáhni přes useknutou část hráče.
+        Body <b style="color:#3ddc84">＋ Hráč</b> / <b style="color:#ff5a5f">− Nepatří</b> nechají AI vyříznout znovu.</p>
+      <div class="radek pr-vyrez-nastroje">
+        <button type="button" class="btn small" data-rezim="guma">🧽 Gumovat</button>
+        <button type="button" class="btn small ghost" data-rezim="dopln">🖌️ Doplnit</button>
+        <label class="pr-velikost">Štětec <input type="range" min="6" max="120" value="34" data-velikost></label>
+        <button type="button" class="btn small ghost" data-akce="zpet" title="Vrátit poslední tah">↶ Zpět</button>
+        <span class="pr-oddel"></span>
+        <button type="button" class="btn small ghost" data-rezim="plus">＋ Hráč</button>
         <button type="button" class="btn small ghost" data-rezim="minus">− Nepatří</button>
-        <button type="button" class="btn small ghost" data-akce="smaz">Smazat body</button>
-        <button type="button" class="btn small ghost" data-akce="auto">Automaticky</button>
       </div>
       <canvas class="pr-vyrez-platno"></canvas>
-      <div class="akce"><button type="button" class="btn" data-akce="vyrizni">✂️ Vyříznout</button><button type="button" class="btn ghost" data-akce="zavri">Zavřít</button></div>`;
+      <div class="akce">
+        <button type="button" class="btn" data-akce="pouzit">✓ Použít úpravy</button>
+        <button type="button" class="btn ghost" data-akce="body" title="AI vyřízne znovu podle zelených a červených bodů (štětec zůstane)">✂️ Vyříznout znovu podle bodů</button>
+        <button type="button" class="btn ghost" data-akce="reset" title="Zahodí štětec i body a vyřízne automaticky">Od začátku</button>
+        <button type="button" class="btn ghost" data-akce="zavri">Zavřít</button>
+      </div>`;
     document.body.appendChild(dlg);
   }
   const c = dlg.querySelector("canvas");
   const iw = foto.naturalWidth, ih = foto.naturalHeight;
-  const k = Math.min(860 / iw, 560 / ih, 1.6);
+  const k = Math.min(900 / iw, 600 / ih, 1.8);
   c.width = Math.round(iw * k); c.height = Math.round(ih * k);
+  // plný výřez + masky štětce v rozlišení náhledu (při použití se zvětší na rozlišení fotky)
+  const plna = await canvasZId(st.vyrezPlnyId);
+  const mala = document.createElement("canvas"); mala.width = c.width; mala.height = c.height;
+  mala.getContext("2d").drawImage(plna, 0, 0, c.width, c.height);
+  const alfaMala = mala.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data;
+  const novaMaska = async (id) => {
+    const m = document.createElement("canvas"); m.width = c.width; m.height = c.height;
+    if (id) { try { m.getContext("2d").drawImage(await canvasZId(id), 0, 0, c.width, c.height); } catch { /* nic */ } }
+    return m;
+  };
+  const guma = await novaMaska(st.vyrezGumaId), dopln = await novaMaska(st.vyrezDoplnId);
+  const historie = [];
   let body = JSON.parse(JSON.stringify(st.vyrezBody || { plus: [], minus: [] }));
-  let rezim = "plus";
+  let rezim = "guma", velikost = 34, tah = null, zmeneno = false;
+  const fotoMala = document.createElement("canvas"); fotoMala.width = c.width; fotoMala.height = c.height;
+  fotoMala.getContext("2d").drawImage(foto, 0, 0, c.width, c.height);
+  const fotoData = fotoMala.getContext("2d").getImageData(0, 0, c.width, c.height).data;
   const kresli = () => {
     const x = c.getContext("2d");
-    x.drawImage(foto, 0, 0, c.width, c.height);
+    const out = x.createImageData(c.width, c.height), o = out.data;
+    const g = guma.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    const dp = dopln.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    for (let i = 0; i < o.length; i += 4) {
+      let a = alfaMala[i + 3];
+      if (dp[i + 3]) a = Math.max(a, dp[i + 3]);
+      if (g[i + 3]) a = a * (1 - g[i + 3] / 255);
+      const t = a / 255; // 1 = ve výřezu
+      o[i] = fotoData[i] * (0.35 + 0.65 * t) + 150 * (1 - t) * 0.5;
+      o[i + 1] = fotoData[i + 1] * (0.35 + 0.65 * t) * (0.6 + 0.4 * t);
+      o[i + 2] = fotoData[i + 2] * (0.35 + 0.65 * t) * (0.6 + 0.4 * t);
+      o[i + 3] = 255;
+    }
+    x.putImageData(out, 0, 0);
     for (const [druh, barva] of [["plus", "#3ddc84"], ["minus", "#ff5a5f"]]) {
       for (const [bx, by] of body[druh]) {
         x.beginPath(); x.arc(bx * k, by * k, 9, 0, Math.PI * 2); x.fillStyle = barva; x.fill();
@@ -378,27 +454,95 @@ function upravVyrez() {
       }
     }
     dlg.querySelectorAll("[data-rezim]").forEach((b) => b.classList.toggle("ghost", b.dataset.rezim !== rezim));
+    c.style.cursor = rezim === "guma" || rezim === "dopln" ? "none" : "crosshair";
   };
-  c.onclick = (e) => {
-    const r = c.getBoundingClientRect();
-    const bx = ((e.clientX - r.left) / r.width) * c.width / k, by = ((e.clientY - r.top) / r.height) * c.height / k;
-    // klik blízko existujícího bodu = smazat ho
-    for (const druh of ["plus", "minus"]) {
-      const i = body[druh].findIndex(([x0, y0]) => Math.hypot((x0 - bx) * k, (y0 - by) * k) < 14);
-      if (i >= 0) { body[druh].splice(i, 1); kresli(); return; }
-    }
-    body[e.shiftKey || rezim === "minus" ? "minus" : "plus"].push([Math.round(bx), Math.round(by)]);
+  const bod = (e) => { const r = c.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * c.width, y: ((e.clientY - r.top) / r.height) * c.height, sk: c.width / r.width }; };
+  const stopa = (m, p0, p1, sk) => {
+    const x = m.getContext("2d");
+    x.globalCompositeOperation = "source-over"; x.strokeStyle = "#fff"; x.fillStyle = "#fff";
+    x.lineCap = "round"; x.lineJoin = "round"; x.lineWidth = velikost * sk;
+    x.beginPath(); x.moveTo(p0.x, p0.y); x.lineTo(p1.x, p1.y); x.stroke();
+  };
+  // gumování a doplňování se navzájem ruší (co gumuješ, maže doplnění a naopak)
+  const zrus = (m, p0, p1, sk) => {
+    const x = m.getContext("2d");
+    x.globalCompositeOperation = "destination-out"; x.lineCap = "round"; x.lineWidth = velikost * sk;
+    x.beginPath(); x.moveTo(p0.x, p0.y); x.lineTo(p1.x, p1.y); x.stroke();
+    x.globalCompositeOperation = "source-over";
+  };
+  const kurzor = (p) => {
     kresli();
+    const x = c.getContext("2d");
+    x.beginPath(); x.arc(p.x, p.y, (velikost * p.sk) / 2, 0, Math.PI * 2);
+    x.lineWidth = 2; x.strokeStyle = rezim === "guma" ? "#ff5a5f" : "#3ddc84"; x.stroke();
   };
+  c.onpointerdown = (e) => {
+    const p = bod(e);
+    if (rezim === "plus" || rezim === "minus") {
+      const bx = p.x / k, by = p.y / k;
+      for (const druh of ["plus", "minus"]) {
+        const i = body[druh].findIndex(([x0, y0]) => Math.hypot((x0 - bx) * k, (y0 - by) * k) < 14);
+        if (i >= 0) { body[druh].splice(i, 1); kresli(); return; }
+      }
+      body[e.shiftKey || rezim === "minus" ? "minus" : "plus"].push([Math.round(bx), Math.round(by)]);
+      kresli(); return;
+    }
+    historie.push([guma.getContext("2d").getImageData(0, 0, c.width, c.height), dopln.getContext("2d").getImageData(0, 0, c.width, c.height)]);
+    if (historie.length > 25) historie.shift();
+    c.setPointerCapture(e.pointerId);
+    tah = p; zmeneno = true;
+    const [cil, opak] = rezim === "guma" ? [guma, dopln] : [dopln, guma];
+    stopa(cil, p, { x: p.x + 0.1, y: p.y }, p.sk); zrus(opak, p, { x: p.x + 0.1, y: p.y }, p.sk);
+    kurzor(p);
+  };
+  c.onpointermove = (e) => {
+    const p = bod(e);
+    if (tah) {
+      const [cil, opak] = rezim === "guma" ? [guma, dopln] : [dopln, guma];
+      stopa(cil, tah, p, p.sk); zrus(opak, tah, p, p.sk); tah = p;
+    }
+    if (rezim === "guma" || rezim === "dopln") kurzor(p);
+  };
+  c.onpointerup = c.onpointercancel = () => { tah = null; kresli(); };
+  c.onpointerleave = () => { if (!tah) kresli(); };
+  const ulozMasky = async () => {
+    const zvetsi = async (m) => {
+      const d = m.getContext("2d").getImageData(0, 0, m.width, m.height).data;
+      let prazdna = true;
+      for (let i = 3; i < d.length; i += 4) if (d[i]) { prazdna = false; break; }
+      if (prazdna) return null;
+      const v = document.createElement("canvas"); v.width = iw; v.height = ih;
+      const vx = v.getContext("2d"); vx.imageSmoothingEnabled = true; vx.imageSmoothingQuality = "high"; vx.drawImage(m, 0, 0, iw, ih);
+      return U().ulozObrazek(await naPng(v), { promoMaska: true });
+    };
+    st.vyrezGumaId = await zvetsi(guma);
+    st.vyrezDoplnId = await zvetsi(dopln);
+  };
+  dlg.querySelector("[data-velikost]").oninput = (e) => { velikost = +e.target.value; };
   dlg.onclick = async (e) => {
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.rezim) { rezim = b.dataset.rezim; kresli(); return; }
-    if (b.dataset.akce === "smaz") { body = { plus: [], minus: [] }; kresli(); return; }
-    if (b.dataset.akce === "zavri") { dlg.close(); return; }
-    if (b.dataset.akce === "auto") { st.vyrezBody = null; dlg.close(); await vyrizni(); return; }
-    if (b.dataset.akce === "vyrizni") {
-      if (!body.plus.length) { alert("Klikni aspoň jednou na hráče (zelený bod)."); return; }
+    if (b.dataset.akce === "zpet") { const h = historie.pop(); if (h) { guma.getContext("2d").putImageData(h[0], 0, 0); dopln.getContext("2d").putImageData(h[1], 0, 0); kresli(); } return; }
+    if (b.dataset.akce === "zavri") {
+      if (zmeneno && !confirm("Zavřít bez použití úprav štětcem?")) return;
+      dlg.close(); return;
+    }
+    if (b.dataset.akce === "reset") {
+      if (!confirm("Zahodit všechny úpravy (štětec i body) a vyříznout znovu automaticky?")) return;
+      st.vyrezBody = null; st.vyrezGumaId = null; st.vyrezDoplnId = null; uloz(); dlg.close(); await vyrizni(); return;
+    }
+    if (b.dataset.akce === "pouzit") {
+      b.disabled = true;
+      await ulozMasky();
+      await ulozHotovyVyrez(await aplikujStetec(plna));
+      uloz(); dlg.close(); b.disabled = false; vykresli();
+      zprava("Hotovo ✓ Výřez je upravený podle tebe.", "ok");
+      return;
+    }
+    if (b.dataset.akce === "body") {
+      if (!body.plus.length) { alert("Přidej aspoň jeden zelený bod (＋ Hráč) na hráče."); return; }
+      await ulozMasky();
       st.vyrezBody = body; uloz(); dlg.close(); await vyrizni();
     }
   };
@@ -412,10 +556,10 @@ async function vyrizni() {
   try {
     const surovy = await window.DHVyrez.vyrizni(await U().obrazekBlob(st.fotoId), null, { presne: true, body: st.vyrezBody });
     if (surovy.body) st.vyrezBody = surovy.body;
-    const blob = await new Promise((ok) => surovy.toBlob(ok, "image/png"));
-    st.vyrezId = await U().ulozObrazek(blob, { promoVyrez: true });
+    const plna = surovy.plna || surovy;
+    st.vyrezPlnyId = await U().ulozObrazek(await naPng(plna), { promoVyrez: true });
+    await ulozHotovyVyrez(await aplikujStetec(plna));
     st.vyrezModel = VYREZ_VERZE;
-    vyrezSurovy = surovy; vyrez = pripravVyrez(surovy);
     uloz();
     zprava(`Hotovo ✓ Hráč je vyříznutý${surovy.sam ? " (jen hráč – bez branky a okolí)" : ""}. Zůstalo něco navíc nebo něco chybí? Klikni na <b>✂️ Upravit výřez</b>.`, "ok");
   } catch (e) {

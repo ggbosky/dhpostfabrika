@@ -304,8 +304,9 @@ async function vyrizniPresne(zdroj, volby) {
       }
     } catch (e) { console.warn("SAM výřez se nepovedl, použiji jen ORMBG:", e?.message); }
     c.getContext("2d").putImageData(new ImageData(px, w, h), 0, 0);
-    const vysl = orizni(docisti(c));
-    vysl.body = body; vysl.sam = pouzitSam;
+    const plna = docisti(c);
+    const vysl = orizni(plna);
+    vysl.body = body; vysl.sam = pouzitSam; vysl.plna = plna;
     return vysl;
   } finally { uvolni(); }
 }
