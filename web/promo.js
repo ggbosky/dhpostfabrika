@@ -18,7 +18,7 @@ const FORMATY = { "4x5": { nazev: "Post 4:5", h: 1350 }, "1x1": { nazev: "Čtver
 const SABLONY = {
   milnik: { nazev: "Milník", popis: "obří číslo za hráčem (NHL styl)", nhl: true },
   rekord: { nazev: "Rekord", popis: "rekord klubu + žebříček", nhl: true },
-  narozeniny: { nazev: "Narozeniny", popis: "velké jméno, dva výřezy", nhl: true },
+  narozeniny: { nazev: "Narozeniny / portrét", popis: "velké jméno; přání jen v den narozenin", nhl: true },
   titulek: { nazev: "Titulek", popis: "velký nápis přes fotku", nhl: true },
   ikona: { nazev: "Ikona", popis: "hráč před obřím jménem, barvy týmu" },
   plakat: { nazev: "Plakát", popis: "duotón v rámu, jméno dole" },
@@ -49,7 +49,7 @@ let foto = null;  // HTMLImageElement
 let vyrez = null; // canvas – hráč bez pozadí
 let foto2 = null, vyrez2 = null; // druhá (akční) fotka – nepovinná
 let vyrezSurovy = null, vyrez2Surovy = null; // výřezy bez vylepšení (vylepšení jde vypnout)
-const VYREZ_VERZE = "ormbg-2"; // přesný model + dočištění masky; starší výřezy se přepočítají
+const VYREZ_VERZE = "ormbg-3"; // přesný model + dočištění masky; starší výřezy se přepočítají
 let kandidati = []; // nalezené fotky seřazené podle kvality
 
 // ------------------------------------------------------- vylepšení výřezu --
@@ -321,6 +321,7 @@ async function nastavFoto(blob, kredit = "") {
   uloz();
   foto = await U().obrazekImg(st.fotoId);
   vyrez = null;
+  if (Math.max(foto.naturalWidth, foto.naturalHeight) < 900) toast(`Fotka má jen ${foto.naturalWidth}×${foto.naturalHeight} px – grafika bude méně ostrá. Lepší je fotka s vyšším rozlišením (v pásu má větší číslo).`, "info");
   vykresliFormular();
   vykresli();
   await vyrizni();
@@ -405,7 +406,11 @@ async function hledejKandidaty(dotaz = "") {
     if (tym && tym.split(/\s+/).some((w) => w.length > 3 && n.includes(normT(w)))) sk += 10;
     if (/(hockey|game|vs\.?|match|nhl|iihf|extraliga|playoff)/i.test(n)) sk += 8;
     const sir = f.sirka || 0, vys = f.vyska || 0;
-    if (sir && vys) { sk += Math.min(16, Math.min(sir, vys) / 150); if (vys >= sir * 0.95) sk += 8; }
+    if (sir && vys) {
+      const kratsi = Math.min(sir, vys);
+      sk += kratsi >= 1500 ? 30 : kratsi >= 1100 ? 20 : kratsi >= 800 ? 8 : -25;
+      if (vys >= sir * 0.95) sk += 8;
+    }
     return { ...f, skore: sk };
   }).sort((a, b) => b.skore - a.skore).slice(0, 14);
   vykresliKandidaty();
@@ -417,6 +422,7 @@ function vykresliKandidaty() {
   el.innerHTML = kandidati.length ? kandidati.map((f, i) => `
     <div class="pr-fotka${f.url === st.fotoUrl ? " on" : ""}${f.url === st.foto2Url ? " druha" : ""}" title="${esc(f.nazev)} · ${esc(f.autor)} (${esc(f.licence)})">
       <img src="${esc(f.nahled)}" alt="" loading="lazy" data-pr-fotka="${i}">
+      ${f.sirka ? `<span class="pr-fotka-px${Math.min(f.sirka, f.vyska || f.sirka) < 800 ? " malo" : ""}">${Math.round(Math.max(f.sirka, f.vyska || 0) / 100) / 10}k</span>` : ""}
       <button type="button" data-pr-fotka2="${i}" title="Použít jako druhou (akční) fotku">+2</button>
     </div>`).join("") + `<button type="button" class="btn ghost small" id="prGalerie">Víc fotek…</button>` : "";
 }
@@ -862,6 +868,17 @@ function pozadiTym(ctx, h, { svetle = false } = {}) {
     sv.addColorStop(0, "rgba(255,255,255,0.16)"); sv.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = sv; ctx.fillRect(0, 0, W, h);
   }
+  // šikmé pásy v akcentní barvě za hráčem
+  if (!svetle) {
+    ctx.save(); ctx.globalCompositeOperation = "screen";
+    for (const [x0, sirka, a] of [[0.58, 120, 0.13], [0.74, 46, 0.18], [0.12, 70, 0.08]]) {
+      ctx.save(); ctx.translate(W * x0, h * 0.5); ctx.rotate(-0.38);
+      const pg = ctx.createLinearGradient(0, -h * 0.8, 0, h * 0.8);
+      pg.addColorStop(0, hex(paleta().akc, 0)); pg.addColorStop(0.5, hex(paleta().akc, a)); pg.addColorStop(1, hex(paleta().akc, 0));
+      ctx.fillStyle = pg; ctx.fillRect(-sirka / 2, -h * 0.8, sirka, h * 1.6); ctx.restore();
+    }
+    ctx.restore();
+  }
   // šikmé světelné pruhy
   ctx.save();
   for (const [x, sirka, a] of [[0.18, 260, 0.08], [0.62, 140, 0.06], [0.86, 320, 0.05]]) {
@@ -916,17 +933,19 @@ const prekryv = (r) => prekryvS(obsazeno, r);
 function boxVyrezu(h, zdroj, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = true, odShora = null } = {}) {
   const kamera = anim == null ? 1 : 1 + 0.05 * Math.min(1, anim / DELKA_ANIM);
   const zoom = hlavni ? (st.foto.zoom || 1) : 1;
-  let vh = h * vyska * zoom * kamera, vw = vh * (zdroj.width / zdroj.height);
+  // celá postava (vysoký výřez) → zvětšit a nechat spodek (kolena, brusle) přečnívat pod plátno
+  const kadr = hlavni && odShora == null && zdroj.height / zdroj.width >= 1.2 ? 0.8 : 1;
+  let vh = (h * vyska * zoom * kamera) / kadr, vw = vh * (zdroj.width / zdroj.height);
   // portrét do pasu (široký výřez) se nezvětšuje přes šířku plátna – jinak by z hráče zbyl jen dres
   const maxSirka = W * (zdroj.width / zdroj.height > 0.8 ? 0.98 : 1.15) * (hlavni ? (st.foto.zoom || 1) : 1);
   if (vw > maxSirka) { vw = maxSirka; vh = vw * (zdroj.height / zdroj.width); }
   // hlava nesmí být uříznutá nahoře (pokud ji uživatel sám nepřetáhne / nepřiblíží)
   const horniOkraj = h * 0.04;
-  if (odShora == null && h - vh - h * spodek < horniOkraj && zoom <= 1.001) {
-    vh = h - h * spodek - horniOkraj; vw = vh * (zdroj.width / zdroj.height);
+  if (odShora == null && h - vh * kadr - h * spodek < horniOkraj && zoom <= 1.001) {
+    vh = (h - h * spodek - horniOkraj) / kadr; vw = vh * (zdroj.width / zdroj.height);
   }
   const x = W * stredX - vw / 2 + (hlavni ? (st.foto.x || 0) * W * 0.35 : 0);
-  const y = (odShora != null ? h * odShora : h - vh - h * spodek) + (hlavni ? (st.foto.y || 0) * h * 0.25 : 0);
+  const y = (odShora != null ? h * odShora : h - vh * kadr - h * spodek) + (hlavni ? (st.foto.y || 0) * h * 0.25 : 0);
   return { x, y, w: vw, h: vh };
 }
 // největší výška hráče (podíl plátna), při které nezakryje texty víc než o toleranci
@@ -1053,53 +1072,41 @@ function sablonaMilnik(ctx, h) {
   stitekSCarami(ctx, cele(), h * 0.095, "#ffffff", 40);
   const cislo = formatCislo(d.cislo) || "—";
   const yCisla = h * 0.13;
-  const spodekCisla = obriCislo(ctx, cislo, { y: yCisla, maxV: h * 0.4, sirka: W * 0.92 });
-  ctx.font = `${vejdeSe(ctx, cislo, (q) => `${q}px ${P_CISLO}`, h * 0.4, W * 0.92, 80)}px ${P_CISLO}`;
-  const sirkaCisla = ctx.measureText(cislo).width;
-  const hlavni = { stredX: 0.44, spodek: 0.0, hlavni: true };
+  // číslo + popis vedle něj na jednom „řádku“ (jako „200 WINS“); popis ve dvou řádcích vpravo od čísla
+  const slova = String(d.co || "").split(/\s+/).filter(Boolean);
+  const radky = slova.length > 1 ? [slova.slice(0, Math.ceil(slova.length / 2)).join(" "), slova.slice(Math.ceil(slova.length / 2)).join(" ")] : slova;
+  const mezera = 34, okraj = 56, sirkaVse = W - 2 * okraj;
+  let vC = h * 0.36, vL = 0, sirC = 0, sirL = 0, ascC = 0;
+  for (; vC >= 90; vC -= 6) {
+    ctx.font = `${vC}px ${P_CISLO}`;
+    const m = ctx.measureText(cislo); sirC = m.width; ascC = m.actualBoundingBoxAscent || vC * 0.8;
+    if (!radky.length) { if (sirC <= sirkaVse) break; continue; }
+    // popis: dva řádky dohromady ~ 62 % výšky číslic
+    vL = Math.min(150, (ascC * 0.62) / (radky.length > 1 ? 1.75 : 0.85));
+    ctx.font = `${vL}px ${P_CISLO}`;
+    sirL = Math.max(...radky.map((r) => ctx.measureText(r).width));
+    if (sirC + mezera + sirL <= sirkaVse) break;
+  }
+  const celkem = sirC + (radky.length ? mezera + sirL : 0);
+  const xC = W / 2 - celkem / 2;
+  const spodekCisla = obriCislo(ctx, cislo, { y: yCisla, maxV: vC, sirka: W, x: xC, zarovnani: "left" });
+  const xL = xC + sirC + mezera;
+  const hlavni = { stredX: 0.5, spodek: 0.0, hlavni: true };
+  // hráč nesmí zakrýt horní polovinu čísla ani popis
+  const popisObd = radky.length ? { x: xL, y: yCisla, w: sirL, h: ascC * 0.75 } : null;
   if (maVyrez()) {
-    // horních 60 % čísla musí zůstat vidět
-    const vrch = { x: W / 2 - sirkaCisla / 2, y: yCisla, w: sirkaCisla, h: (spodekCisla - yCisla) * 0.6 };
-    hlavni.vyska = vyskaBezPrekryvu(h, vyrez, hlavni, [vrch], 0.74, 0.5, 0.06);
-  } else hlavni.vyska = 0.74;
-  hraci(ctx, h, hlavni, { stredX: 0.2, spodek: 0.06, vyska: 0.5 });
-  if (d.co) {
-    const slova = d.co.split(/\s+/);
-    const radky = slova.length > 1 ? [slova.slice(0, Math.ceil(slova.length / 2)).join(" "), slova.slice(Math.ceil(slova.length / 2)).join(" ")] : [d.co];
-    let nej = null;
-    for (let v = 110; v >= 50; v -= 6) {
-      ctx.font = `${v}px ${P_CISLO}`;
-      const sir = Math.max(...radky.map((r) => ctx.measureText(r).width));
-      if (sir > W * 0.46) continue;
-      const vys = (radky.length - 1) * v * 0.98 + v * 0.78;
-      for (const strana of ["vpravo", "vlevo"]) {
-        for (let yz = Math.max(spodekCisla + 40 + v * 0.78, h * 0.4); yz + vys - v * 0.78 <= h * 0.84; yz += h * 0.025) {
-          const x0 = strana === "vpravo" ? W - 56 - sir - 40 : 56;
-          const r = { x: x0, y: yz - v * 0.78, w: sir + 40, h: vys };
-          const pk = prekryv(r);
-          const skore = pk * 100 + (strana === "vlevo" ? 0.4 : 0) + Math.abs(yz - h * 0.66) / h - v / 400;
-          if (!nej || skore < nej.skore) nej = { v, strana, yz, sir, pk, skore, r };
-        }
-      }
-      if (nej && nej.pk <= 0.02) break;
-    }
-    if (nej) {
-      ctx.save(); ctx.globalAlpha = vidim(0.9);
-      if (nej.pk > 0.02) podklad(ctx, nej.r, 0.55);
-      ctx.font = `${nej.v}px ${P_CISLO}`; ctx.textBaseline = "alphabetic";
-      ctx.textAlign = nej.strana === "vpravo" ? "right" : "left";
-      const xT = nej.strana === "vpravo" ? W - 56 : 56 + 40;
-      ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 18; ctx.fillStyle = "#ffffff";
-      radky.forEach((r, i) => ctx.fillText(r, xT, nej.yz + i * nej.v * 0.98));
-      // šipka ukazující na hráče
-      ctx.fillStyle = akcent2();
-      const s1 = ctx.measureText(radky[0]).width, ty = nej.yz - nej.v * 0.36;
-      ctx.beginPath();
-      if (nej.strana === "vpravo") { const tx = W - 56 - s1 - 22; ctx.moveTo(tx - 22, ty - 20); ctx.lineTo(tx, ty); ctx.lineTo(tx - 22, ty + 20); }
-      else { const tx = 56 + 24; ctx.moveTo(tx, ty - 20); ctx.lineTo(tx - 22, ty); ctx.lineTo(tx, ty + 20); }
-      ctx.closePath(); ctx.fill();
-      ctx.restore();
-    }
+    const vrch = { x: xC, y: yCisla, w: sirC, h: (spodekCisla - yCisla) * 0.5 };
+    hlavni.vyska = vyskaBezPrekryvu(h, vyrez, hlavni, [vrch, popisObd].filter(Boolean), 0.8, 0.6, 0.05);
+  } else hlavni.vyska = 0.78;
+  hraci(ctx, h, hlavni, { stredX: 0.16, spodek: 0.04, vyska: 0.5 });
+  if (radky.length) {
+    ctx.save(); ctx.globalAlpha = vidim(0.5);
+    ctx.font = `${vL}px ${P_CISLO}`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    if (prekryv(popisObd) > 0.05) podklad(ctx, popisObd, 0.5);
+    ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 16;
+    const yPrvni = yCisla + vL * 0.8;
+    radky.forEach((r, i) => { ctx.fillStyle = i === 0 ? "#ffffff" : akcent2(); ctx.fillText(r, xL, yPrvni + i * vL * 0.95); });
+    ctx.restore();
   }
   spodniRadek(ctx, h, d.dole);
   kresliZrno(ctx, W, h, 0.05);
@@ -1189,6 +1196,19 @@ function vekLetos(narozen) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(narozen || "");
   return m ? new Date().getFullYear() - +m[1] : null;
 }
+// jsou narozeniny „teď“? (3 dny zpět až 10 dní dopředu)
+function narozeninyTed(narozen) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(narozen || "");
+  if (!m) return false;
+  const dnes = new Date(); dnes.setHours(0, 0, 0, 0);
+  for (const rok of [dnes.getFullYear() - 1, dnes.getFullYear(), dnes.getFullYear() + 1]) {
+    const dny = (new Date(rok, +m[2] - 1, +m[3]) - dnes) / 864e5;
+    if (dny >= -3 && dny <= 10) return true;
+  }
+  return false;
+}
+const MESICE_2 = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
+const datumCesky = (narozen) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(narozen || ""); return m ? `${+m[3]}. ${MESICE_2[+m[2] - 1]} ${m[1]}` : ""; };
 
 // 7) NAROZENINY – světlé pozadí, velký portrét + akční výřez, velké jméno vlevo dole.
 // Portrét končí nad textem (plynule se rozplyne do bílé), akční výřez je vpravo vedle jména.
@@ -1200,11 +1220,14 @@ function sablonaNarozeniny(ctx, h) {
   // rozvržení textu odspodu (měření)
   const L = 60, barvaTextu = jas(c) > 0.62 ? (jas(st.barva2 || "#000") < 0.4 ? st.barva2 : "#111111") : c;
   const vek = vekLetos(d.narozen);
-  const kicker = d.zemrel ? (vek ? `NEDOŽITÉ ${vek}. NAROZENINY` : "VZPOMÍNÁME") : "VŠECHNO NEJLEPŠÍ";
+  const ted = narozeninyTed(d.narozen);
+  // přání jen když narozeniny opravdu jsou (jinak portrét s datem narození)
+  const kicker = ted ? (d.zemrel ? (vek ? `NEDOŽITÉ ${vek}. NAROZENINY` : "VZPOMÍNÁME") : "VŠECHNO NEJLEPŠÍ") : (d.nahore || "LEGENDA");
+  const radekDole = ted ? (!d.zemrel && vek ? `K ${vek}. NAROZENINÁM` : "") : (d.narozen ? `NAROZEN ${datumCesky(d.narozen).toUpperCase()}` : (d.roky || ""));
   const pr = (d.prijmeni || "").toUpperCase(), kr = (d.krestni || "").toUpperCase();
   const v = Math.min(vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 170, W * 0.56, 60), vejdeSe(ctx, kr, (q) => `${q}px ${P_CISLO}`, 170, W * 0.56, 60));
   let y = h - (h > 1500 ? 140 : 70);
-  const yVek = !d.zemrel && vek ? y : null;
+  const yVek = radekDole ? y : null;
   if (yVek) y -= 46;
   const yPr = y; y -= v * 0.95;
   const yKr = y; y -= v * 0.95 + 4;
@@ -1231,14 +1254,14 @@ function sablonaNarozeniny(ctx, h) {
   }
   ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.globalAlpha = vidim(0.9);
-  if (yVek) { ctx.font = `700 30px ${P_STITEK}`; ctx.fillStyle = "#333"; ctx.letterSpacing = "4px"; ctx.fillText(`K ${vek}. NAROZENINÁM`, L, yVek); ctx.letterSpacing = "0px"; }
+  if (yVek) { ctx.font = `700 30px ${P_STITEK}`; ctx.fillStyle = "#333"; ctx.letterSpacing = "4px"; ctx.fillText(radekDole, L, yVek, W * 0.56); ctx.letterSpacing = "0px"; }
   ctx.globalAlpha = vidim(0.6);
   ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = barvaTextu;
   ctx.fillText(pr, L, yPr);
   ctx.fillText(kr, L, yKr);
   ctx.globalAlpha = vidim(0.3);
   ctx.font = `700 46px ${P_STITEK}`; ctx.fillStyle = jas(c) > 0.62 ? tmavsi(c, 0.35) : c;
-  ctx.fillText(kicker, L, yKick);
+  ctx.fillText(kicker, L, yKick, W * 0.58);
   ctx.restore();
   logo(ctx, "cerna", { x: 46, y: 40, sirka: 110 });
 }
@@ -1264,17 +1287,19 @@ function sablonaTitulek(ctx, h) {
   if (maVyrez()) {
     // největší nápis a největší hráč, kteří se nepřekrývají (hráč se může posunout doleva a zmenšit)
     let nej = null;
-    for (let v = vMax; v >= 90; v -= 8) {
+    for (let v = vMax; v >= 80; v -= 8) {
       const pl = rozvrh(v);
-      for (const sx of [0.4, 0.34, 0.28]) {
+      for (const sx of [0.42, 0.36, 0.3]) {
         const vo = { stredX: sx, spodek: 0, hlavni: true };
-        const vy = vyskaBezPrekryvu(h, vyrez, vo, [pl.obd], 0.86, 0.56, 0.03);
+        const vy = vyskaBezPrekryvu(h, vyrez, vo, [pl.obd], 0.88, 0.72, 0.06);
         const pk = prekryvS([{ zdroj: vyrez, box: boxVyrezu(h, vyrez, { ...vo, vyska: vy }) }], pl.obd);
-        const skore = (pk > 0.03 ? 1000 : 0) + (0.86 - vy) * 300 + (vMax - v) * 1.2 + (0.4 - sx) * 60;
+        const skore = (pk > 0.06 ? 1000 : 0) + (0.88 - vy) * 300 + (vMax - v) * 1.2 + (0.42 - sx) * 60;
         if (!nej || skore < nej.skore) nej = { skore, pl, vo: { ...vo, vyska: vy } };
       }
       if (nej && nej.skore < 1000 && nej.pl.v === v) break;
     }
+    // když se nic nevejde bez překryvu, hráč zůstane velký a nápis dostane podklad
+    if (nej.skore >= 1000) nej = { pl: rozvrh(Math.max(110, vMax - 40)), vo: { stredX: 0.4, spodek: 0, hlavni: true, vyska: 0.86 } };
     plan = nej.pl; volby = nej.vo;
     pozadiTym(ctx, h);
     hraci(ctx, h, volby, { stredX: 0.8, odShora: 0.06, vyska: 0.36 });

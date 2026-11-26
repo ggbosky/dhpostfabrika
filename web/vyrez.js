@@ -82,6 +82,25 @@ function docisti(c) {
     else if (!m[mi] && a < 60 && !dira[mi]) a = 0;               // opar kolem postavy
     d[i + 3] = a;
   }
+  // okraje: barva poloprůhledných pixelů se nahradí barvou postavy (bez lemu z původního pozadí),
+  // alfa se o pixel stáhne a jemně vyhladí
+  const a0 = new Uint8ClampedArray(w * h);
+  for (let i = 0; i < w * h; i++) a0[i] = d[i * 4 + 3];
+  const src = new Uint8ClampedArray(d);
+  for (let y = 1; y < h - 1; y++) for (let xx = 1; xx < w - 1; xx++) {
+    const p = y * w + xx, a = a0[p];
+    if (!a || a >= 250) continue;
+    let r = 0, g = 0, b = 0, n = 0, mn = a;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const yy = y + dy, xq = xx + dx;
+      if (yy < 0 || xq < 0 || yy >= h || xq >= w) continue;
+      const q = yy * w + xq;
+      if (a0[q] >= 245) { r += src[q * 4]; g += src[q * 4 + 1]; b += src[q * 4 + 2]; n++; }
+      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && a0[q] < mn) mn = a0[q];
+    }
+    if (n) { d[p * 4] = r / n; d[p * 4 + 1] = g / n; d[p * 4 + 2] = b / n; }
+    d[p * 4 + 3] = (a * 0.55 + mn * 0.45);
+  }
   x.putImageData(id, 0, 0);
   return c;
 }
