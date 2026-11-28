@@ -16,14 +16,30 @@ const KLIC = "dhpf_promo";
 const W = 1080;
 const FORMATY = { "4x5": { nazev: "Post 4:5", h: 1350 }, "1x1": { nazev: "Čtverec 1:1", h: 1080 }, "9x16": { nazev: "Story 9:16", h: 1920 } };
 const SABLONY = {
-  milnik: { nazev: "Milník", popis: "obří číslo za hráčem (NHL styl)", nhl: true },
-  rekord: { nazev: "Rekord", popis: "rekord klubu + žebříček", nhl: true },
-  narozeniny: { nazev: "Narozeniny / portrét", popis: "velké jméno; přání jen v den narozenin", nhl: true },
-  titulek: { nazev: "Titulek", popis: "velký nápis přes fotku", nhl: true },
-  ikona: { nazev: "Ikona", popis: "hráč před obřím jménem, barvy týmu" },
-  plakat: { nazev: "Plakát", popis: "duotón v rámu, jméno dole" },
-  vertikal: { nazev: "Vertikál", popis: "fotka + svislé jméno v barvě týmu" },
-  karta: { nazev: "Karta", popis: "sběratelská kartička" },
+  // NHL styl
+  milnik: { nazev: "Milník", popis: "obří číslo + popis", skupina: "NHL styl" },
+  rekord: { nazev: "Rekord", popis: "rekord klubu + žebříček", skupina: "NHL styl" },
+  narozeniny: { nazev: "Narozeniny / portrét", popis: "přání jen v den narozenin", skupina: "NHL styl" },
+  titulek: { nazev: "Titulek", popis: "obří nápis přes celou šířku", skupina: "NHL styl" },
+  dres: { nazev: "Číslo dresu", popis: "obří číslo obrysem za hráčem", skupina: "NHL styl" },
+  duo: { nazev: "Duo", popis: "dva výřezy proti sobě", skupina: "NHL styl" },
+  // kreativní
+  split: { nazev: "Split", popis: "šikmé rozdělení, jméno v barvě", skupina: "Kreativní" },
+  echo: { nazev: "Echo", popis: "pohyb – hráč s ozvěnami", skupina: "Kreativní" },
+  neon: { nazev: "Neon", popis: "tmavá scéna, neonová záře", skupina: "Kreativní" },
+  kruh: { nazev: "Slunce", popis: "velký kruh s rastrem", skupina: "Kreativní" },
+  typo: { nazev: "Typo", popis: "jméno přes celé pozadí", skupina: "Kreativní" },
+  magazin: { nazev: "Magazín", popis: "titulní strana časopisu", skupina: "Kreativní" },
+  holo: { nazev: "Holo karta", popis: "prémiová karta, hráč vystupuje", skupina: "Kreativní" },
+  citat: { nazev: "Citát", popis: "věta o hráči velkým písmem", skupina: "Kreativní" },
+  // retro a klasika
+  plakat: { nazev: "Retro plakát", popis: "papír, slunce, tóny týmu", skupina: "Retro a klasika" },
+  vhs: { nazev: "VHS 90s", popis: "barevný posun, REC", skupina: "Retro a klasika" },
+  mono: { nazev: "Mono", popis: "černobílá, barevné jen jméno", skupina: "Retro a klasika" },
+  ikona: { nazev: "Ikona", popis: "hráč před obřím jménem", skupina: "Retro a klasika" },
+  vertikal: { nazev: "Vertikál", popis: "svislé jméno v barvě týmu", skupina: "Retro a klasika" },
+  karta: { nazev: "Karta", popis: "klasická kartička", skupina: "Retro a klasika" },
+  minimal: { nazev: "Minimal", popis: "čistá plocha, hodně vzduchu", skupina: "Retro a klasika" },
 };
 const P_JMENO = '"Anton", "Oswald", Impact, sans-serif';
 const P_TEXT = '"Inter", "Helvetica Neue", Arial, sans-serif';
@@ -871,62 +887,6 @@ function sablonaIkona(ctx, h) {
   logo(ctx, "bila", { x: 56, y: 52, sirka: 130 });
 }
 
-// 2) PLAKÁT – tmavé pozadí, barevný rám s hráčem v duotónu (hlava přesahuje rám), jméno dole vlevo
-function sablonaPlakat(ctx, h) {
-  const d = st.data, c = st.barva;
-  ctx.fillStyle = tmavsi(c, 0.86); ctx.fillRect(0, 0, W, h);
-  const M = 70, ramY = h * 0.13, ramH = h * 0.56;
-  ctx.fillStyle = c; ctx.fillRect(M, ramY, W - 2 * M, ramH);
-  ctx.save(); ctx.globalAlpha = 0.25; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.strokeRect(M + 18, ramY + 18, W - 2 * M - 36, ramH - 36); ctx.restore();
-  const spodekRamu = h - (ramY + ramH);
-  if (maVyrez()) {
-    const r = polohaVyrezu(h, 0.66, 0.5, spodekRamu);
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, ramY + ramH); ctx.clip();
-    ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
-    ctx.drawImage(st.cb ? vyrez : duotonVyrezu(), r.x, r.y, r.w, r.h);
-    ctx.restore();
-  } else {
-    ctx.save(); ctx.beginPath(); ctx.rect(M, ramY, W - 2 * M, ramH); ctx.clip();
-    kresliFoto(ctx, M, ramY, W - 2 * M, ramH, true);
-    ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = c; ctx.fillRect(M, ramY, W - 2 * M, ramH);
-    ctx.restore();
-  }
-  // text pod rámem (shora dolů, měřeno)
-  const L = M;
-  let y = ramY + ramH + 54;
-  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-  const asc = (t) => ctx.measureText(t).actualBoundingBoxAscent || 0;
-  if (d.krestni) {
-    ctx.font = `700 32px ${P_TEXT}`; const t = d.krestni.toUpperCase(); y += asc(t);
-    ctx.save(); ctx.globalAlpha = vidim(0.3); ctx.fillStyle = svetlejsi(c, 0.55); rozprostreny(ctx, t, L, y, 10); ctx.restore();
-    y += 16;
-  }
-  const prijmeni = (d.prijmeni || "").toUpperCase();
-  if (prijmeni) {
-    const zbyva = h - y - 150;
-    let v = vejdeSe(ctx, prijmeni, (q) => `${q}px ${P_JMENO}`, h > 1500 ? 230 : 180, W - 2 * L);
-    ctx.font = `${v}px ${P_JMENO}`;
-    while (v > 60 && asc(prijmeni) > zbyva) { v -= 4; ctx.font = `${v}px ${P_JMENO}`; }
-    y += asc(prijmeni);
-    ctx.save(); ctx.globalAlpha = vidim(0.6); ctx.fillStyle = "#ffffff"; ctx.fillText(prijmeni, L - 4, y); ctx.restore();
-    y += 22;
-  }
-  const k = kickerText();
-  if (k) {
-    ctx.font = `700 26px ${P_UZKE}`; y += asc(k);
-    ctx.save(); ctx.globalAlpha = vidim(0.9); ctx.fillStyle = "rgba(255,255,255,0.7)"; rozprostreny(ctx, k.toUpperCase(), L, y, 5); ctx.restore();
-    y += 18;
-  }
-  if (d.veta) {
-    ctx.font = `500 30px ${P_TEXT}`;
-    const vety = zalom(ctx, d.veta, W - 2 * L).slice(0, 2);
-    y += asc(vety[0] || "A") + 6;
-    ctx.save(); ctx.globalAlpha = vidim(1.3); ctx.fillStyle = "rgba(255,255,255,0.85)";
-    vety.forEach((r, i) => { if (y + i * 40 < h - 30) ctx.fillText(r, L, y + i * 40); }); ctx.restore();
-  }
-  kresliZrno(ctx, W, h, 0.07);
-  logo(ctx, "bila", { x: M, y: Math.max(24, ramY - 92), sirka: 120 });
-}
 
 // 3) VERTIKÁL – fotka vlevo (černobílá), vpravo sloupec v barvě týmu se svislým jménem
 function sablonaVertikal(ctx, h) {
@@ -1596,62 +1556,608 @@ function sablonaNarozeniny(ctx, h) {
   logo(ctx, "cerna", { x: 46, y: 40, sirka: 110 });
 }
 
-// 8) TITULEK – velký dvouřádkový nápis vpravo dole; hráč vlevo se zmenší/posune, aby ho nezakryl.
-function sablonaTitulek(ctx, h) {
+
+// ======================================================= DALŠÍ ŠABLONY (kreativní, retro, minimal) ==
+// Společné pomocníky: šedý / dvoubarevný výřez (bez ctx.filter – funguje i v Safari), blok jména dole.
+const sedyCache = new WeakMap(), duoCache2 = new WeakMap();
+function sedy(zdroj) {
+  if (!zdroj) return null;
+  if (sedyCache.has(zdroj)) return sedyCache.get(zdroj);
+  const c = document.createElement("canvas"); c.width = zdroj.width; c.height = zdroj.height;
+  const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(zdroj, 0, 0);
+  const id = x.getImageData(0, 0, c.width, c.height), d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    l = Math.max(0, Math.min(255, (l - 128) * 1.18 + 128));
+    d[i] = d[i + 1] = d[i + 2] = l;
+  }
+  x.putImageData(id, 0, 0);
+  sedyCache.set(zdroj, c);
+  return c;
+}
+function duoVyrez(zdroj, tmava, svetla) {
+  if (!zdroj) return null;
+  let m = duoCache2.get(zdroj);
+  if (!m) { m = new Map(); duoCache2.set(zdroj, m); }
+  const k = tmava + svetla;
+  if (!m.has(k)) m.set(k, duoton(zdroj, tmava, svetla));
+  return m.get(k);
+}
+// nejsytější barva týmu (pro neon, slunce) – zesvětlená, ať svítí
+function sytaBarva() {
+  const kandidati = [st.barva, st.barva2].filter((b) => /^#[0-9a-f]{6}$/i.test(b || ""));
+  const syt = (h) => { const n = parseInt(h.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255; return (Math.max(r, g, b) - Math.min(r, g, b)) / 255; };
+  kandidati.sort((a, b) => syt(b) - syt(a));
+  const c = kandidati[0] || "#ffd400";
+  return jas(c) < 0.35 ? svetlejsi(c, 0.35) : c;
+}
+// výřez nakreslený jinak (šedý, duotón, zrcadlený, průhledný) – poloha stejná jako u kresliVyrez
+function vyrezJinak(ctx, h, zdroj, obraz, { stredX = 0.5, spodek = 0, vyska = 0.8, hlavni = false, odShora = null, alfa = 1, zrcadlit = false, posunX = 0, stin = true } = {}) {
+  const b = boxVyrezu(h, zdroj, { stredX, spodek, vyska, hlavni, odShora });
+  ctx.save();
+  ctx.globalAlpha = alfa;
+  if (zrcadlit) { ctx.translate(b.x + b.w / 2 + posunX, 0); ctx.scale(-1, 1); ctx.translate(-(b.x + b.w / 2), 0); }
+  else ctx.translate(posunX, 0);
+  if (stin) { ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14; }
+  ctx.drawImage(obraz, b.x, b.y, b.w, b.h);
+  ctx.restore();
+  return b;
+}
+// blok jména dole: kicker (tým · roky), křestní jméno, velké příjmení, věta. Vrací horní hranu bloku.
+function blokJmena(ctx, h, { L = 56, zarovnani = "left", spodek = null, maxV = 170, sirka = W - 112, barvaJmena = "#ffffff", barvaKicker = null, veta = true } = {}) {
   const d = st.data;
-  const R = W - 56;
+  const x = zarovnani === "center" ? W / 2 : zarovnani === "right" ? W - L : L;
+  let y = spodek ?? h - (h > 1500 ? 130 : 70);
+  ctx.save(); ctx.textAlign = zarovnani; ctx.textBaseline = "alphabetic";
+  ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 16;
+  if (veta && d.veta) {
+    ctx.font = `500 30px ${P_TEXT}`; ctx.fillStyle = "rgba(255,255,255,0.88)";
+    const r = zalom(ctx, d.veta, sirka).slice(0, 2);
+    ctx.globalAlpha = vidim(1.3);
+    for (let i = r.length - 1; i >= 0; i--) { ctx.fillText(r[i], x, y); y -= 40; }
+    y -= 14;
+  }
+  const pr = bezTecky(d.prijmeni).toUpperCase();
+  if (pr) {
+    const v = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, maxV, sirka, 60);
+    ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = barvaJmena; ctx.globalAlpha = vidim(0.6);
+    ctx.fillText(pr, x, y);
+    y -= (ctx.measureText(pr).actualBoundingBoxAscent || v * 0.8) + 18;
+  }
+  const kr = bezTecky(d.krestni).toUpperCase();
+  if (kr) {
+    ctx.font = `700 34px ${P_STITEK}`; ctx.letterSpacing = "8px"; ctx.fillStyle = barvaKicker || akcent2(); ctx.globalAlpha = vidim(0.4);
+    ctx.fillText(kr, x, y); ctx.letterSpacing = "0px"; y -= 46;
+  }
+  const kick = [d.nahore, d.roky].filter(Boolean).join("  ·  ").toUpperCase();
+  if (kick) {
+    ctx.font = `700 22px ${P_STITEK}`; ctx.letterSpacing = "5px"; ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.globalAlpha = vidim(0.3);
+    ctx.fillText(kick, x, y, sirka); ctx.letterSpacing = "0px"; y -= 30;
+  }
+  ctx.restore();
+  return y;
+}
+// výška bloku jména (bez kreslení) – kvůli místu pro hráče
+function vyskaBlokuJmena(ctx, { sirka = W - 112, maxV = 170, veta = true } = {}) {
+  const d = st.data; let v = 0;
+  if (veta && d.veta) { ctx.font = `500 30px ${P_TEXT}`; v += zalom(ctx, d.veta, sirka).slice(0, 2).length * 40 + 14; }
+  const pr = bezTecky(d.prijmeni).toUpperCase();
+  if (pr) { const q = vejdeSe(ctx, pr, (z) => `${z}px ${P_CISLO}`, maxV, sirka, 60); ctx.font = `${q}px ${P_CISLO}`; v += (ctx.measureText(pr).actualBoundingBoxAscent || q * 0.8) + 18; }
+  if (d.krestni) v += 46;
+  if (d.nahore || d.roky) v += 30;
+  return v;
+}
+const spodekBloku = (h) => h - (h > 1500 ? 130 : 70);
+function tmavyPas(ctx, h, odY, sila = 0.92) {
+  const g = ctx.createLinearGradient(0, odY, 0, h);
+  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.45, `rgba(0,0,0,${sila * 0.75})`); g.addColorStop(1, `rgba(0,0,0,${sila})`);
+  ctx.fillStyle = g; ctx.fillRect(0, odY, W, h - odY);
+}
+// hlavní hráč nad blokem jména (smí zasahovat jen do horní části bloku)
+function hracNadBlokem(ctx, h, volby, vyskaBloku, max = 0.86) {
+  if (!maVyrez()) return null;
+  const vrch = spodekBloku(h) - vyskaBloku;
+  const obd = { x: 56, y: vrch + vyskaBloku * 0.35, w: W - 112, h: vyskaBloku * 0.65 };
+  const vy = vyskaBezPrekryvu(h, vyrez, volby, [obd], max, 0.6, 0.08);
+  return kresliVyrez(ctx, h, vyrez, { ...volby, vyska: vy });
+}
+
+// 9) SPLIT – šikmo rozdělené: vlevo barva týmu s velkým jménem, vpravo aréna s hráčem
+function sablonaSplit(ctx, h) {
+  const d = st.data, { bg, akc } = paleta();
+  pozadiTym(ctx, h);
+  const hrana = (y) => W * (0.52 - 0.14 * (y / h));
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(hrana(0), 0); ctx.lineTo(hrana(h), h); ctx.lineTo(0, h); ctx.closePath();
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, svetlejsi(bg, 0.08)); g.addColorStop(1, tmavsi(bg, 0.45));
+  ctx.fillStyle = g; ctx.fill();
+  ctx.restore();
+  // akcentní pás podél šikmé hrany
+  ctx.save(); ctx.strokeStyle = akc; ctx.lineWidth = 14;
+  ctx.beginPath(); ctx.moveTo(hrana(0) + 10, 0); ctx.lineTo(hrana(h) + 10, h); ctx.stroke();
+  ctx.lineWidth = 3; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(hrana(0) + 34, 0); ctx.lineTo(hrana(h) + 34, h); ctx.stroke();
+  ctx.restore();
+  if (maVyrez()) kresliVyrez(ctx, h, vyrez, { stredX: 0.68, spodek: 0, vyska: 0.9, hlavni: true });
+  // jméno ve sloupci vlevo – příjmení pod sebou po písmenech skupin, aby vyplnilo levou část
+  const L = 56, sirka = W * 0.36;
+  const pr = bezTecky(d.prijmeni).toUpperCase(), kr = bezTecky(d.krestni).toUpperCase();
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 14;
+  let y = h * 0.5;
+  ctx.font = `700 24px ${P_STITEK}`; ctx.letterSpacing = "5px"; ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.globalAlpha = vidim(0.3);
+  ctx.fillText([d.nahore, d.roky].filter(Boolean).join(" · ").toUpperCase(), L, y, sirka); ctx.letterSpacing = "0px";
+  y += 70;
+  ctx.font = `700 46px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = akc; ctx.globalAlpha = vidim(0.4);
+  ctx.fillText(kr, L, y, sirka); ctx.letterSpacing = "0px";
+  const v = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 200, sirka, 60);
+  ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; ctx.globalAlpha = vidim(0.6);
+  y += v * 0.95; ctx.fillText(pr, L, y);
+  if (d.veta) {
+    ctx.font = `500 28px ${P_TEXT}`; ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.globalAlpha = vidim(1.2);
+    zalom(ctx, d.veta, sirka).slice(0, 4).forEach((r, i) => ctx.fillText(r, L, y + 60 + i * 38));
+  }
+  ctx.restore();
+  detaily(ctx, h);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 10) DRES – obří číslo dresu obrysem za hráčem
+function sablonaDres(ctx, h) {
+  const d = st.data, { akc } = paleta();
+  pozadiTym(ctx, h);
+  const cislo = String(d.dres || d.cislo || "").replace(/\D/g, "").slice(0, 3) || "#";
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const v = vejdeSe(ctx, cislo, (q) => `${q}px ${P_CISLO}`, h * 0.72, W * 0.96, 120);
+  ctx.font = `${v}px ${P_CISLO}`;
+  const asc = ctx.measureText(cislo).actualBoundingBoxAscent || v * 0.8;
+  const y = h * 0.07 + asc;
+  ctx.globalAlpha = vidim(0.1, 0.8);
+  const g = ctx.createLinearGradient(0, h * 0.07, 0, y);
+  g.addColorStop(0, hex(akc, 0.35)); g.addColorStop(1, hex(akc, 0.05));
+  ctx.fillStyle = g; ctx.fillText(cislo, W / 2, y);
+  ctx.lineWidth = 5; ctx.strokeStyle = hex(akc, 0.85); ctx.strokeText(cislo, W / 2, y);
+  ctx.restore();
+  const vb = vyskaBlokuJmena(ctx, {});
+  hracNadBlokem(ctx, h, { stredX: 0.5, spodek: 0, hlavni: true }, vb, 0.86);
+  tmavyPas(ctx, h, spodekBloku(h) - vb - 120);
+  blokJmena(ctx, h, { zarovnani: "center", L: 56 });
+  detaily(ctx, h);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 11) DUO – dva výřezy proti sobě (druhá fotka, jinak zrcadlený „stín“ hlavní)
+function sablonaDuo(ctx, h) {
+  const { bg, akc } = paleta();
+  pozadiTym(ctx, h);
+  const vb = vyskaBlokuJmena(ctx, { veta: false });
+  if (maVyrez()) {
+    const druhy = vyrez2 || vyrez;
+    const obraz = vyrez2 ? vyrez2 : duoVyrez(vyrez, tmavsi(bg, 0.7), svetlejsi(akc, 0.2));
+    vyrezJinak(ctx, h, druhy, obraz, { stredX: 0.27, spodek: 0.06, vyska: 0.72, zrcadlit: !vyrez2, alfa: vyrez2 ? 1 : 0.8 });
+    hracNadBlokem(ctx, h, { stredX: 0.66, spodek: 0, hlavni: true }, vb, 0.88);
+  }
+  tmavyPas(ctx, h, spodekBloku(h) - vb - 140);
+  blokJmena(ctx, h, { zarovnani: "center", veta: false });
+  detaily(ctx, h);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 12) ECHO – pohyb: hráč se třemi ozvěnami v barvě týmu
+function sablonaEcho(ctx, h) {
+  const { akc } = paleta();
+  pozadiTym(ctx, h);
+  const vb = vyskaBlokuJmena(ctx, {});
+  if (maVyrez()) {
+    const ton = duoVyrez(vyrez, tmavsi(paleta().bg, 0.75), sytaBarva());
+    for (let i = 3; i >= 1; i--) vyrezJinak(ctx, h, vyrez, ton, { stredX: 0.56 - i * 0.085, spodek: 0, vyska: 0.84, hlavni: true, alfa: 0.55 - i * 0.12, stin: false });
+    hracNadBlokem(ctx, h, { stredX: 0.56, spodek: 0, hlavni: true }, vb, 0.86);
+  }
+  tmavyPas(ctx, h, spodekBloku(h) - vb - 120);
+  blokJmena(ctx, h, {});
+  detaily(ctx, h);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 13) NEON – tmavá scéna, hráč s neonovou září, jméno neonovým obrysem
+function sablonaNeon(ctx, h) {
+  const d = st.data, { akc } = paleta();
+  const neon = sytaBarva(); void akc;
+  ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, h);
+  if (foto) { ctx.save(); ctx.globalAlpha = 0.22; ctx.drawImage(rozmazanaFotka(W, h, 18), 0, 0); ctx.restore(); }
+  // perspektivní mřížka (podlaha)
+  ctx.save(); ctx.strokeStyle = hex(neon, 0.25); ctx.lineWidth = 2;
+  const hor = h * 0.62;
+  for (let i = -10; i <= 10; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 18, hor); ctx.lineTo(W / 2 + i * 260, h); ctx.stroke(); }
+  for (let j = 0; j < 9; j++) { const yy = hor + Math.pow(j / 8, 1.8) * (h - hor); ctx.globalAlpha = 0.3 + j * 0.05; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); }
+  ctx.restore();
+  const vb = vyskaBlokuJmena(ctx, { veta: false, maxV: 150 });
+  if (maVyrez()) {
+    const vo = { stredX: 0.5, spodek: 0, hlavni: true };
+    const vrch = spodekBloku(h) - vb;
+    const vy = vyskaBezPrekryvu(h, vyrez, vo, [{ x: 56, y: vrch + vb * 0.35, w: W - 112, h: vb * 0.65 }], 0.84, 0.6, 0.08);
+    const b = boxVyrezu(h, vyrez, { ...vo, vyska: vy });
+    // neonový obrys: záře kolem siluety (silueta sama je pod hráčem, takže vidět je jen záře)
+    ctx.save(); ctx.shadowColor = neon; ctx.shadowBlur = 55;
+    for (let i = 0; i < 3; i++) ctx.drawImage(silueta(vyrez, neon), b.x, b.y, b.w, b.h);
+    ctx.restore();
+    kresliVyrez(ctx, h, vyrez, { ...vo, vyska: vy, zare: "rgba(0,0,0,0)" });
+  }
+  tmavyPas(ctx, h, spodekBloku(h) - vb - 100, 0.85);
+  // jméno: neonový obrys + svítící křestní
+  const pr = bezTecky(d.prijmeni).toUpperCase();
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.globalAlpha = vidim(0.6);
+  const v = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 170, W - 112, 60);
+  ctx.font = `${v}px ${P_CISLO}`;
+  const y = spodekBloku(h);
+  ctx.lineWidth = 5; ctx.strokeStyle = neon; ctx.shadowColor = neon; ctx.shadowBlur = 30;
+  ctx.strokeText(pr, W / 2, y); ctx.strokeText(pr, W / 2, y);
+  ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.strokeStyle = "#ffffff"; ctx.strokeText(pr, W / 2, y);
+  const asc = ctx.measureText(pr).actualBoundingBoxAscent || v * 0.8;
+  ctx.font = `700 38px ${P_STITEK}`; ctx.letterSpacing = "10px"; ctx.fillStyle = "#ffffff"; ctx.shadowColor = neon; ctx.shadowBlur = 20;
+  ctx.fillText(bezTecky(d.krestni).toUpperCase(), W / 2, y - asc - 26); ctx.letterSpacing = "0px";
+  ctx.restore();
+  kresliZrno(ctx, W, h, 0.05);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 14) MONO – černobílá scéna, barevné je jen jméno a pruh
+function sablonaMono(ctx, h) {
+  const { akc, bg } = paleta();
+  const barva = jas(bg) > 0.15 && jas(bg) < 0.8 ? svetlejsi(bg, 0.1) : akc;
+  ctx.fillStyle = "#6f6f6f"; ctx.fillRect(0, 0, W, h);
+  if (foto) { ctx.save(); ctx.globalCompositeOperation = "luminosity"; ctx.drawImage(rozmazanaFotka(W, h, 14), 0, 0); ctx.restore(); }
+  const vg = ctx.createRadialGradient(W / 2, h * 0.4, h * 0.2, W / 2, h / 2, h * 0.85);
+  vg.addColorStop(0, "rgba(0,0,0,0.25)"); vg.addColorStop(1, "rgba(0,0,0,0.8)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, h);
+  const vb = vyskaBlokuJmena(ctx, {});
+  if (maVyrez()) {
+    const vrch = spodekBloku(h) - vb;
+    const vy = vyskaBezPrekryvu(h, vyrez, { stredX: 0.5, spodek: 0, hlavni: true }, [{ x: 56, y: vrch + vb * 0.35, w: W - 112, h: vb * 0.65 }], 0.86, 0.6, 0.08);
+    const b = vyrezJinak(ctx, h, vyrez, sedy(vyrez), { stredX: 0.5, spodek: 0, vyska: vy, hlavni: true });
+    obsazeno.push({ zdroj: vyrez, box: b });
+  }
+  tmavyPas(ctx, h, spodekBloku(h) - vb - 120, 0.9);
+  ctx.fillStyle = barva; ctx.fillRect(56, spodekBloku(h) - vb - 34, 120, 10);
+  blokJmena(ctx, h, { barvaJmena: barva, barvaKicker: "#ffffff" });
+  kresliZrno(ctx, W, h, 0.09);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 15) MAGAZÍN – titulní strana časopisu: velký nadpis nahoře, hlava hráče ho překrývá, titulky vlevo
+function sablonaMagazin(ctx, h) {
+  const d = st.data, { akc } = paleta();
+  pozadiTym(ctx, h);
+  const titul = "LEGENDY";
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const v = vejdeSe(ctx, titul, (q) => `${q}px ${P_CISLO}`, h * 0.2, W - 80, 80);
+  ctx.font = `${v}px ${P_CISLO}`; ctx.letterSpacing = "4px";
+  const asc = ctx.measureText(titul).actualBoundingBoxAscent || v * 0.8;
+  ctx.fillStyle = "#ffffff"; ctx.globalAlpha = vidim(0.1);
+  ctx.fillText(titul, W / 2, h * 0.04 + asc); ctx.letterSpacing = "0px";
+  ctx.font = `700 22px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = akc;
+  ctx.fillText("DENÍK HOKEJE · SPECIÁL", W / 2, h * 0.04 + asc + 40); ctx.letterSpacing = "0px";
+  ctx.restore();
+  if (maVyrez()) kresliVyrez(ctx, h, vyrez, { stredX: 0.6, spodek: 0, vyska: 0.84, hlavni: true });
+  // titulky na obálce vlevo
+  const L = 50, sirka = W * 0.36;
+  let y = h * 0.42;
+  const pr = bezTecky(d.prijmeni).toUpperCase(), kr = bezTecky(d.krestni).toUpperCase();
+  const blok = { x: L - 10, y: y - 40, w: sirka + 20, h: h * 0.4 };
+  if (prekryv(blok) > 0.08) podklad(ctx, blok, 0.45);
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 12;
+  ctx.font = `700 30px ${P_STITEK}`; ctx.fillStyle = akc; ctx.globalAlpha = vidim(0.4); ctx.fillText(kr, L, y, sirka);
+  const v2 = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 110, sirka, 50);
+  ctx.font = `${v2}px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; y += v2 * 0.92; ctx.fillText(pr, L, y);
+  ctx.fillStyle = akc; ctx.fillRect(L, y + 18, 70, 6);
+  y += 64;
+  ctx.font = `600 27px ${P_TEXT}`; ctx.fillStyle = "rgba(255,255,255,0.9)";
+  for (const r of zalom(ctx, d.veta || "", sirka).slice(0, 4)) { ctx.fillText(r, L, y); y += 36; }
+  y += 22;
+  if (d.nahore || d.roky) { ctx.font = `700 22px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = "rgba(255,255,255,0.7)"; zalom(ctx, [d.nahore, d.roky].filter(Boolean).join(" · ").toUpperCase(), sirka).slice(0, 2).forEach((r) => { ctx.fillText(r, L, y); y += 30; }); ctx.letterSpacing = "0px"; }
+  ctx.restore();
+  // čárový kód vpravo dole
+  ctx.save(); ctx.fillStyle = "#ffffff"; ctx.fillRect(W - 230, h - 140, 170, 92);
+  ctx.fillStyle = "#000"; let bx = W - 220, sem = 3;
+  while (bx < W - 72) { sem = (sem * 16807) % 2147483647; const s = 2 + (sem % 4); ctx.fillRect(bx, h - 132, s, 62); bx += s + 2 + (sem % 3); }
+  ctx.font = `600 13px ${P_TEXT}`; ctx.fillText("8 594 000 000 00", W - 218, h - 56);
+  ctx.restore();
+  kresliZrno(ctx, W, h, 0.05);
+  logo(ctx, "bila", { x: 46, y: h - 110, sirka: 110 });
+}
+
+// 16) HOLO KARTA – prémiová sběratelská karta s holografickým rámem, hráč vystupuje z karty
+function sablonaHolo(ctx, h) {
+  const d = st.data, { bg, akc } = paleta();
+  ctx.fillStyle = "#0a0b10"; ctx.fillRect(0, 0, W, h);
+  const sv = ctx.createRadialGradient(W / 2, h * 0.45, 20, W / 2, h * 0.45, h * 0.7);
+  sv.addColorStop(0, hex(akc, 0.22)); sv.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = sv; ctx.fillRect(0, 0, W, h);
+  const kx = 110, ky = h * 0.11, kw = W - 220, kh = h * 0.78;
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(kx, ky, kw, kh, 34); ctx.clip();
+  if (foto) { ctx.drawImage(rozmazanaFotka(kw, kh, 14), kx, ky); ctx.globalAlpha = 0.55; ctx.globalCompositeOperation = "color"; ctx.fillStyle = bg; ctx.fillRect(kx, ky, kw, kh); ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1; }
+  else { ctx.fillStyle = bg; ctx.fillRect(kx, ky, kw, kh); }
+  // holografický odlesk
+  const hol = ctx.createLinearGradient(kx, ky, kx + kw, ky + kh);
+  ["#ff4ecd", "#4ee1ff", "#b3ff4e", "#ffe14e", "#ff4ecd"].forEach((c, i) => hol.addColorStop(i / 4, hex(c, 0.14)));
+  ctx.fillStyle = hol; ctx.globalCompositeOperation = "overlay"; ctx.fillRect(kx, ky, kw, kh);
+  ctx.restore();
+  // rám
+  ctx.save();
+  const ram = ctx.createLinearGradient(kx, ky, kx + kw, ky + kh);
+  ["#f6d365", "#fda085", "#a1c4fd", "#c2e9fb", "#d4fc79", "#f6d365"].forEach((c, i) => ram.addColorStop(i / 5, c));
+  ctx.lineWidth = 14; ctx.strokeStyle = ram; ctx.beginPath(); ctx.roundRect(kx, ky, kw, kh, 34); ctx.stroke();
+  ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,255,255,0.6)"; ctx.beginPath(); ctx.roundRect(kx + 22, ky + 22, kw - 44, kh - 44, 22); ctx.stroke();
+  ctx.restore();
+  // jmenovka dole na kartě
+  const pasY = ky + kh - 190;
+  // hráč – vystupuje nad horní hranu karty, spodek uříznutý jmenovkou
+  if (maVyrez()) {
+    const b = boxVyrezu(h, vyrez, { stredX: 0.5, spodek: 0, vyska: 0.8, hlavni: true });
+    const posun = pasY + 30 - (b.y + b.h);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, pasY + 4); ctx.clip();
+    ctx.translate(0, posun);
+    kresliVyrez(ctx, h, vyrez, { stredX: 0.5, spodek: 0, vyska: 0.8, hlavni: true });
+    ctx.restore();
+    obsazeno = [];
+  }
+  ctx.save();
+  const pg = ctx.createLinearGradient(0, pasY, 0, ky + kh);
+  pg.addColorStop(0, tmavsi(bg, 0.55)); pg.addColorStop(1, tmavsi(bg, 0.8));
+  ctx.beginPath(); ctx.roundRect(kx + 7, pasY, kw - 14, ky + kh - pasY - 7, [0, 0, 28, 28]); ctx.fillStyle = pg; ctx.fill();
+  ctx.fillStyle = akc; ctx.fillRect(kx + 7, pasY, kw - 14, 6);
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const pr = bezTecky(d.prijmeni).toUpperCase();
+  const v = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 110, kw - 80, 50);
+  ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; ctx.fillText(pr, W / 2, pasY + 40 + v * 0.8);
+  ctx.font = `700 24px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = akc;
+  ctx.fillText([bezTecky(d.krestni), d.nahore, d.roky].filter(Boolean).join("  ·  ").toUpperCase(), W / 2, ky + kh - 34, kw - 80); ctx.letterSpacing = "0px";
+  ctx.restore();
+  if (d.dres) {
+    ctx.save(); ctx.beginPath(); ctx.arc(kx + 70, ky + 70, 46, 0, Math.PI * 2); ctx.fillStyle = akc; ctx.fill();
+    ctx.font = `44px ${P_CISLO}`; ctx.fillStyle = jas(akc) > 0.6 ? "#111" : "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(d.dres, kx + 70, ky + 73); ctx.restore();
+  }
+  logo(ctx, "bila", { x: W / 2 - 55, y: h - 92, sirka: 110 });
+}
+
+// 17) KRUH – velké slunce v barvě týmu s rastrem za hráčem
+function sablonaKruh(ctx, h) {
+  const { akc, bg } = paleta();
+  pozadiTym(ctx, h);
+  const cx = W / 2, cy = h * 0.4, r = W * 0.4;
+  ctx.save();
+  const g = ctx.createLinearGradient(0, cy - r, 0, cy + r);
+  const sb = sytaBarva(); void akc;
+  g.addColorStop(0, svetlejsi(sb, 0.15)); g.addColorStop(1, tmavsi(sb, 0.3));
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.globalAlpha = vidim(0.1, 0.8); ctx.fill();
+  ctx.clip();
+  ctx.fillStyle = hex(tmavsi(sb, 0.55), 0.35);
+  for (let y = cy - r; y < cy + r; y += 22) for (let x = cx - r; x < cx + r; x += 22) {
+    const t = (y - (cy - r)) / (2 * r), rr = 1 + t * 8;
+    ctx.beginPath(); ctx.arc(x + ((y / 22) % 2) * 11, y, rr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+  ctx.save(); ctx.lineWidth = 4; ctx.strokeStyle = hex("#ffffff", 0.5); ctx.beginPath(); ctx.arc(cx, cy, r + 26, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  const vb = vyskaBlokuJmena(ctx, {});
+  hracNadBlokem(ctx, h, { stredX: 0.5, spodek: 0, hlavni: true }, vb, 0.86);
+  tmavyPas(ctx, h, spodekBloku(h) - vb - 120);
+  blokJmena(ctx, h, { zarovnani: "center" });
+  detaily(ctx, h);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 18) TYPO – příjmení opakované přes celé pozadí (plné / obrys), hráč vpředu
+function sablonaTypo(ctx, h) {
+  const d = st.data, { bg, akc } = paleta();
+  ctx.fillStyle = tmavsi(bg, 0.25); ctx.fillRect(0, 0, W, h);
+  const pr = bezTecky(d.prijmeni || st.jmeno).toUpperCase() || "HOKEJ";
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const v = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, h / 6.2, W * 0.98, 60);
+  ctx.font = `${v}px ${P_CISLO}`;
+  const asc = ctx.measureText(pr).actualBoundingBoxAscent || v * 0.8;
+  const krok = asc * 1.08;
+  let i = 0;
+  for (let y = asc + 10; y < h + asc; y += krok, i++) {
+    if (i % 2 === 0) { ctx.fillStyle = hex(i === 2 ? akc : "#ffffff", i === 2 ? 0.95 : 0.12); ctx.fillText(pr, W / 2, y); }
+    else { ctx.lineWidth = 3; ctx.strokeStyle = hex("#ffffff", 0.35); ctx.strokeText(pr, W / 2, y); }
+  }
+  ctx.restore();
+  if (maVyrez()) kresliVyrez(ctx, h, vyrez, { stredX: 0.5, spodek: 0, vyska: 0.84, hlavni: true });
+  tmavyPas(ctx, h, h * 0.72, 0.85);
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.font = `700 40px ${P_STITEK}`; ctx.letterSpacing = "10px"; ctx.fillStyle = "#ffffff"; ctx.globalAlpha = vidim(0.5);
+  ctx.fillText(cele(), W / 2, spodekBloku(h) - 34, W - 100);
+  ctx.font = `700 22px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = akc;
+  ctx.fillText([d.nahore, d.roky].filter(Boolean).join(" · ").toUpperCase(), W / 2, spodekBloku(h) + 6, W - 100); ctx.letterSpacing = "0px";
+  ctx.restore();
+  kresliZrno(ctx, W, h, 0.05);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 19) VHS – retro 90. léta: barevný posun, řádky obrazovky, REC a časový kód
+function sablonaVhs(ctx, h) {
+  const d = st.data;
+  ctx.fillStyle = "#08080b"; ctx.fillRect(0, 0, W, h);
+  if (foto) { ctx.save(); ctx.globalAlpha = 0.45; ctx.drawImage(rozmazanaFotka(W, h, 10), 0, 0); ctx.restore(); }
+  const vb = vyskaBlokuJmena(ctx, { veta: false });
+  if (maVyrez()) {
+    const opt = { stredX: 0.5, spodek: 0, vyska: 0.84, hlavni: true, stin: false };
+    ctx.save(); ctx.globalCompositeOperation = "screen";
+    vyrezJinak(ctx, h, vyrez, silueta(vyrez, "#ff2a4d"), { ...opt, posunX: -14, alfa: 0.7 });
+    vyrezJinak(ctx, h, vyrez, silueta(vyrez, "#22e6ff"), { ...opt, posunX: 14, alfa: 0.7 });
+    ctx.restore();
+    const b = vyrezJinak(ctx, h, vyrez, vyrez, opt);
+    obsazeno.push({ zdroj: vyrez, box: b });
+    // posunuté vodorovné pruhy (glitch)
+    const src = document.createElement("canvas"); src.width = W; src.height = h;
+    const sx = src.getContext("2d"); sx.drawImage(ctx.canvas, 0, 0);
+    let sem = 11;
+    for (let i = 0; i < 6; i++) {
+      sem = (sem * 16807) % 2147483647; const yy = b.y + (sem % 1000) / 1000 * b.h * 0.8;
+      sem = (sem * 16807) % 2147483647; const vv = 6 + (sem % 18), pos = ((sem % 40) - 20);
+      ctx.drawImage(src, 0, yy, W, vv, pos, yy, W, vv);
+    }
+  }
+  // řádky obrazovky
+  ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.22)";
+  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, W, 2);
+  ctx.restore();
+  tmavyPas(ctx, h, spodekBloku(h) - vb - 80, 0.85);
+  // jméno s barevným posunem
+  const pr = bezTecky(d.prijmeni).toUpperCase();
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  const v = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 170, W - 112, 60);
+  ctx.font = `${v}px ${P_CISLO}`; const y = spodekBloku(h);
+  ctx.globalAlpha = vidim(0.6);
+  ctx.fillStyle = "#ff2a4d"; ctx.fillText(pr, 56 - 6, y);
+  ctx.fillStyle = "#22e6ff"; ctx.fillText(pr, 56 + 6, y);
+  ctx.fillStyle = "#ffffff"; ctx.fillText(pr, 56, y);
+  const asc = ctx.measureText(pr).actualBoundingBoxAscent || v * 0.8;
+  ctx.font = `700 34px ${P_STITEK}`; ctx.letterSpacing = "8px"; ctx.fillText(bezTecky(d.krestni).toUpperCase(), 56, y - asc - 24); ctx.letterSpacing = "0px";
+  ctx.restore();
+  // REC a časový kód
+  ctx.save(); ctx.font = `700 34px "Courier New", monospace`; ctx.textBaseline = "top"; ctx.fillStyle = "#ffffff";
+  ctx.fillText("PLAY ▶", 56, 50);
+  ctx.fillStyle = "#ff2a4d"; ctx.beginPath(); ctx.arc(W - 200, 70, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#ffffff"; ctx.fillText("REC", W - 180, 52);
+  const rok = (String(d.roky).match(/\d{4}/) || ["1998"])[0];
+  ctx.font = `700 28px "Courier New", monospace`; ctx.fillText(`${rok}  00:${String(d.dres || "68").padStart(2, "0").slice(-2)}:19`, W - 300, 100);
+  ctx.restore();
+  kresliZrno(ctx, W, h, 0.12);
+}
+
+// 20) CITÁT – velké uvozovky a věta o hráči, hráč vpravo
+function sablonaCitat(ctx, h) {
+  const d = st.data, { akc } = paleta();
+  pozadiTym(ctx, h);
+  const L = 60, sirka = W * 0.5;
+  const text = d.veta || d.podnadpis || d.dole || "";
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  let v = 76, radky = [];
+  for (; v >= 44; v -= 4) { ctx.font = `${v}px ${P_CISLO}`; radky = zalom(ctx, text.toUpperCase(), sirka); if (radky.length <= 5) break; }
+  const vyskaTextu = radky.length * v * 1.02;
+  const y0 = h * 0.5 - vyskaTextu / 2 + 90;
+  const textObd = { x: L, y: y0 - 160, w: sirka, h: vyskaTextu + 260 };
+  ctx.restore();
+  if (maVyrez()) {
+    const vo = { stredX: 0.72, spodek: 0, hlavni: true };
+    const vy = vyskaBezPrekryvu(h, vyrez, vo, [textObd], 0.9, 0.6, 0.05);
+    kresliVyrez(ctx, h, vyrez, { ...vo, vyska: vy });
+  }
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 16;
+  ctx.font = `300px ${P_CISLO}`; ctx.fillStyle = akc; ctx.globalAlpha = vidim(0.2);
+  ctx.fillText("“", L - 14, y0 + 150);
+  ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = "#ffffff"; ctx.globalAlpha = vidim(0.5);
+  radky.forEach((r, i) => ctx.fillText(r, L, y0 + v * 0.9 + i * v * 1.02));
+  const yJ = y0 + v * 0.9 + (radky.length - 1) * v * 1.02 + 70;
+  ctx.fillStyle = akc; ctx.fillRect(L, yJ - 22, 60, 6);
+  ctx.font = `700 30px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = "#ffffff"; ctx.globalAlpha = vidim(0.9);
+  ctx.fillText(cele(), L + 80, yJ - 10, sirka); ctx.letterSpacing = "0px";
+  ctx.font = `600 22px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText([d.nahore, d.roky].filter(Boolean).join(" · ").toUpperCase(), L + 80, yJ + 24, sirka); ctx.letterSpacing = "0px";
+  ctx.restore();
+  detaily(ctx, h);
+  logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
+}
+
+// 21) MINIMAL – čistá plocha v barvě týmu, hodně vzduchu, drobná typografie
+function sablonaMinimal(ctx, h) {
+  const d = st.data, { bg, akc } = paleta();
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, h);
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "rgba(255,255,255,0.06)"); g.addColorStop(1, "rgba(0,0,0,0.25)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, h);
+  if (maVyrez()) {
+    const b = boxVyrezu(h, vyrez, { stredX: 0.5, spodek: 0.2, vyska: 0.62, hlavni: true });
+    // měkký stín pod hráčem
+    ctx.save(); const sg = ctx.createRadialGradient(W / 2, b.y + b.h, 10, W / 2, b.y + b.h, b.w * 0.5);
+    sg.addColorStop(0, "rgba(0,0,0,0.35)"); sg.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = sg;
+    ctx.fillRect(W / 2 - b.w * 0.6, b.y + b.h - 40, b.w * 1.2, 80); ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, b.y + b.h); ctx.clip();
+    kresliVyrez(ctx, h, vyrez, { stredX: 0.5, spodek: 0.2, vyska: 0.62, hlavni: true, zare: "rgba(0,0,0,0)" });
+    ctx.restore();
+  }
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const y = h - h * 0.11;
+  ctx.font = `700 44px ${P_STITEK}`; ctx.letterSpacing = "16px"; ctx.fillStyle = "#ffffff"; ctx.globalAlpha = vidim(0.5);
+  ctx.fillText(cele(), W / 2, y, W - 120);
+  ctx.fillStyle = akc; ctx.fillRect(W / 2 - 30, y + 26, 60, 4);
+  ctx.font = `600 20px ${P_STITEK}`; ctx.letterSpacing = "8px"; ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText([d.nahore, d.roky].filter(Boolean).join("  ·  ").toUpperCase(), W / 2, y + 70, W - 120); ctx.letterSpacing = "0px";
+  ctx.restore();
+  logo(ctx, "bila", { x: W / 2 - 50, y: 44, sirka: 100 });
+}
+
+// 2) PLAKÁT (nový) – retro plakát: krémový papír, slunce, hráč v tónech týmu, velké jméno dole
+function sablonaPlakat(ctx, h) {
+  const d = st.data, c = st.barva || "#c8102e";
+  const PAPIR = "#efe6d2", TMAVA = jas(c) > 0.6 ? tmavsi(c, 0.65) : tmavsi(c, 0.35);
+  ctx.fillStyle = PAPIR; ctx.fillRect(0, 0, W, h);
+  // slunce s paprsky
+  const cx = W / 2, cy = h * 0.42;
+  ctx.save(); ctx.translate(cx, cy);
+  for (let i = 0; i < 24; i++) { ctx.rotate(Math.PI / 12); ctx.fillStyle = hex(c, i % 2 ? 0.1 : 0.18); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-60, -h); ctx.lineTo(60, -h); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, W * 0.33, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore();
+  // rám
+  ctx.save(); ctx.strokeStyle = TMAVA; ctx.lineWidth = 6; ctx.strokeRect(34, 34, W - 68, h - 68); ctx.lineWidth = 2; ctx.strokeRect(50, 50, W - 100, h - 100); ctx.restore();
+  // jméno dole (měření)
+  const pr = bezTecky(d.prijmeni).toUpperCase();
+  const v = vejdeSe(ctx, pr, (q) => `${q}px ${P_CISLO}`, 240, W - 140, 70);
+  ctx.font = `${v}px ${P_CISLO}`;
+  const asc = ctx.measureText(pr).actualBoundingBoxAscent || v * 0.8;
+  const yPr = h - (h > 1500 ? 170 : 120);
+  const nameTop = yPr - asc - 60;
+  if (maVyrez()) {
+    const vo = { stredX: 0.5, spodek: (h - nameTop - 70) / h, hlavni: true };
+    const vy = (nameTop + 70 - 90) / h;
+    const b = boxVyrezu(h, vyrez, { ...vo, vyska: vy });
+    ctx.save(); ctx.beginPath(); ctx.rect(50, 50, W - 100, h - 100); ctx.clip();
+    ctx.drawImage(duoVyrez(vyrez, TMAVA, "#f3ead8"), b.x, b.y, b.w, b.h);
+    ctx.restore();
+    obsazeno.push({ zdroj: vyrez, box: b });
+  } else if (foto) {
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, W * 0.33, 0, Math.PI * 2); ctx.clip(); kresliFoto(ctx, cx - W * 0.33, cy - W * 0.33, W * 0.66, W * 0.66, true); ctx.restore();
+  }
+  // papírový spodek pod jménem (čitelnost)
+  ctx.fillStyle = PAPIR; ctx.fillRect(50, nameTop + 20, W - 100, h - 50 - nameTop - 20);
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.font = `700 26px ${P_STITEK}`; ctx.letterSpacing = "8px"; ctx.fillStyle = c; ctx.globalAlpha = vidim(0.3);
+  ctx.fillText([bezTecky(d.krestni), d.nahore].filter(Boolean).join("  ·  ").toUpperCase(), W / 2, nameTop + 56, W - 160); ctx.letterSpacing = "0px";
+  ctx.font = `${v}px ${P_CISLO}`; ctx.fillStyle = TMAVA; ctx.globalAlpha = vidim(0.6);
+  ctx.fillText(pr, W / 2, yPr);
+  ctx.font = `600 24px ${P_STITEK}`; ctx.letterSpacing = "6px"; ctx.fillStyle = TMAVA;
+  ctx.fillText([d.roky, "DENÍK HOKEJE"].filter(Boolean).join("  ·  ").toUpperCase(), W / 2, yPr + 48); ctx.letterSpacing = "0px";
+  ctx.restore();
+  kresliZrno(ctx, W, h, 0.14);
+}
+
+// 8) TITULEK (nový) – velký hráč, obří dvouřádkový nápis přes celou šířku dole
+function sablonaTitulek(ctx, h) {
+  const d = st.data, { akc } = paleta();
+  pozadiTym(ctx, h);
   const slova = String(d.nadpisTitulek || d.nadpis || cele()).split(/\s+/).filter(Boolean);
   const pul = Math.ceil(slova.length / 2);
   const radky = slova.length > 1 ? [slova.slice(0, pul).join(" "), slova.slice(pul).join(" ")] : slova;
+  let v = 240; ctx.font = `${v}px ${P_CISLO}`;
+  while (v > 90 && Math.max(...radky.map((r) => ctx.measureText(r).width)) > W - 112) { v -= 4; ctx.font = `${v}px ${P_CISLO}`; }
   const pod = d.podnadpis || d.veta;
-  const rozvrh = (v) => {
-    ctx.font = `${v}px ${P_CISLO}`;
-    const sirka = Math.max(...radky.map((r) => ctx.measureText(r).width));
-    const yPrvni = h - (h > 1500 ? 170 : 100) - (radky.length - 1) * v * 0.95;
-    return { v, yPrvni, obd: { x: R - sirka, y: yPrvni - v * 0.8, w: sirka, h: (radky.length - 1) * v * 0.95 + v * 0.8 + 10 } };
-  };
-  let vMax = 200;
-  ctx.font = `${vMax}px ${P_CISLO}`;
-  while (vMax > 70 && Math.max(...radky.map((r) => ctx.measureText(r).width)) > W * 0.86) { vMax -= 4; ctx.font = `${vMax}px ${P_CISLO}`; }
-  let plan = rozvrh(vMax), volby = { stredX: 0.4, spodek: 0, hlavni: true, vyska: 0.86 };
-  if (maVyrez()) {
-    // největší nápis a největší hráč, kteří se nepřekrývají (hráč se může posunout doleva a zmenšit)
-    let nej = null;
-    for (let v = vMax; v >= 80; v -= 8) {
-      const pl = rozvrh(v);
-      for (const sx of [0.42, 0.36, 0.3]) {
-        const vo = { stredX: sx, spodek: 0, hlavni: true };
-        const vy = vyskaBezPrekryvu(h, vyrez, vo, [pl.obd], 0.88, 0.72, 0.06);
-        const pk = prekryvS([{ zdroj: vyrez, box: boxVyrezu(h, vyrez, { ...vo, vyska: vy }) }], pl.obd);
-        const skore = (pk > 0.06 ? 1000 : 0) + (0.88 - vy) * 300 + (vMax - v) * 1.2 + (0.42 - sx) * 60;
-        if (!nej || skore < nej.skore) nej = { skore, pl, vo: { ...vo, vyska: vy } };
-      }
-      if (nej && nej.skore < 1000 && nej.pl.v === v) break;
-    }
-    // když se nic nevejde bez překryvu, hráč zůstane velký a nápis dostane podklad
-    if (nej.skore >= 1000) nej = { pl: rozvrh(Math.max(110, vMax - 40)), vo: { stredX: 0.4, spodek: 0, hlavni: true, vyska: 0.86 } };
-    plan = nej.pl; volby = nej.vo;
-    pozadiTym(ctx, h);
-    hraci(ctx, h, volby, { stredX: 0.8, odShora: 0.06, vyska: 0.36 });
-  } else kresliFoto(ctx, 0, 0, W, h, st.cb);
-  const { v, yPrvni } = plan;
-  const nadpisObd = plan.obd;
-  const g = ctx.createLinearGradient(0, h * 0.5, 0, h);
-  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.6, "rgba(0,0,0,0.55)"); g.addColorStop(1, "rgba(0,0,0,0.85)");
-  ctx.fillStyle = g; ctx.fillRect(0, h * 0.5, W, h * 0.5);
-  ctx.save(); ctx.globalAlpha = vidim(0.5); ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
-  if (prekryv(nadpisObd) > 0.04) podklad(ctx, nadpisObd, 0.5);
+  const yPosl = h - (h > 1500 ? 150 : 96) - (pod ? 46 : 0);
+  const yPrvni = yPosl - (radky.length - 1) * v * 0.9;
   ctx.font = `${v}px ${P_CISLO}`;
-  ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 24;
-  radky.forEach((r, i) => { ctx.fillStyle = i === 0 ? "#ffffff" : akcent2(); ctx.fillText(r, R, yPrvni + i * v * 0.95); });
-  ctx.shadowBlur = 0;
-  if (pod) {
-    ctx.globalAlpha = vidim(1.1);
-    ctx.font = `700 28px ${P_STITEK}`; ctx.letterSpacing = "4px"; ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.fillText(pod.toUpperCase(), R, h - (h > 1500 ? 120 : 52), W - 120); ctx.letterSpacing = "0px";
+  const vrch = yPrvni - Math.max(v * 0.82, ctx.measureText(radky[0] || "").actualBoundingBoxAscent || 0);
+  if (maVyrez()) {
+    // hráč velký; nápis smí zakrýt jen spodek (brusle/kolena)
+    const vo = { stredX: 0.5, spodek: 0, hlavni: true };
+    const vy = vyskaBezPrekryvu(h, vyrez, vo, [{ x: 56, y: vrch, w: W - 112, h: v * 0.35 }], 0.94, 0.78, 0.22);
+    kresliVyrez(ctx, h, vyrez, { ...vo, vyska: vy });
   }
+  tmavyPas(ctx, h, vrch - 220, 0.95);
+  ctx.save(); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 20;
+  ctx.font = `700 26px ${P_STITEK}`; ctx.letterSpacing = "8px"; ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.globalAlpha = vidim(0.3);
+  ctx.fillText([cele(), d.nahore].filter(Boolean).join("  ·  "), 56, vrch - 30, W - 112); ctx.letterSpacing = "0px";
+  ctx.font = `${v}px ${P_CISLO}`; ctx.globalAlpha = vidim(0.5);
+  radky.forEach((r, i) => { ctx.fillStyle = i === radky.length - 1 && radky.length > 1 ? akc : "#ffffff"; ctx.fillText(r, 50, yPrvni + i * v * 0.9); });
+  if (pod) { ctx.font = `600 28px ${P_TEXT}`; ctx.fillStyle = "rgba(255,255,255,0.88)"; ctx.globalAlpha = vidim(1.1); ctx.fillText(pod, 56, yPosl + 52, W - 112); }
   ctx.restore();
-  kresliZrno(ctx, W, h, 0.05);
   detaily(ctx, h);
   logo(ctx, "bila", { x: 46, y: 40, sirka: 110 });
 }
@@ -1663,7 +2169,10 @@ function kresliDo(c, sablona = st.sablona) {
   ctx.textBaseline = "alphabetic";
   obsazeno = [];
   ({ ikona: sablonaIkona, plakat: sablonaPlakat, vertikal: sablonaVertikal, karta: sablonaKarta,
-    milnik: sablonaMilnik, rekord: sablonaRekord, narozeniny: sablonaNarozeniny, titulek: sablonaTitulek }[sablona] || sablonaIkona)(ctx, h);
+    milnik: sablonaMilnik, rekord: sablonaRekord, narozeniny: sablonaNarozeniny, titulek: sablonaTitulek,
+    split: sablonaSplit, dres: sablonaDres, duo: sablonaDuo, echo: sablonaEcho, neon: sablonaNeon, mono: sablonaMono,
+    magazin: sablonaMagazin, holo: sablonaHolo, kruh: sablonaKruh, typo: sablonaTypo, vhs: sablonaVhs, citat: sablonaCitat,
+    minimal: sablonaMinimal }[sablona] || sablonaIkona)(ctx, h);
 }
 
 // ---------------------------------------------------------- animované MP4 --
@@ -1707,7 +2216,25 @@ async function exportujVideo() {
 
 // ------------------------------------------------------------------ UI --
 
-let kresliCekani = null;
+let kresliCekani = null, nahledyCekani = null, nahledyKolo = 0;
+// miniatury šablon: po jedné, s pauzou, ať se při psaní nic nesekne; novější kolo přeruší starší
+function vykresliNahledy() {
+  const kolo = ++nahledyKolo;
+  const seznam = $$("[data-pr-nahled]");
+  const t = document.createElement("canvas");
+  let i = 0;
+  const dalsi = () => {
+    if (kolo !== nahledyKolo || i >= seznam.length) return;
+    const m = seznam[i++];
+    const ulozObs = obsazeno;
+    try { kresliDo(t, m.dataset.prNahled); } catch (e) { console.warn("Náhled šablony:", m.dataset.prNahled, e); }
+    obsazeno = ulozObs;
+    m.width = 216; m.height = Math.round(216 * (t.height / t.width));
+    m.getContext("2d").drawImage(t, 0, 0, m.width, m.height);
+    setTimeout(dalsi, 16);
+  };
+  dalsi();
+}
 function vykresli() {
   cancelAnimationFrame(kresliCekani);
   kresliCekani = requestAnimationFrame(() => {
@@ -1720,12 +2247,8 @@ function vykresli() {
       x.font = `800 44px ${P_STITEK}`; x.fillStyle = "#fff"; x.textAlign = "center"; x.textBaseline = "middle";
       x.fillText("✂️ VYŘEZÁVÁM HRÁČE…", c.width / 2, c.height / 2); x.restore();
     }
-    $$("[data-pr-nahled]").forEach((m) => {
-      const t = document.createElement("canvas");
-      kresliDo(t, m.dataset.prNahled);
-      m.width = 216; m.height = Math.round(216 * (t.height / t.width));
-      m.getContext("2d").drawImage(t, 0, 0, m.width, m.height);
-    });
+    clearTimeout(nahledyCekani);
+    nahledyCekani = setTimeout(vykresliNahledy, 450);
   });
 }
 
@@ -1856,7 +2379,7 @@ function init() {
     </div>
     <div>
       <div class="card pr-nahled-karta">
-        <div class="pr-sablony">${Object.entries(SABLONY).map(([k, s]) => `<button type="button" class="pr-sablona" data-pr-sablona="${k}"><canvas data-pr-nahled="${k}" width="216" height="270"></canvas><b>${s.nazev}</b><small>${s.popis}</small></button>`).join("")}</div>
+        ${[...new Set(Object.values(SABLONY).map((x) => x.skupina))].map((sk) => `<h3 class="pr-skupina">${sk}</h3><div class="pr-sablony">${Object.entries(SABLONY).filter(([, x]) => x.skupina === sk).map(([k, s]) => `<button type="button" class="pr-sablona" data-pr-sablona="${k}"><canvas data-pr-nahled="${k}" width="216" height="270"></canvas><b>${s.nazev}</b><small>${s.popis}</small></button>`).join("")}</div>`).join("")}
         <canvas id="prPlatno" class="pr-platno" width="1080" height="1350" title="Táhnutím posuneš fotku"></canvas>
         <div class="filtry tri" style="margin-top:12px">
           <label>Formát<select id="prFormat">${Object.entries(FORMATY).map(([k, f]) => `<option value="${k}">${f.nazev}</option>`).join("")}</select></label>
