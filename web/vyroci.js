@@ -83,7 +83,10 @@ function kresli() {
   const prvni = posledni - (radky.length - 1) * rozestup;
   const horniText = radky.length ? prvni - v * 0.86 : H - 200;
 
-  G.ztmaveni(ctx, horniText - 565, horniText + 185, W, H);
+  // Fotka končí na FOTO_V – přechod do černé musí skončit nejpozději tam, jinak je vidět ostrá hrana
+  // (hlavně u krátkého textu na jeden řádek). Delší a plynulejší náběh.
+  const plne = Math.min(horniText + 185, FOTO_V - 4);
+  G.ztmaveni(ctx, plne - 640, plne, W, H);
 
   // Kulatá vložená fotka nad textem.
   if (stav.vlozka) {
